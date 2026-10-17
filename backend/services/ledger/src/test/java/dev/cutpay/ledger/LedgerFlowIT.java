@@ -89,10 +89,15 @@ class LedgerFlowIT {
     JsonMapper json;
 
     private String merchant;
+    // Payment ids are globally unique in production, so every test gets its own on the shared database.
+    private String pay1;
+    private String pay2;
 
     @BeforeEach
     void freshMerchant() {
         merchant = "mer_" + UUID.randomUUID().toString().replace("-", "");
+        pay1 = id("pay");
+        pay2 = id("pay");
     }
 
     // --- helpers ----------------------------------------------------------------------------------
@@ -187,7 +192,7 @@ class LedgerFlowIT {
 
     @Test
     void aHundredEuroConsumerPaymentNetsNinetyEightSixtyOneAndLandsInPending() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
 
         assertThat(pending()).isEqualTo(9_861);
         assertThat(available()).isZero();
@@ -224,7 +229,7 @@ class LedgerFlowIT {
 
     @Test
     void fundsBecomeAvailableOnlyAfterTheSettlementDelay() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
 
         advanceDays(1);
         releaseAll();
@@ -241,7 +246,7 @@ class LedgerFlowIT {
 
     @Test
     void releasingTwiceDoesNotMoveTheFundsTwice() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         advanceDays(2);
 
         releaseAll();
@@ -255,8 +260,8 @@ class LedgerFlowIT {
 
     @Test
     void aRefundBeforeReleaseComesOutOfPendingAndShrinksWhatIsReleased() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
-        ledger.onRefundSucceeded(refund("pay_1", 3_000));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
+        ledger.onRefundSucceeded(refund(pay1, 3_000));
 
         // The fee is not returned: 98.61 - 30.00 = 68.61 is what the merchant keeps.
         assertThat(pending()).isEqualTo(6_861);
@@ -270,12 +275,12 @@ class LedgerFlowIT {
 
     @Test
     void aRefundAfterReleaseMakesAvailableNegativeAndIsDeductedFromTheNextPayout() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         advanceDays(2);
         releaseAll();
         ledger.onPayoutCreated(payout("po_1", 9_861, 0)); // everything was paid out
 
-        ledger.onRefundSucceeded(refund("pay_1", 3_000));
+        ledger.onRefundSucceeded(refund(pay1, 3_000));
 
         assertThat(available()).isEqualTo(-3_000);
         assertThat(fundsAvailableAmounts(merchant)).containsExactly(9_861L, -3_000L);
@@ -284,8 +289,8 @@ class LedgerFlowIT {
 
     @Test
     void aFullRefundBeforeReleaseLeavesTheMerchantOutOfPocketByTheFee() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
-        ledger.onRefundSucceeded(refund("pay_1", 10_000));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
+        ledger.onRefundSucceeded(refund(pay1, 10_000));
 
         assertThat(pending()).isEqualTo(-139);
 
@@ -310,7 +315,7 @@ class LedgerFlowIT {
 
     @Test
     void aPayoutMovesFundsOutOfAvailableAndIsPaidOut() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         advanceDays(2);
         releaseAll();
 
@@ -326,7 +331,7 @@ class LedgerFlowIT {
 
     @Test
     void aFailedPayoutReturnsTheFundsAndAnyInstantFee() {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         advanceDays(2);
         releaseAll();
         // An instant payout of everything: 98.61 gross, 0.99 fee, 97.62 reaches the bank.
@@ -345,7 +350,7 @@ class LedgerFlowIT {
         ledger.onMerchantCreated(id("evt"), merchant, "EUR");
         ledger.onPayoutScheduleChanged(id("evt"), merchant, 5);
 
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         advanceDays(2);
         releaseAll();
         assertThat(pending()).isEqualTo(9_861);
@@ -359,8 +364,8 @@ class LedgerFlowIT {
 
     @Test
     void redeliveredEventsChangeNothing() {
-        PaymentSucceeded payment = payment("pay_1", 10_000, "consumer", "eea");
-        RefundSucceeded refund = refund("pay_1", 1_000);
+        PaymentSucceeded payment = payment(pay1, 10_000, "consumer", "eea");
+        RefundSucceeded refund = refund(pay1, 1_000);
         ledger.onPaymentSucceeded(payment);
         ledger.onRefundSucceeded(refund);
         long before = pending();
@@ -407,34 +412,34 @@ class LedgerFlowIT {
 
     @Test
     void theBalanceEndpointShowsWhatTheMerchantIsOwedPerCurrency() throws Exception {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
 
         mvc.perform(get("/v1/balance").with(asMerchant()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.livemode").value(false))
                 .andExpect(jsonPath("$.pending[0].amount").value(9_861))
                 .andExpect(jsonPath("$.pending[0].currency").value("EUR"))
-                .andExpect(jsonPath("$.available[0].amount").value(0));
+                .andExpect(jsonPath("$.available").isEmpty()); // no available account until funds are released
     }
 
     @Test
     void balanceTransactionsCarryGrossFeeAndNetAndCanBeFilteredByPayment() throws Exception {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
-        ledger.onPaymentSucceeded(payment("pay_2", 5_000, "consumer", "eea"));
-        ledger.onRefundSucceeded(refund("pay_1", 1_000));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay2, 5_000, "consumer", "eea"));
+        ledger.onRefundSucceeded(refund(pay1, 1_000));
 
-        mvc.perform(get("/v1/balance_transactions").param("source", "pay_1").with(asMerchant()))
+        mvc.perform(get("/v1/balance_transactions").param("source", pay1).with(asMerchant()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2)) // the payment and the refund against it
                 .andExpect(jsonPath("$.data[?(@.type=='payment')].gross").value(10_000))
                 .andExpect(jsonPath("$.data[?(@.type=='payment')].fee").value(139))
                 .andExpect(jsonPath("$.data[?(@.type=='payment')].net").value(9_861))
-                .andExpect(jsonPath("$.data[?(@.type=='refund')].parent_id").value("pay_1"));
+                .andExpect(jsonPath("$.data[?(@.type=='refund')].parent_id").value(pay1));
     }
 
     @Test
     void aMerchantNeverSeesAnotherMerchantsMoney() throws Exception {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
         String other = "mer_" + UUID.randomUUID().toString().replace("-", "");
 
         mvc.perform(get("/v1/balance_transactions")
@@ -451,8 +456,8 @@ class LedgerFlowIT {
 
     @Test
     void theTrialBalanceEndpointReportsABalancedLedger() throws Exception {
-        ledger.onPaymentSucceeded(payment("pay_1", 10_000, "consumer", "eea"));
-        ledger.onRefundSucceeded(refund("pay_1", 2_500));
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea"));
+        ledger.onRefundSucceeded(refund(pay1, 2_500));
 
         mvc.perform(get("/admin/trial-balance"))
                 .andExpect(status().isOk())
