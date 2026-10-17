@@ -1,8 +1,10 @@
-import { Badge, Card } from "@cutpay/ui";
+import { Badge, Card, formatMoney } from "@cutpay/ui";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api";
 import { useSession } from "../auth/AuthProvider";
 
 const STEPS = [
-  { title: "Take your first payment", text: "Hosted checkout and test cards arrive in phase 1." },
+  { title: "Take your first payment", text: "Create a test payment on the Payments page and pay it with 4242 4242 4242 4242." },
   { title: "See your balance", text: "Fees, balances and payouts arrive in phase 2." },
   { title: "Connect your website", text: "API keys, webhooks and the checkout SDK arrive in phase 3." },
 ];
@@ -10,6 +12,8 @@ const STEPS = [
 export function HomePage() {
   const { merchant, user } = useSession();
   const firstName = user.full_name.split(" ")[0];
+  const summary = useQuery({ queryKey: ["payment-summary"], queryFn: () => api.paymentSummary() });
+  const today = summary.data?.today.find((row) => row.currency === merchant.default_currency);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -24,11 +28,15 @@ export function HomePage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <p className="text-sm text-muted">Today&apos;s volume</p>
-          <p className="mt-2 text-2xl font-semibold">{merchant.default_currency} 0.00</p>
+          <p className="mt-2 text-2xl font-semibold" data-testid="today-volume">
+            {formatMoney(today?.volume ?? 0, merchant.default_currency)}
+          </p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">Payments</p>
-          <p className="mt-2 text-2xl font-semibold">0</p>
+          <p className="text-sm text-muted">Payments today</p>
+          <p className="mt-2 text-2xl font-semibold" data-testid="today-count">
+            {today?.count ?? 0}
+          </p>
         </Card>
         <Card>
           <p className="text-sm text-muted">Next payout</p>

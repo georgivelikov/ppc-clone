@@ -14,6 +14,7 @@ vi.mock("./api", () => ({
     signup: vi.fn(),
     logout: vi.fn(),
     updateMerchant: vi.fn(),
+    paymentSummary: vi.fn().mockResolvedValue({ since: "2026-01-01T00:00:00Z", today: [] }),
   },
   onSessionExpired: vi.fn(),
 }));
@@ -51,6 +52,7 @@ function renderApp(initialPath: string) {
 describe("dashboard", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(api.paymentSummary).mockResolvedValue({ since: "2026-01-01T00:00:00Z", today: [] });
     localStorage.clear();
   });
 

@@ -4,6 +4,8 @@ import { LoginPage } from "./auth/LoginPage";
 import { SignupPage } from "./auth/SignupPage";
 import { AppShell } from "./layout/AppShell";
 import { HomePage } from "./pages/HomePage";
+import { PaymentDetailPage } from "./pages/PaymentDetailPage";
+import { PaymentsPage } from "./pages/PaymentsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
@@ -16,6 +18,8 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
+          <Route path="payments" element={<PaymentsPage />} />
+          <Route path="payments/:id" element={<PaymentDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>

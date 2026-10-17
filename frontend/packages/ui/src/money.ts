@@ -20,3 +20,9 @@ export function toMinorUnits(input: string, currency: string): number | null {
   const minor = Math.round(Number(normalised) * 10 ** digits);
   return minor > 0 && Number.isSafeInteger(minor) ? minor : null;
 }
+
+/** Minor units as a plain decimal for an input field, e.g. 1250 EUR -> "12.50". */
+export function toMajorString(minor: number, currency: string): string {
+  const digits = fractionDigits(currency);
+  return (minor / 10 ** digits).toFixed(digits);
+}
