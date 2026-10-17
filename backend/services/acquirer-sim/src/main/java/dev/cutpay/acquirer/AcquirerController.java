@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -100,6 +101,17 @@ class AcquirerController {
         tokens.put(token, new StoredCard(pan, request.expMonth(), expYear));
         return new TokenizeResponse(token, TestCards.brand(pan), pan.substring(pan.length() - 4), request.expMonth(),
                 expYear, fingerprint(pan));
+    }
+
+    /** What payments is allowed to know about a card: never the number itself. */
+    @GetMapping("/tokens/{token}")
+    TokenizeResponse describe(@PathVariable String token) {
+        StoredCard card = tokens.get(token);
+        if (card == null) {
+            throw ApiException.notFound("invalid_token", "Unknown or expired card token");
+        }
+        return new TokenizeResponse(token, TestCards.brand(card.pan()), card.pan().substring(card.pan().length() - 4),
+                card.expMonth(), card.expYear(), fingerprint(card.pan()));
     }
 
     @PostMapping("/authorize")

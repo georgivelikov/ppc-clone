@@ -1,0 +1,47 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: payments
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payments
+    username: cutpay
+    password: cutpay
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so payments can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: payments-debug-logger
+      auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  # Where the hosted checkout lives; used to build the URL returned by POST /v1/checkout_sessions.
+  checkout-url: http://localhost:5174
+  acquirer:
+    url: http://localhost:8083
+    connect-timeout: PT2S
+    read-timeout: PT5S
