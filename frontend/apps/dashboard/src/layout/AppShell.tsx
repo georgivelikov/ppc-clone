@@ -4,6 +4,7 @@ import {
   Code2,
   CreditCard,
   Home,
+  Keyboard,
   Link2,
   LogOut,
   Repeat,
@@ -29,7 +30,8 @@ const NAV: NavItem[] = [
   { label: "Payments", to: "/payments", icon: CreditCard },
   { label: "Balances", to: "/balances", icon: Wallet },
   { label: "Payouts", to: "/payouts", icon: Banknote },
-  { label: "Links", to: "/links", icon: Link2, phase: 4 },
+  { label: "Links", to: "/links", icon: Link2 },
+  { label: "Terminal", to: "/terminal", icon: Keyboard },
   { label: "Customers", to: "/customers", icon: Users, phase: 5 },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat, phase: 5 },
   { label: "Developers", to: "/developers", icon: Code2 },
@@ -85,7 +87,7 @@ function Shell() {
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
-      <aside className="border-b border-border bg-surface md:min-h-screen md:border-r md:border-b-0">
+      <aside className="border-b border-border bg-surface print:hidden md:min-h-screen md:border-r md:border-b-0">
         <div className="flex items-center gap-2 px-4 py-4 text-lg font-semibold">
           <span className="grid size-8 place-items-center rounded-lg bg-brand-600 text-white">C</span>
           Cutpay
@@ -99,11 +101,11 @@ function Shell() {
 
       <div className="flex min-w-0 flex-col">
         {testMode && (
-          <div className="bg-warning-bg px-4 py-1.5 text-center text-sm text-warning" role="status">
+          <div className="bg-warning-bg px-4 py-1.5 text-center text-sm text-warning print:hidden" role="status">
             You are viewing test data. No real money is involved.
           </div>
         )}
-        <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 md:px-8">
+        <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 print:hidden md:px-8">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold" data-testid="merchant-name">
               {merchant.display_name}

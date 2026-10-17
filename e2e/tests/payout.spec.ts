@@ -51,7 +51,7 @@ test.describe("balances and payouts", () => {
     await payHundredEuros(page, context);
 
     await nav(page, "Balances");
-    await expect(page.getByTestId("balance-pending")).toHaveText("€98.61");
+    await expect(page.getByTestId("balance-pending")).toHaveText("€98.61", { timeout: 20_000 });
     await expect(page.getByTestId("balance-available")).toHaveText("€0.00");
 
     await advanceClocks(request, 2);

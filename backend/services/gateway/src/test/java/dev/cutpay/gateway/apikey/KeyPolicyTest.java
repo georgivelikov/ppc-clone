@@ -63,6 +63,7 @@ class KeyPolicyTest {
     void publishableKeysAreLimitedToCheckoutAndVault() {
         assertThat(KeyPolicy.isPublishableAllowed("/checkout/sessions/x")).isTrue();
         assertThat(KeyPolicy.isPublishableAllowed("/vault/tokenize")).isTrue();
+        assertThat(KeyPolicy.isPublishableAllowed("/links/AbCdEfGhJk")).isTrue();
         assertThat(KeyPolicy.isPublishableAllowed("/v1/payment_intents")).isFalse();
         assertThat(KeyPolicy.isPublishableAllowed("/checkoutx")).isFalse();
     }

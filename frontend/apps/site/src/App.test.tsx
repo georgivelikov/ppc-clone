@@ -40,8 +40,8 @@ describe("marketing pages", () => {
 
   it("products separates what exists from what is coming", () => {
     renderAt("/products");
-    expect(screen.getAllByText("Available")).toHaveLength(2);
-    expect(screen.getAllByText("Coming soon")).toHaveLength(3);
+    expect(screen.getAllByText("Available")).toHaveLength(4);
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
     for (const name of ["Checkout", "Billing & payouts", "Links & QR", "Virtual POS", "Buy now, pay later"]) {
       expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     }
@@ -117,6 +117,14 @@ describe("docs", () => {
     expect(screen.getByRole("heading", { name: "Check the signature" })).toBeInTheDocument();
     expect(screen.getByText(/1 minute, 5 minutes, 30 minutes/)).toBeInTheDocument();
     expect(screen.getByText("payout.paid")).toBeInTheDocument();
+  });
+
+  it("payment links guide explains limited uses, QR codes and why the terminal skips 3-D Secure", () => {
+    renderAt("/docs/payment-links");
+    expect(screen.getByRole("heading", { name: "Limiting uses" })).toBeInTheDocument();
+    expect(screen.getByText(/exactly one of them gets it/)).toBeInTheDocument();
+    expect(screen.getByText(/outside the European strong customer authentication/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Payment links" })).toBeInTheDocument();
   });
 
   it("api reference is part of the docs navigation", async () => {

@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from "react-router";
 const PAGES = [
   { label: "Getting started", to: "/docs", end: true },
   { label: "Test cards", to: "/docs/test-cards", end: false },
+  { label: "Payment links", to: "/docs/payment-links", end: false },
   { label: "Webhooks", to: "/docs/webhooks", end: false },
   { label: "API reference", to: "/docs/api", end: false },
 ];

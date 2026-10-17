@@ -83,6 +83,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/payment_intents/{id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Follow a payment live
+         * @description A Server-Sent Events stream (`Accept: text/event-stream`). It starts with the payment's current status and
+         *     then sends one `status` event for every change, closing after the payment reaches an end state
+         *     (`succeeded`, `failed`, `canceled`, `refunded`). Use it to flip a screen the moment a customer has paid,
+         *     for example next to a printed QR code. For back-end processing use webhooks instead.
+         */
+        get: operations["streamPaymentIntent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payment_links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List payment links */
+        get: operations["listPaymentLinks"];
+        put?: never;
+        /**
+         * Create a payment link
+         * @description A link opens a Cutpay page where the customer pays. A **fixed** link has one price, a
+         *     **customer_chooses** link lets the customer type the amount (within `min_amount` and `max_amount`), and a
+         *     **products** link sums its line items. Price, currency and type cannot be changed afterwards: create a
+         *     new link instead.
+         */
+        post: operations["createPaymentLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payment_links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a payment link */
+        get: operations["getPaymentLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update a payment link
+         * @description Set `active` to `false` to stop taking payments. A link also closes by itself when it reaches `max_uses`
+         *     or its `expires_at`. Fields you leave out stay as they are.
+         */
+        patch: operations["updatePaymentLink"];
+        trace?: never;
+    };
+    "/v1/payment_links/{id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the payments made with a link */
+        get: operations["listPaymentLinkPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payment_links/{id}/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the QR code of a link
+         * @description Returns the code as an image. Colours default to the ones saved on the link.
+         */
+        get: operations["getPaymentLinkQr"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payment_links/{id}/card.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a print-ready table card
+         * @description An A6 PDF with the link's name, its QR code and the address in words.
+         */
+        get: operations["getPaymentLinkCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/refunds": {
         parameters: {
             query?: never;
@@ -524,6 +650,12 @@ export interface components {
             currency: string;
             status: components["schemas"]["PaymentStatus"];
             capture_method?: string;
+            /**
+             * @description `online` for checkout and the API. `moto` (mail or telephone order) for payments keyed in by the
+             *     merchant at the dashboard's virtual terminal; the card network does not ask for 3-D Secure for those.
+             * @enum {string}
+             */
+            channel?: "online" | "moto";
             description?: string | null;
             customer_email?: string | null;
             metadata?: components["schemas"]["Metadata"];
@@ -557,6 +689,150 @@ export interface components {
              * @description Send the customer here.
              */
             url: string;
+        };
+        LinkLineItem: {
+            product_name: string;
+            /** Format: int64 */
+            unit_amount: number;
+            quantity: number;
+        };
+        /** @description Colours of the printed code. Keep strong contrast or phones may not scan it. */
+        QrStyle: {
+            fg?: string;
+            bg?: string;
+        };
+        /** @enum {string} */
+        PaymentLinkStatus: "active" | "inactive" | "expired" | "sold_out";
+        CreatePaymentLink: {
+            /** @enum {string} */
+            type: "fixed" | "customer_chooses" | "products";
+            currency: string;
+            title: string;
+            /**
+             * Format: int64
+             * @description Required for `fixed` links.
+             */
+            amount?: number;
+            /**
+             * Format: int64
+             * @description For `customer_chooses` links. Defaults to 100.
+             */
+            min_amount?: number;
+            /**
+             * Format: int64
+             * @description For `customer_chooses` links. Defaults to the largest payment.
+             */
+            max_amount?: number;
+            /** @description Required for `products` links. */
+            line_items?: components["schemas"]["LinkLineItem"][];
+            description?: string;
+            /** Format: uri */
+            image_url?: string;
+            /** @description What to ask the customer for before they pay. */
+            collect?: ("email" | "phone" | "name" | "address")[];
+            /** @description Lets the customer change the quantity (not for `customer_chooses` links). */
+            quantity_adjustable?: boolean;
+            /** @description The link closes after this many successful payments, however many customers open it at once. */
+            max_uses?: number;
+            /** Format: date-time */
+            expires_at?: string;
+            /**
+             * @default message
+             * @enum {string}
+             */
+            after_completion: "message" | "redirect";
+            /**
+             * Format: uri
+             * @description Required when `after_completion` is `redirect`.
+             */
+            redirect_url?: string;
+            success_message?: string;
+            metadata?: components["schemas"]["Metadata"];
+            qr_style?: components["schemas"]["QrStyle"];
+        };
+        UpdatePaymentLink: {
+            title?: string;
+            description?: string;
+            /** Format: uri */
+            image_url?: string;
+            collect?: ("email" | "phone" | "name" | "address")[];
+            max_uses?: number;
+            /** Format: date-time */
+            expires_at?: string;
+            active?: boolean;
+            /** @enum {string} */
+            after_completion?: "message" | "redirect";
+            /** Format: uri */
+            redirect_url?: string;
+            success_message?: string;
+            metadata?: components["schemas"]["Metadata"];
+            qr_style?: components["schemas"]["QrStyle"];
+        };
+        PaymentLink: {
+            id: string;
+            /** @constant */
+            object: "payment_link";
+            livemode: boolean;
+            /**
+             * Format: uri
+             * @description Share this address.
+             */
+            url: string;
+            slug: string;
+            status: components["schemas"]["PaymentLinkStatus"];
+            /** @enum {string} */
+            type: "fixed" | "customer_chooses" | "products";
+            /** Format: int64 */
+            amount?: number | null;
+            currency: string;
+            /** Format: int64 */
+            min_amount?: number | null;
+            /** Format: int64 */
+            max_amount?: number | null;
+            title: string;
+            description?: string | null;
+            image_url?: string | null;
+            collect?: ("email" | "phone" | "name" | "address")[];
+            quantity_adjustable?: boolean;
+            max_uses?: number | null;
+            /** @description Payments that succeeded. */
+            uses_count?: number;
+            /**
+             * Format: int64
+             * @description Total paid through the link, in the smallest currency unit.
+             */
+            amount_collected?: number;
+            /** Format: date-time */
+            expires_at?: string | null;
+            active: boolean;
+            /** @enum {string} */
+            after_completion?: "message" | "redirect";
+            redirect_url?: string | null;
+            success_message?: string | null;
+            metadata?: components["schemas"]["Metadata"];
+            qr_style?: components["schemas"]["QrStyle"];
+            line_items?: components["schemas"]["LinkLineItem"][];
+            /** Format: date-time */
+            created_at: string;
+        };
+        PaymentLinkList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["PaymentLink"][];
+            has_more: boolean;
+        };
+        PaymentLinkPayments: {
+            /** @constant */
+            object: "list";
+            data: {
+                payment_id: string;
+                reservation_id?: string;
+                status?: string;
+                /** Format: int64 */
+                amount: number;
+                /** Format: date-time */
+                created_at: string;
+            }[];
         };
         Refund: {
             id: string;
@@ -683,7 +959,7 @@ export interface components {
             weekly_anchor: string;
         };
         /** @enum {string} */
-        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "webhook_endpoint.test";
+        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "payment_link.created" | "payment_link.deactivated" | "webhook_endpoint.test";
         Event: {
             /** @description Stable across retries; use it to deduplicate. */
             id: string;
@@ -815,6 +1091,7 @@ export interface components {
         /** @description Fields to replace with the full object. */
         ExpandPayment: "latest_attempt"[];
         PaymentId: string;
+        LinkId: string;
         EndpointId: string;
         DeliveryId: string;
     };
@@ -978,6 +1255,223 @@ export interface operations {
             };
             400: components["responses"]["InvalidRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamPaymentIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PaymentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The event stream. Each event has the name `status` and JSON data such as `{"status":"succeeded"}`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPaymentLinks: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                status?: "active" | "inactive";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of links, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLinkList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createPaymentLink: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePaymentLink"];
+            };
+        };
+        responses: {
+            /** @description The link. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLink"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPaymentLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["LinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLink"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updatePaymentLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["LinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePaymentLink"];
+            };
+        };
+        responses: {
+            /** @description The updated link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLink"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPaymentLinkPayments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["LinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paid uses of the link, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLinkPayments"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPaymentLinkQr: {
+        parameters: {
+            query?: {
+                format?: "svg" | "png";
+                /** @description Target width in pixels for PNG (128 to 2048). */
+                size?: number;
+                /** @description Code colour as `#rrggbb`. */
+                fg?: string;
+                /** @description Background colour as `#rrggbb`. */
+                bg?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["LinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": string;
+                    "image/png": string;
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPaymentLinkCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["LinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listRefunds: {

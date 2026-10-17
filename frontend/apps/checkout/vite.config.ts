@@ -58,6 +58,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/checkout": gateway,
+      "/links": gateway,
       "/vault": gateway,
     },
   },

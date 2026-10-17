@@ -40,7 +40,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ✅ Built |
 | 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ✅ Built |
 | 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ✅ Built |
-| 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) | ⏳ Planned |
+| 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) — payment links, QR codes, charge-with-QR, virtual terminal | ✅ Built |
 | 5 | [Billing](docs/plans/phase-05-billing.md) — subscriptions, invoices, pre-auth, split payments | ⏳ Planned |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ⏳ Planned |
@@ -73,6 +73,7 @@ cd backend
 ./gradlew :services:ledger:bootRun        # http://localhost:8084  (double-entry ledger, fees, balances)
 ./gradlew :services:payouts:bootRun       # http://localhost:8085  (bank accounts, payouts, fake bank)
 ./gradlew :services:webhooks:bootRun      # http://localhost:8086  (webhook endpoints, events, deliveries)
+./gradlew :services:links:bootRun         # http://localhost:8087  (payment links, QR codes)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard
@@ -89,7 +90,7 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 | Tool | URL |
 |---|---|
 | Dashboard | http://localhost:5173 |
-| Hosted checkout | http://localhost:5174 (links are created from the dashboard's Payments page) |
+| Hosted checkout | http://localhost:5174 (payment links open at `/l/{slug}`) |
 | Site and docs | http://localhost:5176 (API reference at `/docs/api`, rendered from [docs/api/openapi.yaml](docs/api/openapi.yaml)) |
 | Demo shop | http://localhost:5175 (see below) |
 | API gateway | http://localhost:8080 |
@@ -133,6 +134,16 @@ The platform is meant to be used like a real one:
 3. Add a webhook endpoint under **Developers → Webhooks**; requests are signed with `Cutpay-Signature` and retried for three days. **Developers → Logs** shows every call.
 
 The [demo shop](frontend/apps/demo-shop) is a complete example: a Node backend that holds the secret key, prices orders itself and trusts only verified webhooks, with a storefront that pays either through the embedded card field or the hosted checkout. Paste your keys into its Settings page and register `http://localhost:4000/webhooks/cutpay` as a webhook endpoint.
+
+## Links, QR codes and the terminal
+
+No website needed. In the dashboard:
+
+- **Links** creates a payment link (fixed price, customer chooses, or products) with an optional limit on payments, an expiry and fields to collect. Each link has a QR code you can recolour and download (SVG, PNG) and a print-ready A6 table card (PDF). A link with `max_uses` never takes more payments than it allows, even when customers race for the last one ([ADR 0014](docs/adr/0014-links-qr-and-virtual-pos.md)).
+- **Terminal → Charge with QR** shows a full-screen code for an amount; the page turns into a green tick within about a second of the customer paying, through a Server-Sent Events stream (`GET /v1/payment_intents/{id}/stream`).
+- **Terminal → Virtual POS** keys in a card for a phone or mail order. The payment has `channel: "moto"` and the simulated bank skips 3-D Secure, as card-not-present orders are outside strong customer authentication. Try the 3-D Secure test card `4000 0000 0000 3220` here and at a normal checkout to see the difference.
+
+To scan a code with a phone on the same network, serve the checkout on your computer's address and tell the services where it is: run `npx pnpm@10.34.7 --filter @cutpay/checkout dev --host`, and start the links and payments services with `CUTPAY_LINKS_CHECKOUT_URL` and `CUTPAY_CHECKOUT_URL` set to `http://<your-ip>:5174` (the codes encode that address).
 
 ## Payouts and time travel
 

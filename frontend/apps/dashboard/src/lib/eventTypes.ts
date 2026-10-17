@@ -13,6 +13,7 @@ export const EVENT_GROUPS: { label: string; family: string; types: string[] }[] 
   },
   { label: "Refunds", family: "refund", types: ["charge.refunded", "refund.created", "refund.failed"] },
   { label: "Payouts", family: "payout", types: ["payout.created", "payout.paid", "payout.failed"] },
+  { label: "Payment links", family: "payment_link", types: ["payment_link.created", "payment_link.deactivated"] },
 ];
 
 export const ALL_EVENT_TYPES = EVENT_GROUPS.flatMap((group) => group.types);

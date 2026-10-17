@@ -33,6 +33,7 @@ const payment: Payment = {
   currency: "EUR",
   status: "succeeded",
   capture_method: "automatic",
+  channel: "online",
   description: "Flat white x2",
   customer_email: "anna@example.com",
   metadata: {},

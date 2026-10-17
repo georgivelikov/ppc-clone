@@ -88,3 +88,47 @@ export function confirm(secret: string, token: string, email: string, publishabl
 export function completeThreeDs(challengeId: string, code: string): Promise<{ status: string }> {
   return call("POST", `/vault/3ds/challenge/${encodeURIComponent(challengeId)}/complete`, { code });
 }
+
+// --- payment links (public: the unguessable slug in the URL is the credential) -----------------
+
+export interface PublicLink {
+  slug: string;
+  livemode: boolean;
+  merchant_name: string | null;
+  type: "fixed" | "customer_chooses" | "products";
+  amount: number | null;
+  currency: string;
+  min_amount: number | null;
+  max_amount: number | null;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  collect: ("email" | "phone" | "name" | "address")[];
+  quantity_adjustable: boolean;
+  line_items: { product_name: string; unit_amount: number; quantity: number }[];
+  available: boolean;
+  unavailable_reason: "inactive" | "expired" | "sold_out" | null;
+  after_completion: "message" | "redirect";
+  success_message: string | null;
+}
+
+export interface LinkSessionInput {
+  amount?: number;
+  quantity?: number;
+  email?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+}
+
+export function getLink(slug: string): Promise<PublicLink> {
+  return call("GET", `/links/${encodeURIComponent(slug)}`);
+}
+
+/** Takes one use of the link and starts a payment; the answer carries the client secret of the new payment. */
+export function createLinkSession(
+  slug: string,
+  input: LinkSessionInput,
+): Promise<{ payment_id: string; client_secret: string; url: string }> {
+  return call("POST", `/links/${encodeURIComponent(slug)}/sessions`, input);
+}

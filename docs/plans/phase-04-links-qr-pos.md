@@ -79,3 +79,17 @@ Products/prices catalogue is introduced in phase 5; until then links use inline 
 - "Charge with QR" screen flips to ✓ within 2 s of payment.
 - Virtual POS payment shows `channel: moto` and no 3DS.
 - Tests: concurrency test with parallel requests, Playwright `payment-link.spec.ts`, `virtual-pos.spec.ts`.
+
+## As built
+Status: built. Design decisions and trade-offs are in [ADR 0014](../adr/0014-links-qr-and-virtual-pos.md). Where the build differs from the plan above:
+
+- **Data model.** `qr_codes` was folded into `payment_links.qr_style` (one code per link; colours only, no uploaded logo). A `link_reservations` table holds the uses taken by customers who are still paying, and `payment_links` gained `reserved` and `amount_collected`.
+- **Reservation.** The atomic check happens when the customer continues from the link page (`POST /links/{slug}/sessions`), with a 15-minute time-out and a job that gives back abandoned uses. A 12-way concurrent test proves exactly one wins.
+- **Links to payments.** `links` creates the payment through an internal endpoint on `payments` (`POST /internal/payments`), not through the public API.
+- **Table card.** Built with OpenPDF; non-Western-European characters print as `?` because only the standard PDF fonts are used.
+- **Charge with QR.** Uses the existing `POST /v1/checkout_sessions` and `GET /v1/qr?data=` (restricted to checkout addresses). Closing the screen before payment cancels the payment.
+- **SSE.** `GET /v1/payment_intents/{id}/stream` fans out in memory per instance, fed by the committing transaction and by Kafka (random group id, `latest`). The dashboard uses `fetch` streaming because `EventSource` cannot send the `Authorization` header, and falls back to polling.
+- **Virtual POS.** `POST /v1/terminal/charges` creates a `moto` payment; the card is entered in the phase 3 iframe element. Receipt is a printable page; the email receipt waits for phase 8. Team-only (API keys are refused); owner/admin restriction waits for phase 8 roles.
+- **Not built.** Logo in the QR code, per-link payment filters beyond the paid list, refunds reducing a link's collected amount.
+- **Tests.** `LinksFlowIT` (19, real Postgres and Kafka, including the race), pricing, slug and QR unit tests (the PNG is scanned back with ZXing), payments tests for MOTO, the internal endpoint and the stream, dashboard and checkout component tests, and Playwright `payment-link.spec.ts` and `virtual-pos.spec.ts`.
+

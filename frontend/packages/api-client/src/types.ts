@@ -101,6 +101,8 @@ export interface Payment {
   currency: string;
   status: PaymentStatus;
   capture_method: string;
+  /** "online" for checkout and the API, "moto" for orders keyed in at the virtual terminal. */
+  channel: "online" | "moto";
   description: string | null;
   customer_email: string | null;
   metadata: Record<string, string>;

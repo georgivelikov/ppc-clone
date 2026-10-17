@@ -10,6 +10,12 @@ import { EventsPage } from "./pages/developers/EventsPage";
 import { LogsPage } from "./pages/developers/LogsPage";
 import { WebhookDetailPage } from "./pages/developers/WebhookDetailPage";
 import { WebhooksPage } from "./pages/developers/WebhooksPage";
+import { CreateLinkPage } from "./pages/links/CreateLinkPage";
+import { LinkDetailPage } from "./pages/links/LinkDetailPage";
+import { LinksPage } from "./pages/links/LinksPage";
+import { ChargeQrPage } from "./pages/terminal/ChargeQrPage";
+import { ReceiptPage } from "./pages/terminal/ReceiptPage";
+import { TerminalPage } from "./pages/terminal/TerminalPage";
 import { PaymentDetailPage } from "./pages/PaymentDetailPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
@@ -33,6 +39,12 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="payments/:id" element={<PaymentDetailPage />} />
+            <Route path="links" element={<LinksPage />} />
+            <Route path="links/new" element={<CreateLinkPage />} />
+            <Route path="links/:id" element={<LinkDetailPage />} />
+            <Route path="terminal" element={<TerminalPage />} />
+            <Route path="terminal/qr" element={<ChargeQrPage />} />
+            <Route path="terminal/receipt/:id" element={<ReceiptPage />} />
             <Route path="balances" element={<BalancesPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
             <Route path="payouts/:id" element={<PayoutDetailPage />} />

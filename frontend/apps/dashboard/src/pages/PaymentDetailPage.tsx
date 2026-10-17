@@ -135,6 +135,11 @@ export function PaymentDetailPage() {
           <dl className="mt-2 divide-y divide-border">
             <Row label="Description">{payment.description ?? "—"}</Row>
             <Row label="Customer">{payment.customer_email ?? "—"}</Row>
+            <Row label="Channel">
+              <span data-testid="payment-channel">
+                {payment.channel === "moto" ? "Card not present (MOTO)" : "Online"}
+              </span>
+            </Row>
             <Row label="Created">{new Date(payment.created_at).toLocaleString()}</Row>
             {payment.amount_refunded > 0 && (
               <Row label="Refunded">{formatMoney(payment.amount_refunded, payment.currency)}</Row>

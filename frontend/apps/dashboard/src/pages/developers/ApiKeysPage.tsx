@@ -11,6 +11,7 @@ import { useTestMode } from "../../layout/testMode";
 
 const SCOPE_RESOURCES = [
   ["payments", "Payments"],
+  ["payment_links", "Payment links"],
   ["refunds", "Refunds"],
   ["balance", "Balance"],
   ["payouts", "Payouts"],

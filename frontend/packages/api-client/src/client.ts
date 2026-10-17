@@ -30,6 +30,15 @@ import type {
   UpdatePayoutScheduleInput,
 } from "./types";
 import type {
+  CreatePaymentLinkInput,
+  PaymentLink,
+  PaymentLinkList,
+  PaymentLinkListParams,
+  PaymentLinkPayments,
+  PaymentStatusEvent,
+  UpdatePaymentLinkInput,
+} from "./links";
+import type {
   ApiKey,
   ApiKeyList,
   CreateApiKeyInput,
@@ -165,6 +174,85 @@ export class ApiClient {
 
   paymentSummary(livemode = false): Promise<PaymentSummary> {
     return this.request("GET", `/v1/payment_stats${toQuery({ livemode })}`);
+  }
+
+  // --- links, QR codes and the virtual POS --------------------------------
+
+  createPaymentLink(input: CreatePaymentLinkInput, livemode = false): Promise<PaymentLink> {
+    return this.request("POST", `/v1/payment_links${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listPaymentLinks(params: PaymentLinkListParams = {}): Promise<PaymentLinkList> {
+    return this.request("GET", `/v1/payment_links${toQuery(params)}`);
+  }
+
+  getPaymentLink(id: string): Promise<PaymentLink> {
+    return this.request("GET", `/v1/payment_links/${encodeURIComponent(id)}`);
+  }
+
+  updatePaymentLink(id: string, input: UpdatePaymentLinkInput): Promise<PaymentLink> {
+    return this.request("PATCH", `/v1/payment_links/${encodeURIComponent(id)}`, input);
+  }
+
+  paymentLinkPayments(id: string): Promise<PaymentLinkPayments> {
+    return this.request("GET", `/v1/payment_links/${encodeURIComponent(id)}/payments`);
+  }
+
+  /** The QR code as an image. `fg` and `bg` ("#rrggbb") preview colours that are not saved yet. */
+  paymentLinkQr(
+    id: string,
+    options: { format?: "svg" | "png"; size?: number; fg?: string; bg?: string } = {},
+  ): Promise<Blob> {
+    return this.fetchBlob(`/v1/payment_links/${encodeURIComponent(id)}/qr${toQuery({ format: "svg", ...options })}`);
+  }
+
+  /** The print-ready A6 table card, as a PDF. */
+  paymentLinkCard(id: string): Promise<Blob> {
+    return this.fetchBlob(`/v1/payment_links/${encodeURIComponent(id)}/card.pdf`);
+  }
+
+  /** A QR code for one checkout address (the "Charge with QR" screen). */
+  checkoutQr(checkoutUrl: string, format: "svg" | "png" = "svg"): Promise<Blob> {
+    return this.fetchBlob(`/v1/qr${toQuery({ data: checkoutUrl, format })}`);
+  }
+
+  /**
+   * Keys in an order taken by phone or mail. The charge is created here; the card is then typed into the card
+   * element and paid with the returned `client_secret`. Card-not-present, so the bank does not ask for 3-D Secure.
+   */
+  createTerminalCharge(input: CreatePaymentInput, livemode = false): Promise<Payment> {
+    return this.request("POST", `/v1/terminal/charges${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  /**
+   * Follows one payment live (Server-Sent Events): calls `onStatus` with the current status first and then on
+   * every change. Resolves when the payment reaches an end state, the server closes the stream or `signal` aborts.
+   * Uses fetch rather than EventSource because the latter cannot send the Authorization header.
+   */
+  async watchPayment(id: string, onStatus: (event: PaymentStatusEvent) => void, signal?: AbortSignal): Promise<void> {
+    const response = await this.send("GET", `/v1/payment_intents/${encodeURIComponent(id)}/stream`, undefined, {
+      accept: "text/event-stream",
+      signal,
+    });
+    if (!response.body) return;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const parsed = parseSse(buffer);
+        buffer = parsed.rest;
+        for (const event of parsed.events) onStatus(event);
+      }
+    } catch (error) {
+      if (signal?.aborted) return;
+      throw error;
+    } finally {
+      reader.cancel().catch(() => undefined);
+    }
   }
 
   // --- balances (ledger) --------------------------------------------------
@@ -319,14 +407,21 @@ export class ApiClient {
     }
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-    options: { auth?: boolean; retried?: boolean; idempotent?: boolean; idempotencyKey?: string } = {},
-  ): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
+    const response = await this.send(method, path, body, options);
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  }
+
+  private async fetchBlob(path: string): Promise<Blob> {
+    const response = await this.send("GET", path, undefined, { accept: "*/*" });
+    return response.blob();
+  }
+
+  /** One authenticated call, renewing the access token once if it has expired. Throws ApiError on any non-2xx. */
+  private async send(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<Response> {
     const useAuth = options.auth ?? true;
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = { Accept: options.accept ?? "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (useAuth && this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     // One key per user action, reused on the automatic retry after a token refresh so it cannot double-submit.
@@ -338,18 +433,52 @@ export class ApiClient {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "include",
+      signal: options.signal,
     });
 
     if (response.status === 401 && useAuth && !options.retried) {
       const session = await this.restoreSession();
-      if (session) return this.request<T>(method, path, body, { ...options, retried: true, idempotencyKey });
+      if (session) return this.send(method, path, body, { ...options, retried: true, idempotencyKey });
       this.onSessionExpired?.();
     }
 
     if (!response.ok) throw await toApiError(response);
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    return response;
   }
+}
+
+interface RequestOptions {
+  auth?: boolean;
+  retried?: boolean;
+  idempotent?: boolean;
+  idempotencyKey?: string;
+  accept?: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Reads the complete events out of a Server-Sent Events buffer and returns what is left over (a partial event
+ * waits for the next chunk). Only "status" events with JSON data are understood; comments and others are skipped.
+ */
+export function parseSse(buffer: string): { events: PaymentStatusEvent[]; rest: string } {
+  const events: PaymentStatusEvent[] = [];
+  const blocks = buffer.split(/\r?\n\r?\n/);
+  const rest = blocks.pop() ?? "";
+  for (const block of blocks) {
+    let name = "message";
+    const data: string[] = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith("event:")) name = line.slice(6).trim();
+      else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+    }
+    if (name !== "status" || data.length === 0) continue;
+    try {
+      events.push(JSON.parse(data.join("\n")) as PaymentStatusEvent);
+    } catch {
+      // a malformed event is ignored rather than ending the stream
+    }
+  }
+  return { events, rest };
 }
 
 async function toApiError(response: Response): Promise<ApiError> {

@@ -76,12 +76,12 @@ test.describe("merchant authentication", () => {
     await signUp(page, uniqueEmail());
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav).toBeVisible();
-    // Built so far: payments, balances, payouts and the developer tools.
-    for (const built of ["Payments", "Balances", "Payouts", "Developers", "Settings"]) {
+    // Built so far: payments, balances, payouts, links, the terminal and the developer tools.
+    for (const built of ["Payments", "Balances", "Payouts", "Links", "Terminal", "Developers", "Settings"]) {
       await expect(nav.getByRole("link", { name: built })).toBeVisible();
     }
     // Still to come.
-    for (const later of ["Links", "Customers", "Subscriptions"]) {
+    for (const later of ["Customers", "Subscriptions"]) {
       await expect(nav.getByRole("link", { name: later })).toHaveCount(0);
       await expect(nav.getByText(later)).toHaveAttribute("aria-disabled", "true");
     }

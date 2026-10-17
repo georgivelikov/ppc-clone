@@ -72,6 +72,8 @@ const EVENTS: [string, string][] = [
   ["payout.created", "A payout to your bank was created."],
   ["payout.paid", "The money reached your bank."],
   ["payout.failed", "The payout failed; the object has a failure_code such as account_closed."],
+  ["payment_link.created", "A payment link was created."],
+  ["payment_link.deactivated", "A link closed: you turned it off, it reached max_uses or it expired (see reason)."],
   ["webhook_endpoint.test", "A test event you sent from the dashboard."],
 ];
 

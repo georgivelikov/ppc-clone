@@ -11,7 +11,7 @@ final class KeyPolicy {
     private static final List<String> TEAM_ONLY = List.of("/v1/api_keys", "/v1/merchant", "/v1/logs", "/v1/terminal", "/v1/qr", "/me", "/auth");
 
     /** Paths where the browser-safe publishable key is accepted (see ADR 0009). */
-    private static final List<String> PUBLISHABLE_PATHS = List.of("/checkout", "/vault");
+    private static final List<String> PUBLISHABLE_PATHS = List.of("/checkout", "/vault", "/links");
 
     private static final Map<String, String> RESOURCE_BY_PATH = Map.ofEntries(
             Map.entry("/v1/payment_intents", "payments"),

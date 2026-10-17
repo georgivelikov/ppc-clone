@@ -54,6 +54,8 @@ security:
 tags:
   - name: Payments
     description: Create and track card payments.
+  - name: Payment links
+    description: Get paid without a website, with a shareable link or a QR code.
   - name: Refunds
     description: Return money to a customer.
   - name: Balance
@@ -215,6 +217,218 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/payment_intents/{id}/stream:
+    get:
+      tags: [Payments]
+      operationId: streamPaymentIntent
+      summary: Follow a payment live
+      description: |
+        A Server-Sent Events stream (`Accept: text/event-stream`). It starts with the payment's current status and
+        then sends one `status` event for every change, closing after the payment reaches an end state
+        (`succeeded`, `failed`, `canceled`, `refunded`). Use it to flip a screen the moment a customer has paid,
+        for example next to a printed QR code. For back-end processing use webhooks instead.
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      responses:
+        "200":
+          description: "The event stream. Each event has the name `status` and JSON data such as `{\"status\":\"succeeded\"}`."
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payment_links:
+    post:
+      tags: [Payment links]
+      operationId: createPaymentLink
+      summary: Create a payment link
+      description: |
+        A link opens a Cutpay page where the customer pays. A **fixed** link has one price, a
+        **customer_chooses** link lets the customer type the amount (within `min_amount` and `max_amount`), and a
+        **products** link sums its line items. Price, currency and type cannot be changed afterwards: create a
+        new link instead.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentLink"
+      responses:
+        "201":
+          description: The link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    get:
+      tags: [Payment links]
+      operationId: listPaymentLinks
+      summary: List payment links
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        "200":
+          description: A page of links, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLinkList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/payment_links/{id}:
+    get:
+      tags: [Payment links]
+      operationId: getPaymentLink
+      summary: Retrieve a payment link
+      parameters:
+        - $ref: "#/components/parameters/LinkId"
+      responses:
+        "200":
+          description: The link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Payment links]
+      operationId: updatePaymentLink
+      summary: Update a payment link
+      description: |
+        Set `active` to `false` to stop taking payments. A link also closes by itself when it reaches `max_uses`
+        or its `expires_at`. Fields you leave out stay as they are.
+      parameters:
+        - $ref: "#/components/parameters/LinkId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePaymentLink"
+      responses:
+        "200":
+          description: The updated link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payment_links/{id}/payments:
+    get:
+      tags: [Payment links]
+      operationId: listPaymentLinkPayments
+      summary: List the payments made with a link
+      parameters:
+        - $ref: "#/components/parameters/LinkId"
+      responses:
+        "200":
+          description: Paid uses of the link, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLinkPayments"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payment_links/{id}/qr:
+    get:
+      tags: [Payment links]
+      operationId: getPaymentLinkQr
+      summary: Download the QR code of a link
+      description: Returns the code as an image. Colours default to the ones saved on the link.
+      parameters:
+        - $ref: "#/components/parameters/LinkId"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [svg, png]
+            default: svg
+        - name: size
+          in: query
+          description: Target width in pixels for PNG (128 to 2048).
+          schema:
+            type: integer
+            minimum: 128
+            maximum: 2048
+            default: 512
+        - name: fg
+          in: query
+          description: Code colour as `#rrggbb`.
+          schema:
+            type: string
+            pattern: "^#[0-9a-fA-F]{6}$"
+        - name: bg
+          in: query
+          description: Background colour as `#rrggbb`.
+          schema:
+            type: string
+            pattern: "^#[0-9a-fA-F]{6}$"
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payment_links/{id}/card.pdf:
+    get:
+      tags: [Payment links]
+      operationId: getPaymentLinkCard
+      summary: Download a print-ready table card
+      description: An A6 PDF with the link's name, its QR code and the address in words.
+      parameters:
+        - $ref: "#/components/parameters/LinkId"
+      responses:
+        "200":
+          description: The PDF.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/refunds:
     post:
       tags: [Refunds]
@@ -958,6 +1172,13 @@ components:
       schema:
         type: string
         examples: [pay_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    LinkId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [plink_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
     EndpointId:
       name: id
       in: path
@@ -1127,6 +1348,12 @@ components:
           $ref: "#/components/schemas/PaymentStatus"
         capture_method:
           type: string
+        channel:
+          type: string
+          enum: [online, moto]
+          description: |
+            `online` for checkout and the API. `moto` (mail or telephone order) for payments keyed in by the
+            merchant at the dashboard's virtual terminal; the card network does not ask for 3-D Secure for those.
         description:
           type: [string, "null"]
         customer_email:
@@ -1190,6 +1417,252 @@ components:
           type: string
           format: uri
           description: Send the customer here.
+    LinkLineItem:
+      type: object
+      required: [product_name, unit_amount, quantity]
+      properties:
+        product_name:
+          type: string
+          maxLength: 120
+        unit_amount:
+          type: integer
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+    QrStyle:
+      type: object
+      description: Colours of the printed code. Keep strong contrast or phones may not scan it.
+      properties:
+        fg:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+        bg:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+    PaymentLinkStatus:
+      type: string
+      enum: [active, inactive, expired, sold_out]
+    CreatePaymentLink:
+      type: object
+      required: [type, currency, title]
+      properties:
+        type:
+          type: string
+          enum: [fixed, customer_chooses, products]
+        currency:
+          type: string
+        title:
+          type: string
+          maxLength: 120
+        amount:
+          type: integer
+          format: int64
+          description: Required for `fixed` links.
+        min_amount:
+          type: integer
+          format: int64
+          description: For `customer_chooses` links. Defaults to 100.
+        max_amount:
+          type: integer
+          format: int64
+          description: For `customer_chooses` links. Defaults to the largest payment.
+        line_items:
+          type: array
+          maxItems: 20
+          description: Required for `products` links.
+          items:
+            $ref: "#/components/schemas/LinkLineItem"
+        description:
+          type: string
+          maxLength: 1000
+        image_url:
+          type: string
+          format: uri
+        collect:
+          type: array
+          description: What to ask the customer for before they pay.
+          items:
+            type: string
+            enum: [email, phone, name, address]
+        quantity_adjustable:
+          type: boolean
+          description: Lets the customer change the quantity (not for `customer_chooses` links).
+        max_uses:
+          type: integer
+          minimum: 1
+          description: The link closes after this many successful payments, however many customers open it at once.
+        expires_at:
+          type: string
+          format: date-time
+        after_completion:
+          type: string
+          enum: [message, redirect]
+          default: message
+        redirect_url:
+          type: string
+          format: uri
+          description: Required when `after_completion` is `redirect`.
+        success_message:
+          type: string
+          maxLength: 500
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        qr_style:
+          $ref: "#/components/schemas/QrStyle"
+    UpdatePaymentLink:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        collect:
+          type: array
+          items:
+            type: string
+            enum: [email, phone, name, address]
+        max_uses:
+          type: integer
+          minimum: 1
+        expires_at:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        after_completion:
+          type: string
+          enum: [message, redirect]
+        redirect_url:
+          type: string
+          format: uri
+        success_message:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        qr_style:
+          $ref: "#/components/schemas/QrStyle"
+    PaymentLink:
+      type: object
+      required: [id, object, livemode, url, slug, status, type, currency, title, active, created_at]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: payment_link
+        livemode:
+          type: boolean
+        url:
+          type: string
+          format: uri
+          description: Share this address.
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/PaymentLinkStatus"
+        type:
+          type: string
+          enum: [fixed, customer_chooses, products]
+        amount:
+          type: [integer, "null"]
+          format: int64
+        currency:
+          type: string
+        min_amount:
+          type: [integer, "null"]
+          format: int64
+        max_amount:
+          type: [integer, "null"]
+          format: int64
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        image_url:
+          type: [string, "null"]
+        collect:
+          type: array
+          items:
+            type: string
+            enum: [email, phone, name, address]
+        quantity_adjustable:
+          type: boolean
+        max_uses:
+          type: [integer, "null"]
+        uses_count:
+          type: integer
+          description: Payments that succeeded.
+        amount_collected:
+          type: integer
+          format: int64
+          description: Total paid through the link, in the smallest currency unit.
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+        active:
+          type: boolean
+        after_completion:
+          type: string
+          enum: [message, redirect]
+        redirect_url:
+          type: [string, "null"]
+        success_message:
+          type: [string, "null"]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        qr_style:
+          $ref: "#/components/schemas/QrStyle"
+        line_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkLineItem"
+        created_at:
+          type: string
+          format: date-time
+    PaymentLinkList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentLink"
+        has_more:
+          type: boolean
+    PaymentLinkPayments:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            type: object
+            required: [payment_id, amount, created_at]
+            properties:
+              payment_id:
+                type: string
+              reservation_id:
+                type: string
+              status:
+                type: string
+              amount:
+                type: integer
+                format: int64
+              created_at:
+                type: string
+                format: date-time
     Refund:
       type: object
       required: [id, object, payment_intent, amount, currency, status]
@@ -1416,6 +1889,8 @@ components:
         - payout.created
         - payout.paid
         - payout.failed
+        - payment_link.created
+        - payment_link.deactivated
         - webhook_endpoint.test
     Event:
       type: object

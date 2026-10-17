@@ -105,6 +105,9 @@ importers:
       '@cutpay/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@cutpay/checkout-js':
+        specifier: workspace:*
+        version: link:../../packages/checkout-js
       '@cutpay/ui':
         specifier: workspace:*
         version: link:../../packages/ui
