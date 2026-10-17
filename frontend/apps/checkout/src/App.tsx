@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router";
+import { CardElementFrame } from "./CardElementFrame";
 import { CheckoutPage } from "./CheckoutPage";
 import { Shell } from "./Shell";
 
@@ -6,6 +7,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/c/:secret" element={<CheckoutPage />} />
+      <Route path="/elements/card" element={<CardElementFrame />} />
       <Route
         path="*"
         element={

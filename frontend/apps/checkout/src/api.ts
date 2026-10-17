@@ -45,10 +45,14 @@ export class CheckoutApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function call<T>(method: string, path: string, body?: unknown, publishableKey?: string): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // Embedded checkouts identify the merchant integration; the gateway ignores it on these public routes.
+  if (publishableKey) headers.Authorization = `Bearer ${publishableKey}`;
   const response = await fetch(path, {
     method,
-    headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
@@ -71,13 +75,13 @@ export function getSession(secret: string): Promise<Session> {
 }
 
 /** Sends the card number to the vault, which hands back a token. Our payments service never sees the number. */
-export async function tokenize(card: CardInput): Promise<string> {
-  const result = await call<{ token: string }>("POST", "/vault/tokenize", card);
+export async function tokenize(card: CardInput, publishableKey?: string): Promise<string> {
+  const result = await call<{ token: string }>("POST", "/vault/tokenize", card, publishableKey);
   return result.token;
 }
 
-export function confirm(secret: string, token: string, email: string): Promise<Session> {
-  return call("POST", `/checkout/sessions/${encodeURIComponent(secret)}/confirm`, { token, email });
+export function confirm(secret: string, token: string, email: string, publishableKey?: string): Promise<Session> {
+  return call("POST", `/checkout/sessions/${encodeURIComponent(secret)}/confirm`, { token, email }, publishableKey);
 }
 
 /** The customer's answer on the fake bank page. The bank then notifies payments, so re-read the session afterwards. */

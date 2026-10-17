@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --filter @cutpay/checkout-js build && vite",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
+    "@cutpay/checkout-js": "workspace:*",
     "@cutpay/ui": "workspace:*",
     "@hookform/resolvers": "^5.9.2",
     "@tanstack/react-query": "^5.104.3",
