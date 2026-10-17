@@ -15,7 +15,7 @@ A runnable skeleton: infrastructure in Docker, a Gradle monorepo, a pnpm monorep
 | postgres | postgres:16 | 5432 (init script creates one DB per service) |
 | kafka | apache/kafka (KRaft) | 9092 |
 | schema-registry | confluentinc/cp-schema-registry | 8081 |
-| kafka-ui | provectuslabs/kafka-ui | 8085 |
+| kafka-ui | provectuslabs/kafka-ui | 8090 |
 | redis | redis:7 | 6379 |
 | mailpit | axllent/mailpit | 8025 (UI), 1025 (SMTP) |
 

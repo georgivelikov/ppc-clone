@@ -89,7 +89,7 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 | Dashboard | http://localhost:5173 |
 | Hosted checkout | http://localhost:5174 (links are created from the dashboard's Payments page) |
 | API gateway | http://localhost:8080 |
-| Kafka UI | http://localhost:8085 |
+| Kafka UI | http://localhost:8090 |
 | Mailpit (fake inbox) | http://localhost:8025 |
 
 ### Tests

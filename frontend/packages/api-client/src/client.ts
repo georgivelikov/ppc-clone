@@ -29,6 +29,24 @@ import type {
   UpdateMerchantInput,
   UpdatePayoutScheduleInput,
 } from "./types";
+import type {
+  ApiKey,
+  ApiKeyList,
+  CreateApiKeyInput,
+  CreateWebhookEndpointInput,
+  CutpayEvent,
+  CutpayEventList,
+  CutpayEventListParams,
+  RequestLogEntry,
+  RequestLogList,
+  RequestLogParams,
+  UpdateWebhookEndpointInput,
+  WebhookDelivery,
+  WebhookDeliveryList,
+  WebhookDeliveryListParams,
+  WebhookEndpoint,
+  WebhookEndpointList,
+} from "./developers";
 
 /** Builds "?a=1&b=2", leaving out empty values; `livemode` is sent only when it is true (the default is test). */
 function toQuery(params: object): string {
@@ -123,17 +141,12 @@ export class ApiClient {
   // --- payments -----------------------------------------------------------
 
   /** Creates a payment and returns the hosted checkout URL to send the customer to. */
-  createCheckoutSession(input: CreatePaymentInput): Promise<CheckoutSessionCreated> {
-    return this.request("POST", "/v1/checkout_sessions", input, { idempotent: true });
+  createCheckoutSession(input: CreatePaymentInput, livemode = false): Promise<CheckoutSessionCreated> {
+    return this.request("POST", `/v1/checkout_sessions${toQuery({ livemode })}`, input, { idempotent: true });
   }
 
   listPayments(params: PaymentListParams = {}): Promise<PaymentList> {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== "") query.set(key, String(value));
-    }
-    const suffix = query.size > 0 ? `?${query}` : "";
-    return this.request("GET", `/v1/payment_intents${suffix}`);
+    return this.request("GET", `/v1/payment_intents${toQuery(params)}`);
   }
 
   getPayment(id: string): Promise<Payment> {
@@ -150,8 +163,8 @@ export class ApiClient {
     return this.request("POST", "/v1/refunds", input, { idempotent: true });
   }
 
-  paymentSummary(): Promise<PaymentSummary> {
-    return this.request("GET", "/v1/payment_stats");
+  paymentSummary(livemode = false): Promise<PaymentSummary> {
+    return this.request("GET", `/v1/payment_stats${toQuery({ livemode })}`);
   }
 
   // --- balances (ledger) --------------------------------------------------
@@ -210,6 +223,81 @@ export class ApiClient {
 
   deleteBankAccount(id: string): Promise<void> {
     return this.request("DELETE", `/v1/bank_accounts/${encodeURIComponent(id)}`);
+  }
+
+  // --- developers ---------------------------------------------------------
+
+  listApiKeys(): Promise<ApiKeyList> {
+    return this.request("GET", "/v1/api_keys");
+  }
+
+  /** The response carries the secret once; the caller must show it, because it can never be fetched again. */
+  createApiKey(input: CreateApiKeyInput): Promise<ApiKey> {
+    return this.request("POST", "/v1/api_keys", input, { idempotent: true });
+  }
+
+  /** Issues a replacement key; the old one stops working after `graceHours` (0 means immediately). */
+  rollApiKey(id: string, graceHours = 0): Promise<ApiKey> {
+    return this.request("POST", `/v1/api_keys/${encodeURIComponent(id)}/roll`, { grace_hours: graceHours }, { idempotent: true });
+  }
+
+  revokeApiKey(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/api_keys/${encodeURIComponent(id)}`);
+  }
+
+  listWebhookEndpoints(livemode = false): Promise<WebhookEndpointList> {
+    return this.request("GET", `/v1/webhook_endpoints${toQuery({ livemode })}`);
+  }
+
+  getWebhookEndpoint(id: string): Promise<WebhookEndpoint> {
+    return this.request("GET", `/v1/webhook_endpoints/${encodeURIComponent(id)}`);
+  }
+
+  /** The response carries the signing secret once. */
+  createWebhookEndpoint(input: CreateWebhookEndpointInput, livemode = false): Promise<WebhookEndpoint> {
+    return this.request("POST", `/v1/webhook_endpoints${toQuery({ livemode })}`, input);
+  }
+
+  updateWebhookEndpoint(id: string, input: UpdateWebhookEndpointInput): Promise<WebhookEndpoint> {
+    return this.request("PATCH", `/v1/webhook_endpoints/${encodeURIComponent(id)}`, input);
+  }
+
+  deleteWebhookEndpoint(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/webhook_endpoints/${encodeURIComponent(id)}`);
+  }
+
+  /** Queues a test event for this endpoint only. */
+  testWebhookEndpoint(id: string): Promise<{ delivery_id: string; endpoint: string }> {
+    return this.request("POST", `/v1/webhook_endpoints/${encodeURIComponent(id)}/test`);
+  }
+
+  listWebhookDeliveries(params: WebhookDeliveryListParams = {}): Promise<WebhookDeliveryList> {
+    return this.request("GET", `/v1/webhook_deliveries${toQuery(params)}`);
+  }
+
+  getWebhookDelivery(id: string): Promise<WebhookDelivery> {
+    return this.request("GET", `/v1/webhook_deliveries/${encodeURIComponent(id)}`);
+  }
+
+  /** Sends the delivery again right away. */
+  retryWebhookDelivery(id: string): Promise<WebhookDelivery> {
+    return this.request("POST", `/v1/webhook_deliveries/${encodeURIComponent(id)}/retry`);
+  }
+
+  listEvents(params: CutpayEventListParams = {}): Promise<CutpayEventList> {
+    return this.request("GET", `/v1/events${toQuery(params)}`);
+  }
+
+  getEvent(id: string): Promise<CutpayEvent> {
+    return this.request("GET", `/v1/events/${encodeURIComponent(id)}`);
+  }
+
+  listRequestLogs(params: RequestLogParams = {}): Promise<RequestLogList> {
+    return this.request("GET", `/v1/logs${toQuery(params)}`);
+  }
+
+  getRequestLog(id: string): Promise<RequestLogEntry> {
+    return this.request("GET", `/v1/logs/${encodeURIComponent(id)}`);
   }
 
   // --- internals ----------------------------------------------------------

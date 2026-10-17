@@ -123,6 +123,7 @@ export interface PaymentList {
 export interface PaymentListParams {
   status?: PaymentStatus | "";
   q?: string;
+  livemode?: boolean;
   starting_after?: string;
   limit?: number;
 }

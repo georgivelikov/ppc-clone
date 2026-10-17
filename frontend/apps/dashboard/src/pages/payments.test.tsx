@@ -20,6 +20,9 @@ vi.mock("../auth/AuthProvider", () => ({
   useSession: () => ({ merchant: { display_name: "Rose Cafe", default_currency: "EUR" } }),
 }));
 
+let testMode = true;
+vi.mock("../layout/testMode", () => ({ useTestMode: () => ({ testMode, setTestMode: vi.fn() }) }));
+
 const { api } = await import("../api");
 
 const payment: Payment = {
@@ -85,8 +88,20 @@ describe("payments pages", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     expect(await screen.findByText("€10.00")).toBeInTheDocument();
-    expect(api.listPayments).toHaveBeenLastCalledWith(expect.objectContaining({ starting_after: "pay_1" }));
+    expect(api.listPayments).toHaveBeenLastCalledWith(expect.objectContaining({ starting_after: "pay_1", livemode: false }));
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("asks for live payments when test mode is off", async () => {
+    testMode = false;
+    try {
+      vi.mocked(api.listPayments).mockResolvedValue({ data: [], has_more: false });
+      renderAt("/payments");
+      await screen.findByText(/No payments yet/);
+      expect(api.listPayments).toHaveBeenCalledWith(expect.objectContaining({ livemode: true }));
+    } finally {
+      testMode = true;
+    }
   });
 
   it("filters by status", async () => {

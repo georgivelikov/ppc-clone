@@ -51,7 +51,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: cutpay-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     ports:
-      - "8085:8080"
+      - "8090:8080"
     depends_on:
       kafka:
         condition: service_healthy

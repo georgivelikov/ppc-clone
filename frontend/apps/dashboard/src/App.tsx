@@ -5,6 +5,11 @@ import { LoginPage } from "./auth/LoginPage";
 import { SignupPage } from "./auth/SignupPage";
 import { AppShell } from "./layout/AppShell";
 import { HomePage } from "./pages/HomePage";
+import { ApiKeysPage } from "./pages/developers/ApiKeysPage";
+import { EventsPage } from "./pages/developers/EventsPage";
+import { LogsPage } from "./pages/developers/LogsPage";
+import { WebhookDetailPage } from "./pages/developers/WebhookDetailPage";
+import { WebhooksPage } from "./pages/developers/WebhooksPage";
 import { PaymentDetailPage } from "./pages/PaymentDetailPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
@@ -31,6 +36,12 @@ export function App() {
             <Route path="balances" element={<BalancesPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
             <Route path="payouts/:id" element={<PayoutDetailPage />} />
+            <Route path="developers" element={<Navigate to="/developers/api-keys" replace />} />
+            <Route path="developers/api-keys" element={<ApiKeysPage />} />
+            <Route path="developers/webhooks" element={<WebhooksPage />} />
+            <Route path="developers/webhooks/:id" element={<WebhookDetailPage />} />
+            <Route path="developers/events" element={<EventsPage />} />
+            <Route path="developers/logs" element={<LogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/payouts" element={<PayoutSettingsPage />} />
           </Route>

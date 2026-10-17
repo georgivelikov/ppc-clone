@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api";
 import { STATUS_LABEL, StatusBadge } from "../components/StatusBadge";
+import { useTestMode } from "../layout/testMode";
 import { CreatePaymentDialog } from "./CreatePaymentDialog";
 
 const PAGE_SIZE = 20;
@@ -21,15 +22,17 @@ function useDebounced<T>(value: T, delayMs = 300): T {
 }
 
 export function PaymentsPage() {
+  const { testMode } = useTestMode();
+  const livemode = !testMode;
   const [status, setStatus] = useState<PaymentStatus | "">("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const q = useDebounced(search.trim());
 
   const query = useInfiniteQuery({
-    queryKey: ["payments", { status, q }],
+    queryKey: ["payments", { status, q, livemode }],
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => api.listPayments({ status, q, starting_after: pageParam, limit: PAGE_SIZE }),
+    queryFn: ({ pageParam }) => api.listPayments({ status, q, starting_after: pageParam, limit: PAGE_SIZE, livemode }),
     getNextPageParam: (last) => (last.has_more ? last.data.at(-1)?.id : undefined),
   });
   const payments = query.data?.pages.flatMap((page) => page.data) ?? [];

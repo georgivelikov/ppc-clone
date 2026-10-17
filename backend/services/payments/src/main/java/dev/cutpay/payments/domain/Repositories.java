@@ -26,6 +26,12 @@ public final class Repositories {
 
         Optional<PaymentIntent> findByIdAndMerchantIdAndLivemode(String id, String merchantId, boolean livemode);
 
+        Optional<PaymentIntent> findByIdAndMerchantId(String id, String merchantId);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("select p from PaymentIntent p where p.id = :id and p.merchantId = :merchantId")
+        Optional<PaymentIntent> lockByIdAndMerchantId(@Param("id") String id, @Param("merchantId") String merchantId);
+
         @Lock(LockModeType.PESSIMISTIC_WRITE)
         @Query("select p from PaymentIntent p where p.id = :id and p.merchantId = :merchantId "
                 + "and p.livemode = :livemode")

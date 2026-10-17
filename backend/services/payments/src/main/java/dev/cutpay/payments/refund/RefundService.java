@@ -52,8 +52,9 @@ public class RefundService {
         this.tx = tx;
     }
 
-    public RefundView create(String merchantId, boolean livemode, CreateRefund request) {
-        Reserved reserved = tx.execute(status -> reserve(merchantId, livemode, request));
+    /** {@code claimedMode} is the mode an API key is limited to; null for dashboard sessions. */
+    public RefundView create(String merchantId, Boolean claimedMode, CreateRefund request) {
+        Reserved reserved = tx.execute(status -> reserve(merchantId, claimedMode, request));
         RefundResult result = acquirer.refund(reserved.acquirerRef(), reserved.amount());
         Refund refund = tx.execute(status -> settle(reserved, result));
         return RefundView.of(refund);
@@ -66,8 +67,10 @@ public class RefundService {
                 .map(RefundView::of).toList();
     }
 
-    private Reserved reserve(String merchantId, boolean livemode, CreateRefund request) {
-        PaymentIntent intent = intents.lockByIdAndMerchantIdAndLivemode(request.paymentIntent(), merchantId, livemode)
+    private Reserved reserve(String merchantId, Boolean claimedMode, CreateRefund request) {
+        var locked = claimedMode == null ? intents.lockByIdAndMerchantId(request.paymentIntent(), merchantId)
+                : intents.lockByIdAndMerchantIdAndLivemode(request.paymentIntent(), merchantId, claimedMode);
+        PaymentIntent intent = locked
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         if (intent.getStatus() != dev.cutpay.payments.domain.PaymentStatus.SUCCEEDED
                 && intent.getStatus() != dev.cutpay.payments.domain.PaymentStatus.PARTIALLY_REFUNDED) {

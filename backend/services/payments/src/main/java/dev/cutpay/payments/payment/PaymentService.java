@@ -79,12 +79,18 @@ public class PaymentService {
         return intent;
     }
 
+    /** {@code claimedMode} is the mode an API key is limited to; null for dashboard sessions, which see both. */
     @Transactional(readOnly = true)
-    public PaymentView get(String merchantId, boolean livemode, String id) {
-        PaymentIntent intent = intents.findByIdAndMerchantIdAndLivemode(id, merchantId, livemode)
+    public PaymentView get(String merchantId, Boolean claimedMode, String id) {
+        PaymentIntent intent = find(merchantId, claimedMode, id)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         return PaymentView.of(intent, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(id),
                 refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id));
+    }
+
+    private java.util.Optional<PaymentIntent> find(String merchantId, Boolean claimedMode, String id) {
+        return claimedMode == null ? intents.findByIdAndMerchantId(id, merchantId)
+                : intents.findByIdAndMerchantIdAndLivemode(id, merchantId, claimedMode);
     }
 
     public record Filter(String status, String query, Instant from, Instant to, Long minAmount, Long maxAmount,
@@ -137,8 +143,8 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentView cancel(String merchantId, boolean livemode, String id) {
-        PaymentIntent intent = intents.findByIdAndMerchantIdAndLivemode(id, merchantId, livemode)
+    public PaymentView cancel(String merchantId, Boolean claimedMode, String id) {
+        PaymentIntent intent = find(merchantId, claimedMode, id)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         intent.cancel();
         publish("PaymentCanceled", intent);

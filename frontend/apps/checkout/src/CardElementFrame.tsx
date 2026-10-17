@@ -46,7 +46,7 @@ function summarize(session: Session): SessionSummary {
 }
 
 const field =
-  "w-full bg-transparent px-3 py-2.5 text-[15px] text-fg placeholder:text-muted/70 outline-none " +
+  "w-full bg-transparent px-3 py-2.5 text-[15px] text-ink placeholder:text-muted/70 outline-none " +
   "focus:bg-brand-50/40";
 
 /**

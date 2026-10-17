@@ -325,6 +325,32 @@ class PaymentsFlowIT {
     }
 
     @Test
+    void aDashboardSessionChoosesTheModeWithTheQueryAndCanOpenEitherByIdButAnApiKeyCannot() throws Exception {
+        String testPayment = field(mvc.perform(post("/v1/payment_intents").with(merchant())
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.livemode").value(false))
+                .andReturn().getResponse().getContentAsString(), "id");
+        String livePayment = field(mvc.perform(post("/v1/payment_intents").param("livemode", "true").with(merchant())
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.livemode").value(true))
+                .andReturn().getResponse().getContentAsString(), "id");
+
+        mvc.perform(get("/v1/payment_intents").with(merchant()))
+                .andExpect(jsonPath("$.data.length()").value(1)).andExpect(jsonPath("$.data[0].id").value(testPayment));
+        mvc.perform(get("/v1/payment_intents").param("livemode", "true").with(merchant()))
+                .andExpect(jsonPath("$.data.length()").value(1)).andExpect(jsonPath("$.data[0].id").value(livePayment));
+        mvc.perform(get("/v1/payment_stats").param("livemode", "true").with(merchant())).andExpect(status().isOk());
+
+        // The detail page does not know the mode of the payment it is opening.
+        mvc.perform(get("/v1/payment_intents/" + livePayment).with(merchant())).andExpect(status().isOk());
+        mvc.perform(get("/v1/payment_intents/" + testPayment).with(merchant())).andExpect(status().isOk());
+        // An API key is held to its own mode, even if it asks for the other one.
+        mvc.perform(get("/v1/payment_intents").param("livemode", "true").with(apiKey(false)))
+                .andExpect(jsonPath("$.data[0].id").value(testPayment));
+        mvc.perform(get("/v1/payment_intents/" + livePayment).with(apiKey(false))).andExpect(status().isNotFound());
+    }
+
+    @Test
     void idempotencyKeysAreScopedPerMode() throws Exception {
         String key = UUID.randomUUID().toString();
         mvc.perform(post("/v1/payment_intents").with(apiKey(false)).header("Idempotency-Key", key)

@@ -1,6 +1,7 @@
 package dev.cutpay.payments.refund;
 
 import dev.cutpay.payments.payment.PaymentDtos.RefundView;
+import dev.cutpay.web.RequestMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -25,8 +26,8 @@ class RefundController {
     record RefundList(List<RefundView> data) {
     }
 
-    private static boolean livemode(Jwt jwt) {
-        return Boolean.TRUE.equals(jwt.getClaimAsBoolean("livemode"));
+    private static boolean livemode(Jwt jwt, boolean requested) {
+        return RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requested);
     }
 
     private final RefundService refunds;
@@ -38,15 +39,16 @@ class RefundController {
     @PostMapping("/v1/refunds")
     @ResponseStatus(HttpStatus.CREATED)
     RefundView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateRefundRequest request) {
-        return refunds.create(jwt.getClaimAsString("mid"), livemode(jwt),
+        return refunds.create(jwt.getClaimAsString("mid"), jwt.getClaimAsBoolean("livemode"),
                 new RefundService.CreateRefund(request.paymentIntent(), request.amount(), request.reason()));
     }
 
     @GetMapping("/v1/refunds")
     RefundList list(@AuthenticationPrincipal Jwt jwt,
+                    @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                     @RequestParam(name = "payment_intent", required = false) String paymentIntent,
                     @RequestParam(name = "starting_after", required = false) String startingAfter,
                     @RequestParam(defaultValue = "20") int limit) {
-        return new RefundList(refunds.list(jwt.getClaimAsString("mid"), livemode(jwt), paymentIntent, startingAfter, limit));
+        return new RefundList(refunds.list(jwt.getClaimAsString("mid"), livemode(jwt, requestedLivemode), paymentIntent, startingAfter, limit));
     }
 }

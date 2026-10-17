@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { label: "Links", to: "/links", icon: Link2, phase: 4 },
   { label: "Customers", to: "/customers", icon: Users, phase: 5 },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat, phase: 5 },
-  { label: "Developers", to: "/developers", icon: Code2, phase: 3 },
+  { label: "Developers", to: "/developers", icon: Code2 },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 

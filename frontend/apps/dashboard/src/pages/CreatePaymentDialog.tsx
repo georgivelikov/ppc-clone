@@ -9,6 +9,7 @@ import { z } from "zod";
 import { api } from "../api";
 import { useSession } from "../auth/AuthProvider";
 import { Dialog } from "../components/Dialog";
+import { useTestMode } from "../layout/testMode";
 
 const CURRENCIES = ["EUR", "RON", "PLN", "HUF", "CZK", "GBP", "USD", "CHF"];
 
@@ -22,6 +23,7 @@ type Values = z.infer<typeof schema>;
 /** Creates a payment and gives the merchant the hosted checkout link to open (a stand-in for a real storefront). */
 export function CreatePaymentDialog({ onClose }: { onClose: () => void }) {
   const { merchant } = useSession();
+  const { testMode } = useTestMode();
   const queryClient = useQueryClient();
   const [created, setCreated] = useState<CheckoutSessionCreated | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -44,12 +46,15 @@ export function CreatePaymentDialog({ onClose }: { onClose: () => void }) {
     }
     try {
       setCreated(
-        await api.createCheckoutSession({
-          amount: minor,
-          currency: values.currency,
-          description: values.description || undefined,
-          merchant_name: merchant.display_name,
-        }),
+        await api.createCheckoutSession(
+          {
+            amount: minor,
+            currency: values.currency,
+            description: values.description || undefined,
+            merchant_name: merchant.display_name,
+          },
+          !testMode,
+        ),
       );
       void queryClient.invalidateQueries({ queryKey: ["payments"] });
     } catch (error) {
