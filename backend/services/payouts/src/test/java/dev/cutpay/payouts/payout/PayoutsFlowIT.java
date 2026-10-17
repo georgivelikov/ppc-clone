@@ -226,6 +226,27 @@ class PayoutsFlowIT {
     }
 
     @Test
+    void anApiKeyOnlySeesPayoutsAndBankAccountsOfItsOwnMode() throws Exception {
+        addBankAccount(WORKING_IBAN);
+        fundsAvailable(1_000);
+        payouts.createScheduledPayout(group);
+        String payoutId = payoutIds().get(0);
+        RequestPostProcessor testKey = jwt().jwt(j -> j.claim("mid", merchant).claim("role", "api")
+                .claim("livemode", false));
+        RequestPostProcessor liveKey = jwt().jwt(j -> j.claim("mid", merchant).claim("role", "api")
+                .claim("livemode", true));
+
+        mvc.perform(get("/v1/payouts").param("livemode", "true").with(testKey))
+                .andExpect(jsonPath("$.data.length()").value(1));
+        mvc.perform(get("/v1/payouts").param("livemode", "false").with(liveKey))
+                .andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(get("/v1/payouts/" + payoutId).with(liveKey)).andExpect(status().isNotFound());
+        mvc.perform(get("/v1/payouts/" + payoutId).with(testKey)).andExpect(status().isOk());
+        mvc.perform(get("/v1/bank_accounts").param("livemode", "false").with(liveKey))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
     void merchantsOnlySeeTheirOwnPayoutsAndEndpointsNeedAToken() throws Exception {
         addBankAccount(WORKING_IBAN);
         fundsAvailable(1_000);
@@ -235,5 +256,10 @@ class PayoutsFlowIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(0));
         mvc.perform(get("/v1/payouts")).andExpect(status().isUnauthorized());
+    }
+
+    private java.util.List<String> payoutIds() {
+        return jdbc.sql("SELECT id FROM payouts WHERE merchant_id = :m").param("m", merchant)
+                .query(String.class).list();
     }
 }

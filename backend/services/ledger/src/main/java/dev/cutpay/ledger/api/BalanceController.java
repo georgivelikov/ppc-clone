@@ -8,6 +8,7 @@ import dev.cutpay.ledger.api.BalanceDtos.TransactionList;
 import dev.cutpay.ledger.api.BalanceDtos.TransactionView;
 import dev.cutpay.ledger.posting.Sql;
 import dev.cutpay.web.ApiException;
+import dev.cutpay.web.RequestMode;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,7 +41,8 @@ class BalanceController {
      * merchant can expect, a negative one is money they owe (e.g. a refund after a payout).
      */
     @GetMapping("/v1/balance")
-    BalanceView balance(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "false") boolean livemode) {
+    BalanceView balance(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         record Row(String type, String currency, long amount) {
         }
         List<Row> rows = jdbc.sql("""
@@ -75,9 +77,10 @@ class BalanceController {
                                  @RequestParam(required = false) String type,
                                  // A payment id also matches the refunds made against it.
                                  @RequestParam(required = false) String source,
-                                 @RequestParam(defaultValue = "false") boolean livemode,
+                                 @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                                  @RequestParam(name = "starting_after", required = false) String startingAfter,
                                  @RequestParam(defaultValue = "20") int limit) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         if (limit < 1 || limit > MAX_PAGE) {
             throw ApiException.invalidRequest("invalid_limit", "limit must be between 1 and " + MAX_PAGE, "limit");
         }
@@ -123,8 +126,9 @@ class BalanceController {
     /** Daily card volume, fees and net per currency for the Balances chart; days without payments are included. */
     @GetMapping("/v1/balance_summary")
     SummaryView summary(@AuthenticationPrincipal Jwt jwt,
-                        @RequestParam(defaultValue = "false") boolean livemode,
+                        @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                         @RequestParam(defaultValue = "14") int days) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         if (days < 1 || days > 90) {
             throw ApiException.invalidRequest("invalid_days", "days must be between 1 and 90", "days");
         }

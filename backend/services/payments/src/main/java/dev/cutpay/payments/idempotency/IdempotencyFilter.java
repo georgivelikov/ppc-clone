@@ -71,7 +71,9 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
-        String merchantId = jwt.getToken().getClaimAsString("mid");
+        // Test and live traffic of one merchant must not share keys, or a retry in one mode could replay the other's response.
+        String merchantId = jwt.getToken().getClaimAsString("mid")
+                + (Boolean.TRUE.equals(jwt.getToken().getClaimAsBoolean("livemode")) ? "/live" : "/test");
         var cached = new CachedBodyRequest(request);
         String hash = hash(request.getMethod(), request.getRequestURI(), request.getQueryString(), cached.body());
 

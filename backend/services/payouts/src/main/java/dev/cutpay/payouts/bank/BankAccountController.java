@@ -3,6 +3,7 @@ package dev.cutpay.payouts.bank;
 import dev.cutpay.payouts.iban.Iban;
 import dev.cutpay.payouts.payout.Sql;
 import dev.cutpay.web.ApiException;
+import dev.cutpay.web.RequestMode;
 import dev.cutpay.web.Ids;
 import dev.cutpay.money.SupportedCurrencies;
 import jakarta.validation.Valid;
@@ -53,7 +54,8 @@ class BankAccountController {
     }
 
     @GetMapping("/v1/bank_accounts")
-    BankAccountList list(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "false") boolean livemode) {
+    BankAccountList list(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         List<BankAccountView> accounts = jdbc.sql("""
                         SELECT id, iban, holder_name, currency, status, livemode, created_at
                           FROM bank_accounts
@@ -71,8 +73,9 @@ class BankAccountController {
 
     @PostMapping("/v1/bank_accounts")
     @ResponseStatus(HttpStatus.CREATED)
-    BankAccountView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "false") boolean livemode,
+    BankAccountView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                            @Valid @RequestBody CreateRequest request) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         String iban = Iban.normalise(request.iban()).orElseThrow(() -> ApiException.invalidRequest(
                 "invalid_iban", "That IBAN is not valid. Check the number and try again.", "iban"));
         String currency = request.currency() == null || request.currency().isBlank() ? "EUR"
@@ -102,13 +105,17 @@ class BankAccountController {
     /** Removing keeps the row: past payouts still point at it. */
     @DeleteMapping("/v1/bank_accounts/{id}")
     Deleted delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
-        int updated = jdbc.sql("""
+        Boolean mode = jwt.getClaimAsBoolean("livemode");
+        var statement = jdbc.sql("""
                         UPDATE bank_accounts SET status = 'removed'
                          WHERE id = :id AND merchant_id = :merchant AND status = 'active'
-                        """)
+                        """ + (mode == null ? "" : " AND livemode = :mode"))
                 .param("id", id)
-                .param("merchant", merchant(jwt))
-                .update();
+                .param("merchant", merchant(jwt));
+        if (mode != null) {
+            statement = statement.param("mode", mode);
+        }
+        int updated = statement.update();
         if (updated == 0) {
             throw ApiException.notFound("bank_account_not_found", "No such bank account");
         }

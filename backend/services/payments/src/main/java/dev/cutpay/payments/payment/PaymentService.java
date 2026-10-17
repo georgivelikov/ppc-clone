@@ -66,13 +66,13 @@ public class PaymentService {
     // --- merchant side ---------------------------------------------------------------------------
 
     @Transactional
-    public PaymentIntent create(String merchantId, CreatePaymentRequest request) {
+    public PaymentIntent create(String merchantId, boolean livemode, CreatePaymentRequest request) {
         if (!SupportedCurrencies.isSupported(request.currency())) {
             throw ApiException.invalidRequest("unsupported_currency", "Currency is not supported", "currency");
         }
         Money money = Money.ofMinor(request.amount(), request.currency().toUpperCase(Locale.ROOT));
         String id = Ids.generate("pay");
-        var intent = new PaymentIntent(id, id + "_secret_" + randomSecret(), merchantId, request.merchantName(), false,
+        var intent = new PaymentIntent(id, id + "_secret_" + randomSecret(), merchantId, request.merchantName(), livemode,
                 money, request.description(), request.customerEmail(), request.metadata(), request.returnUrl());
         intents.save(intent);
         publish("PaymentIntentCreated", intent);
@@ -80,8 +80,8 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public PaymentView get(String merchantId, String id) {
-        PaymentIntent intent = intents.findByIdAndMerchantId(id, merchantId)
+    public PaymentView get(String merchantId, boolean livemode, String id) {
+        PaymentIntent intent = intents.findByIdAndMerchantIdAndLivemode(id, merchantId, livemode)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         return PaymentView.of(intent, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(id),
                 refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id));
@@ -92,10 +92,11 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public PaymentList list(String merchantId, Filter filter) {
+    public PaymentList list(String merchantId, boolean livemode, Filter filter) {
         Specification<PaymentIntent> spec = (root, query, cb) -> {
             var predicates = new ArrayList<Predicate>();
             predicates.add(cb.equal(root.get("merchantId"), merchantId));
+            predicates.add(cb.equal(root.get("livemode"), livemode));
             if (filter.status() != null && !filter.status().isBlank()) {
                 try {
                     predicates.add(cb.equal(root.get("status"), PaymentStatus.fromWire(filter.status())));
@@ -136,8 +137,8 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentView cancel(String merchantId, String id) {
-        PaymentIntent intent = intents.findByIdAndMerchantId(id, merchantId)
+    public PaymentView cancel(String merchantId, boolean livemode, String id) {
+        PaymentIntent intent = intents.findByIdAndMerchantIdAndLivemode(id, merchantId, livemode)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         intent.cancel();
         publish("PaymentCanceled", intent);
@@ -146,9 +147,9 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public SummaryView todaysVolume(String merchantId) {
+    public SummaryView todaysVolume(String merchantId, boolean livemode) {
         Instant since = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
-        var rows = intents.volumeSince(merchantId, since).stream()
+        var rows = intents.volumeSince(merchantId, livemode, since).stream()
                 .map(r -> new VolumeView(r.currency(), r.count(), r.volume())).toList();
         return new SummaryView(since.toString(), rows);
     }

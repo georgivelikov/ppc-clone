@@ -36,8 +36,8 @@ class PaymentController {
     @PostMapping("/v1/payment_intents")
     @ResponseStatus(HttpStatus.CREATED)
     PaymentView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreatePaymentRequest request) {
-        PaymentIntent intent = payments.create(merchant(jwt), request);
-        return payments.get(merchant(jwt), intent.getId());
+        PaymentIntent intent = payments.create(merchant(jwt), livemode(jwt), request);
+        return payments.get(merchant(jwt), livemode(jwt), intent.getId());
     }
 
     /** Creates a payment and returns the hosted checkout URL to send the customer to. */
@@ -45,7 +45,7 @@ class PaymentController {
     @ResponseStatus(HttpStatus.CREATED)
     CheckoutSessionCreated createSession(@AuthenticationPrincipal Jwt jwt,
                                          @Valid @RequestBody CreatePaymentRequest request) {
-        PaymentIntent intent = payments.create(merchant(jwt), request);
+        PaymentIntent intent = payments.create(merchant(jwt), livemode(jwt), request);
         return new CheckoutSessionCreated(intent.getId(), intent.getClientSecret(),
                 checkoutUrl + "/c/" + intent.getClientSecret());
     }
@@ -60,23 +60,23 @@ class PaymentController {
                      @RequestParam(name = "max_amount", required = false) Long maxAmount,
                      @RequestParam(name = "starting_after", required = false) String startingAfter,
                      @RequestParam(defaultValue = "20") int limit) {
-        return payments.list(merchant(jwt), new PaymentService.Filter(status, query, from, to, minAmount, maxAmount,
+        return payments.list(merchant(jwt), livemode(jwt), new PaymentService.Filter(status, query, from, to, minAmount, maxAmount,
                 startingAfter, limit));
     }
 
     @GetMapping("/v1/payment_intents/{id}")
     PaymentView get(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
-        return payments.get(merchant(jwt), id);
+        return payments.get(merchant(jwt), livemode(jwt), id);
     }
 
     @PostMapping("/v1/payment_intents/{id}/cancel")
     PaymentView cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
-        return payments.cancel(merchant(jwt), id);
+        return payments.cancel(merchant(jwt), livemode(jwt), id);
     }
 
     @GetMapping("/v1/payment_stats")
     SummaryView stats(@AuthenticationPrincipal Jwt jwt) {
-        return payments.todaysVolume(merchant(jwt));
+        return payments.todaysVolume(merchant(jwt), livemode(jwt));
     }
 
     // --- public: the hosted checkout, authorised by knowing the client secret ----------------------
@@ -89,6 +89,11 @@ class PaymentController {
     @PostMapping("/checkout/sessions/{clientSecret}/confirm")
     SessionView confirm(@PathVariable String clientSecret, @Valid @RequestBody ConfirmRequest request) {
         return payments.confirm(clientSecret, request);
+    }
+
+    /** Dashboard sessions carry no mode and act on test data; API keys carry the mode of the key. */
+    private static boolean livemode(Jwt jwt) {
+        return Boolean.TRUE.equals(jwt.getClaimAsBoolean("livemode"));
     }
 
     private static String merchant(Jwt jwt) {

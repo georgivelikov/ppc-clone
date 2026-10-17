@@ -284,6 +284,59 @@ class PaymentsFlowIT {
         mvc.perform(get("/v1/payment_intents")).andExpect(status().isUnauthorized());
     }
 
+    private RequestPostProcessor apiKey(boolean livemode) {
+        return jwt().jwt(j -> j.claim("mid", merchantId).claim("role", "api").claim("livemode", livemode));
+    }
+
+    @Test
+    void testAndLiveDataNeverMix() throws Exception {
+        String testPayment = field(mvc.perform(post("/v1/payment_intents").with(apiKey(false))
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.livemode").value(false))
+                .andReturn().getResponse().getContentAsString(), "id");
+        String livePayment = field(mvc.perform(post("/v1/payment_intents").with(apiKey(true))
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.livemode").value(true))
+                .andReturn().getResponse().getContentAsString(), "id");
+
+        // Lists are separate...
+        mvc.perform(get("/v1/payment_intents").with(apiKey(false)))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(testPayment));
+        mvc.perform(get("/v1/payment_intents").with(apiKey(true)))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(livePayment));
+
+        // ...and fetching or changing the other mode's object by id looks like it does not exist.
+        mvc.perform(get("/v1/payment_intents/" + livePayment).with(apiKey(false))).andExpect(status().isNotFound());
+        mvc.perform(get("/v1/payment_intents/" + testPayment).with(apiKey(true))).andExpect(status().isNotFound());
+        mvc.perform(post("/v1/payment_intents/" + livePayment + "/cancel").with(apiKey(false)))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/v1/refunds").with(apiKey(true)).param("payment_intent", testPayment))
+                .andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(post("/v1/refunds").with(apiKey(true)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payment_intent\":\"" + testPayment + "\"}"))
+                .andExpect(status().isNotFound());
+
+        // A dashboard session has no mode and works on test data.
+        mvc.perform(get("/v1/payment_intents").with(merchant()))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(testPayment));
+    }
+
+    @Test
+    void idempotencyKeysAreScopedPerMode() throws Exception {
+        String key = UUID.randomUUID().toString();
+        mvc.perform(post("/v1/payment_intents").with(apiKey(false)).header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.livemode").value(false));
+        mvc.perform(post("/v1/payment_intents").with(apiKey(true)).header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON).content(PAYMENT))
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist("Idempotent-Replayed"))
+                .andExpect(jsonPath("$.livemode").value(true));
+    }
+
     @Test
     void twoHalfRefundsRefundThePaymentAndAThirdIsRejected() throws Exception {
         stubAuthorize("""

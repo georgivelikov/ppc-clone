@@ -12,6 +12,7 @@ import dev.cutpay.payouts.payout.PayoutDtos.UpdateScheduleRequest;
 import dev.cutpay.payouts.payout.PayoutService.Group;
 import dev.cutpay.payouts.payout.PayoutService.ScheduleSettings;
 import dev.cutpay.web.ApiException;
+import dev.cutpay.web.RequestMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -50,9 +51,10 @@ class PayoutController {
     @GetMapping("/v1/payouts")
     PayoutList list(@AuthenticationPrincipal Jwt jwt,
                     @RequestParam(required = false) String status,
-                    @RequestParam(defaultValue = "false") boolean livemode,
+                    @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                     @RequestParam(name = "starting_after", required = false) String startingAfter,
                     @RequestParam(defaultValue = "20") int limit) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         if (limit < 1 || limit > MAX_PAGE) {
             throw ApiException.invalidRequest("invalid_limit", "limit must be between 1 and " + MAX_PAGE, "limit");
         }
@@ -82,8 +84,9 @@ class PayoutController {
     /** What "Pay out now" would do: the payable amount, the fee, and what would reach the bank. */
     @GetMapping("/v1/payouts/preview")
     PayoutService.Preview preview(@AuthenticationPrincipal Jwt jwt,
-                                  @RequestParam(defaultValue = "false") boolean livemode,
+                                  @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                                   @RequestParam(defaultValue = "EUR") String currency) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         return payouts.preview(new Group(merchant(jwt), livemode, currency(currency)));
     }
 
@@ -118,8 +121,9 @@ class PayoutController {
 
     @PostMapping("/v1/payouts")
     @ResponseStatus(HttpStatus.CREATED)
-    PayoutView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "false") boolean livemode,
+    PayoutView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                       @RequestBody(required = false) CreatePayoutRequest request) {
+        boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         String currency = currency(request == null ? null : request.currency());
         PayoutService.Created created = payouts.createInstantPayout(new Group(merchant(jwt), livemode, currency));
         return find(jwt, created.payoutId());
@@ -156,9 +160,16 @@ class PayoutController {
             """;
 
     private PayoutView find(Jwt jwt, String id) {
-        return jdbc.sql(SELECT + " WHERE id = :id AND merchant_id = :merchant")
+        // An API key only sees its own mode; dashboard sessions (no claim) see both and tell them apart by livemode.
+        Boolean mode = jwt.getClaimAsBoolean("livemode");
+        var statement = jdbc.sql(SELECT + " WHERE id = :id AND merchant_id = :merchant"
+                        + (mode == null ? "" : " AND livemode = :mode"))
                 .param("id", id)
-                .param("merchant", merchant(jwt))
+                .param("merchant", merchant(jwt));
+        if (mode != null) {
+            statement = statement.param("mode", mode);
+        }
+        return statement
                 .query((rs, n) -> map(rs))
                 .optional()
                 .orElseThrow(() -> ApiException.notFound("payout_not_found", "No such payout"));

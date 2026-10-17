@@ -24,11 +24,14 @@ public final class Repositories {
 
         Optional<PaymentIntent> findByClientSecret(String clientSecret);
 
-        Optional<PaymentIntent> findByIdAndMerchantId(String id, String merchantId);
+        Optional<PaymentIntent> findByIdAndMerchantIdAndLivemode(String id, String merchantId, boolean livemode);
 
         @Lock(LockModeType.PESSIMISTIC_WRITE)
-        @Query("select p from PaymentIntent p where p.id = :id and p.merchantId = :merchantId")
-        Optional<PaymentIntent> lockByIdAndMerchantId(@Param("id") String id, @Param("merchantId") String merchantId);
+        @Query("select p from PaymentIntent p where p.id = :id and p.merchantId = :merchantId "
+                + "and p.livemode = :livemode")
+        Optional<PaymentIntent> lockByIdAndMerchantIdAndLivemode(@Param("id") String id,
+                                                                 @Param("merchantId") String merchantId,
+                                                                 @Param("livemode") boolean livemode);
 
         @Lock(LockModeType.PESSIMISTIC_WRITE)
         @Query("select p from PaymentIntent p where p.id = :id")
@@ -37,13 +40,14 @@ public final class Repositories {
         @Query("""
                 select new dev.cutpay.payments.domain.Repositories$VolumeRow(p.currency, count(p), sum(p.amount))
                 from PaymentIntent p
-                where p.merchantId = :merchantId and p.createdAt >= :since
+                where p.merchantId = :merchantId and p.livemode = :livemode and p.createdAt >= :since
                   and p.status in (dev.cutpay.payments.domain.PaymentStatus.SUCCEEDED,
                                    dev.cutpay.payments.domain.PaymentStatus.PARTIALLY_REFUNDED,
                                    dev.cutpay.payments.domain.PaymentStatus.REFUNDED)
                 group by p.currency
                 """)
-        List<VolumeRow> volumeSince(@Param("merchantId") String merchantId, @Param("since") Instant since);
+        List<VolumeRow> volumeSince(@Param("merchantId") String merchantId, @Param("livemode") boolean livemode,
+                                    @Param("since") Instant since);
     }
 
     public interface PaymentAttemptRepository extends JpaRepository<PaymentAttempt, String> {
@@ -60,13 +64,15 @@ public final class Repositories {
         List<Refund> findByPaymentIntentIdOrderByCreatedAtAsc(String paymentIntentId);
 
         @Query("""
-                select r from Refund r
-                where r.merchantId = :merchantId
+                select r from Refund r, PaymentIntent p
+                where p.id = r.paymentIntentId
+                  and r.merchantId = :merchantId and p.livemode = :livemode
                   and (:paymentId is null or r.paymentIntentId = :paymentId)
                   and (:startingAfter is null or r.id < :startingAfter)
                 order by r.id desc
                 """)
-        List<Refund> page(@Param("merchantId") String merchantId, @Param("paymentId") String paymentId,
+        List<Refund> page(@Param("merchantId") String merchantId, @Param("livemode") boolean livemode,
+                          @Param("paymentId") String paymentId,
                           @Param("startingAfter") String startingAfter, Pageable pageable);
 
         @Query("select coalesce(sum(r.amount), 0) from Refund r where r.paymentIntentId = :paymentId "

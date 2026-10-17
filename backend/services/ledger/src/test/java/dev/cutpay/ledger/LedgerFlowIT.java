@@ -201,6 +201,28 @@ class LedgerFlowIT {
     }
 
     @Test
+    void anApiKeyOnlySeesItsOwnModeWhateverTheQueryStringSays() throws Exception {
+        ledger.onPaymentSucceeded(payment(pay1, 10_000, "consumer", "eea")); // test-mode payment
+        RequestPostProcessor testKey = jwt().jwt(j -> j.claim("mid", merchant).claim("role", "api")
+                .claim("livemode", false));
+        RequestPostProcessor liveKey = jwt().jwt(j -> j.claim("mid", merchant).claim("role", "api")
+                .claim("livemode", true));
+
+        // A test key asking for live data still gets test data...
+        mvc.perform(get("/v1/balance").param("livemode", "true").with(testKey))
+                .andExpect(jsonPath("$.livemode").value(false))
+                .andExpect(jsonPath("$.pending[0].amount").value(9_861));
+        // ...and a live key asking for test data gets live data, which is empty.
+        mvc.perform(get("/v1/balance").param("livemode", "false").with(liveKey))
+                .andExpect(jsonPath("$.livemode").value(true))
+                .andExpect(jsonPath("$.pending").isEmpty());
+        mvc.perform(get("/v1/balance_transactions").param("livemode", "false").with(liveKey))
+                .andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(get("/v1/balance_transactions").param("livemode", "true").with(testKey))
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
     void businessAndNonEeaCardsPayTheHigherFee() {
         ledger.onPaymentSucceeded(payment("pay_b", 10_000, "business", "eea"));
         ledger.onPaymentSucceeded(payment("pay_n", 10_000, "consumer", "non_eea"));

@@ -31,6 +31,15 @@ public final class Repositories {
         Optional<Membership> findByUserIdAndMerchantId(String userId, String merchantId);
     }
 
+    public interface ApiKeyRepository extends JpaRepository<ApiKey, String> {
+
+        Optional<ApiKey> findByKeyHash(String keyHash);
+
+        List<ApiKey> findByMerchantIdOrderByCreatedAtDesc(String merchantId);
+
+        Optional<ApiKey> findByIdAndMerchantId(String id, String merchantId);
+    }
+
     public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
 
         Optional<RefreshToken> findByTokenHash(String tokenHash);

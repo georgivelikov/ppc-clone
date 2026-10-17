@@ -52,22 +52,22 @@ public class RefundService {
         this.tx = tx;
     }
 
-    public RefundView create(String merchantId, CreateRefund request) {
-        Reserved reserved = tx.execute(status -> reserve(merchantId, request));
+    public RefundView create(String merchantId, boolean livemode, CreateRefund request) {
+        Reserved reserved = tx.execute(status -> reserve(merchantId, livemode, request));
         RefundResult result = acquirer.refund(reserved.acquirerRef(), reserved.amount());
         Refund refund = tx.execute(status -> settle(reserved, result));
         return RefundView.of(refund);
     }
 
     @Transactional(readOnly = true)
-    public List<RefundView> list(String merchantId, String paymentId, String startingAfter, int limit) {
+    public List<RefundView> list(String merchantId, boolean livemode, String paymentId, String startingAfter, int limit) {
         int size = Math.max(1, Math.min(limit, 100));
-        return refunds.page(merchantId, paymentId, startingAfter, PageRequest.of(0, size)).stream()
+        return refunds.page(merchantId, livemode, paymentId, startingAfter, PageRequest.of(0, size)).stream()
                 .map(RefundView::of).toList();
     }
 
-    private Reserved reserve(String merchantId, CreateRefund request) {
-        PaymentIntent intent = intents.lockByIdAndMerchantId(request.paymentIntent(), merchantId)
+    private Reserved reserve(String merchantId, boolean livemode, CreateRefund request) {
+        PaymentIntent intent = intents.lockByIdAndMerchantIdAndLivemode(request.paymentIntent(), merchantId, livemode)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         if (intent.getStatus() != dev.cutpay.payments.domain.PaymentStatus.SUCCEEDED
                 && intent.getStatus() != dev.cutpay.payments.domain.PaymentStatus.PARTIALLY_REFUNDED) {
