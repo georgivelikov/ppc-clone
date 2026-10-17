@@ -20,9 +20,10 @@ import reactor.core.publisher.Mono;
 @Component
 public class IdentityHeadersFilter implements GlobalFilter, Ordered {
 
-    static final String USER_ID = "X-User-Id";
-    static final String MERCHANT_ID = "X-Merchant-Id";
-    static final String ROLE = "X-Role";
+    public static final String USER_ID = "X-User-Id";
+    public static final String MERCHANT_ID = "X-Merchant-Id";
+    public static final String ROLE = "X-Role";
+    public static final String LIVEMODE = "X-Livemode";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -40,9 +41,14 @@ public class IdentityHeadersFilter implements GlobalFilter, Ordered {
             headers.remove(USER_ID);
             headers.remove(MERCHANT_ID);
             headers.remove(ROLE);
+            headers.remove(LIVEMODE);
             headers.set(USER_ID, jwt.getSubject());
             headers.set(MERCHANT_ID, jwt.getClaimAsString("mid"));
             headers.set(ROLE, jwt.getClaimAsString("role"));
+            // Only API-key tokens carry a mode; dashboard sessions choose per request.
+            if (jwt.getClaimAsBoolean("livemode") != null) {
+                headers.set(LIVEMODE, String.valueOf(jwt.getClaimAsBoolean("livemode")));
+            }
         })).build();
     }
 
@@ -51,6 +57,7 @@ public class IdentityHeadersFilter implements GlobalFilter, Ordered {
             headers.remove(USER_ID);
             headers.remove(MERCHANT_ID);
             headers.remove(ROLE);
+            headers.remove(LIVEMODE);
         })).build();
     }
 

@@ -1,6 +1,7 @@
 package dev.cutpay.gateway;
 
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +27,11 @@ public class GatewayConfig {
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }))
                 .build();
+    }
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
     }
 
     /** Rate-limit buckets are per client address. */

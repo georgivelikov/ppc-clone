@@ -18,7 +18,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest
+@SpringBootTest(properties = "cutpay.request-log.enabled=false")
 @AutoConfigureWebTestClient
 @Testcontainers
 class GatewayRoutingIT {

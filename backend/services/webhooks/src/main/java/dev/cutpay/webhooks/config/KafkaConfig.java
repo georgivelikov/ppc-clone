@@ -31,6 +31,17 @@ public class KafkaConfig {
         return TopicBuilder.name(Topics.PAYOUT + ".webhooks.dlt").partitions(3).replicas(1).build();
     }
 
+    // Declared by the gateway too (the producer); declaring it here as well makes start-up order irrelevant.
+    @Bean
+    NewTopic apiRequests() {
+        return TopicBuilder.name(Topics.API_REQUESTS).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic apiRequestsDlt() {
+        return TopicBuilder.name(Topics.API_REQUESTS + ".webhooks.dlt").partitions(3).replicas(1).build();
+    }
+
     /** Retries with exponential backoff, then parks the record on {@code <topic>.webhooks.dlt}. */
     @Bean
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<Object, Object> template) {

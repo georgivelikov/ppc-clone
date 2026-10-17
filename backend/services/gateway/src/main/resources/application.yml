@@ -14,6 +14,15 @@ spring:
         jwt:
           # Keys are fetched lazily, so the gateway can start before identity does.
           jwk-set-uri: ${cutpay.upstreams.identity}/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      # The request log must never slow the API down: give up quickly when Kafka is unreachable.
+      acks: 1
+      properties:
+        max.block.ms: 1000
+        delivery.timeout.ms: 5000
+        request.timeout.ms: 2000
   cloud:
     gateway:
       server:
@@ -50,7 +59,7 @@ spring:
             - id: webhooks-api
               uri: ${cutpay.upstreams.webhooks}
               predicates:
-                - Path=/v1/webhook_endpoints,/v1/webhook_endpoints/**,/v1/webhook_deliveries,/v1/webhook_deliveries/**,/v1/events,/v1/events/**
+                - Path=/v1/webhook_endpoints,/v1/webhook_endpoints/**,/v1/webhook_deliveries,/v1/webhook_deliveries/**,/v1/events,/v1/events/**,/v1/logs,/v1/logs/**
             - id: checkout-public
               uri: ${cutpay.upstreams.payments}
               predicates:
@@ -89,6 +98,9 @@ management:
         enabled: true
 
 cutpay:
+  request-log:
+    # Publishes one event per authenticated API request to the api.requests topic (never bodies).
+    enabled: true
   upstreams:
     identity: http://localhost:8081
     payments: http://localhost:8082
