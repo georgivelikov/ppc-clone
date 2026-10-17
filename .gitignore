@@ -1,0 +1,32 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# Java / Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+out/
+bin/
+*.log
+
+# Node
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+
+# Env
+.env
+.env.*
+!.env.example

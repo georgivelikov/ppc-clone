@@ -19,10 +19,10 @@ An **educational clone** of [Paypercut](https://paypercut.com/), the Sofia-based
 
 | Layer | Technologies |
 |---|---|
-| Backend | Java 21, Spring Boot 3, Gradle multi-module, Spring Data JPA, Flyway |
+| Backend | Java 25, Spring Boot 4, Gradle multi-module, Spring Data JPA, Flyway |
 | Messaging | Apache Kafka (KRaft), Schema Registry, Spring Kafka |
 | Database | PostgreSQL 16 (database per service), Redis |
-| Frontend | React 18, TypeScript, Vite, pnpm workspaces, TanStack Query, Tailwind + shadcn/ui |
+| Frontend | React 19, TypeScript, Vite, pnpm workspaces, TanStack Query, Tailwind + shadcn/ui |
 | Infra | Docker Compose, Mailpit, Kafka UI, Prometheus, Grafana, Tempo, OpenTelemetry |
 | Testing | JUnit 5, Testcontainers, Playwright, k6 |
 
@@ -36,7 +36,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ⏳ Planned |
+| 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ✅ Built |
 | 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ⏳ Planned |
 | 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ⏳ Planned |
 | 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ⏳ Planned |
@@ -59,9 +59,41 @@ e2e/        Playwright end-to-end tests
 
 ## Getting started
 
-_Coming in phase 0._ Prerequisites will be: Docker Desktop, JDK 21, Node.js 20+ and pnpm.
+**Prerequisites:** Docker, JDK 25, Node.js 22+ (pnpm is fetched on demand through `npx`).
 
-## Test cards (planned)
+```bash
+# 1. Infrastructure: Postgres, Kafka, Redis, Mailpit, Kafka UI
+docker compose -f infra/docker-compose.yml up -d
+
+# 2. Backend (two terminals)
+cd backend
+./gradlew :services:identity:bootRun      # http://localhost:8081
+./gradlew :services:gateway:bootRun       # http://localhost:8080
+
+# 3. Dashboard
+cd frontend
+npx pnpm@10.34.7 install
+npx pnpm@10.34.7 dev                      # http://localhost:5173
+```
+
+On Windows use `gradlew.bat` instead of `./gradlew`.
+
+| Tool | URL |
+|---|---|
+| Dashboard | http://localhost:5173 |
+| API gateway | http://localhost:8080 |
+| Kafka UI | http://localhost:8085 |
+| Mailpit (fake inbox) | http://localhost:8025 |
+
+### Tests
+
+```bash
+cd backend  && ./gradlew build             # unit + Testcontainers integration tests (needs Docker)
+cd frontend && npx pnpm@10.34.7 -r test    # Vitest
+cd e2e && npm install && npx playwright install chromium && npx playwright test   # needs step 1 running
+```
+
+## Test cards (from phase 1)
 
 | Card number | Result |
 |---|---|

@@ -48,7 +48,7 @@
 
 | # | Plan | Headline outcome |
 |---|---|---|
-| 0 | [Foundation](phase-00-foundation.md) | Merchant can sign up and log into an empty dashboard |
+| 0 | [Foundation](phase-00-foundation.md) ✅ | Merchant can sign up and log into an empty dashboard |
 | 1 | [Card payments core](phase-01-card-payments.md) | Pay with test card on hosted checkout, see it in dashboard, refund it |
 | 2 | [Ledger & payouts](phase-02-ledger-payouts.md) | Fees deducted, balance shown, daily payout created |
 | 3 | [Developer platform](phase-03-developer-platform.md) | Demo shop integrates via API keys, SDK and webhooks |
@@ -106,14 +106,15 @@ docs/
 e2e/                        Playwright
 ```
 
-## Decisions needed (with recommended defaults)
+## Decisions
 
-| # | Decision | Options | Recommended default |
-|---|---|---|---|
-| D1 | Service granularity | Full 11 services from the start **vs.** start with 4 (gateway, identity, payments, acquirer-sim) and add services per phase | **Add per phase** — services appear only when the phase needs them |
-| D2 | Authentication | Hand-rolled JWT in `identity` **vs.** Keycloak | **Hand-rolled JWT** (learn the mechanics); revisit in phase 8 |
-| D3 | Event serialisation | Avro + Schema Registry **vs.** JSON (+ JSON Schema) | **Avro** — schema evolution is a key Kafka lesson |
-| D4 | Outbox relay | Polling publisher **vs.** Debezium CDC | **Polling** first, Debezium in phase 9 |
-| D5 | Service-to-service sync calls | REST (RestClient) **vs.** gRPC | **REST** |
+Recorded as ADRs in [`docs/adr/`](../adr/):
 
-Record final choices as ADRs in `docs/adr/`.
+| # | Decision | Outcome |
+|---|---|---|
+| D1 | Service granularity | [Add services per phase](../adr/0002-service-granularity.md) |
+| D2 | Authentication | [Hand-rolled JWT in `identity`](../adr/0003-authentication.md), revisit Keycloak in phase 8 |
+| D3 | Event serialisation | [JSON envelope for now](../adr/0004-event-serialisation.md) (changed from the Avro default), re-evaluate in phase 2 |
+| D4 | Outbox relay | [Polling](../adr/0005-outbox-relay.md), Debezium in phase 9 |
+| D5 | Sync calls | [REST](../adr/0006-sync-communication.md) |
+| – | Platform versions | [Java 25, Spring Boot 4, React 19](../adr/0007-platform-versions.md) (the plans were written for Java 21 / Boot 3 / React 18) |
