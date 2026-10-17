@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "../api";
 import { useAuth, useSession } from "../auth/AuthProvider";
+import { SettingsTabs } from "../layout/SettingsTabs";
 
 const CURRENCIES = ["EUR", "RON", "PLN", "HUF", "CZK", "GBP", "USD", "CHF"];
 
@@ -43,7 +44,8 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-semibold">Business profile</h1>
+      <h1 className="text-2xl font-semibold">Settings</h1>
+      <SettingsTabs />
       <Card>
         <form
           noValidate

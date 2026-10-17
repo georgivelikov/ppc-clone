@@ -45,6 +45,22 @@ class AcquirerSimTest {
     }
 
     @Test
+    void classifiesCardsByBin() throws Exception {
+        String[][] cases = {
+                {"4242424242424242", "consumer", "eea"},
+                {"4000010000000001", "business", "eea"},
+                {"4000020000000000", "consumer", "non_eea"},
+                {"4000030000000009", "business", "non_eea"}};
+        for (String[] c : cases) {
+            String token = tokenize(c[0]);
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/tokens/" + token))
+                    .andExpect(jsonPath("$.card_type").value(c[1]))
+                    .andExpect(jsonPath("$.card_region").value(c[2]));
+            authorize(token).andExpect(jsonPath("$.status").value("approved"));
+        }
+    }
+
+    @Test
     void declinesWithTheDocumentedCodes() throws Exception {
         authorize(tokenize("4000000000000002")).andExpect(jsonPath("$.decline_code").value("card_declined"));
         authorize(tokenize("4000000000009995")).andExpect(jsonPath("$.decline_code").value("insufficient_funds"));

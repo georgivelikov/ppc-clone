@@ -29,6 +29,13 @@ public class CommonEventsAutoConfiguration {
         return new InboxGuard(jdbc);
     }
 
+    /** Needs the {@code shedlock} table in services that actually run locked jobs. */
+    @Bean
+    @ConditionalOnMissingBean
+    JobLock jobLock(JdbcClient jdbc) {
+        return new JobLock(jdbc);
+    }
+
     @Bean
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnMissingBean

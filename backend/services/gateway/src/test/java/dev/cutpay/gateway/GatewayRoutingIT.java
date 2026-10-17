@@ -36,6 +36,8 @@ class GatewayRoutingIT {
         registry.add("cutpay.upstreams.identity", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
         registry.add("cutpay.upstreams.payments", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
         registry.add("cutpay.upstreams.acquirer", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
+        registry.add("cutpay.upstreams.ledger", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
+        registry.add("cutpay.upstreams.payouts", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
     }
 
     @Autowired
@@ -80,6 +82,34 @@ class GatewayRoutingIT {
 
         client.get().uri("/v1/payment_intents").exchange().expectStatus().isUnauthorized();
         client.post().uri("/v1/refunds").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void balanceAndPayoutRoutesNeedAToken() {
+        for (String path : new String[] {"/v1/balance", "/v1/balance_transactions", "/v1/balance_summary",
+                "/v1/payouts", "/v1/payouts/po_1", "/v1/payout_schedule", "/v1/bank_accounts"}) {
+            client.get().uri(path).exchange().expectStatus().isUnauthorized();
+        }
+        client.post().uri("/v1/payouts").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void routesBalanceAndPayoutRequestsToTheirServicesWithTheCallersIdentity() {
+        var merchant = client.mutateWith(mockJwt().jwt(jwt -> jwt.subject("usr_1").claim("mid", "mer_1")
+                .claim("role", "owner")));
+        for (String path : new String[] {"/v1/balance", "/v1/balance_transactions", "/v1/payouts",
+                "/v1/payout_schedule", "/v1/bank_accounts"}) {
+            merchant.get().uri(path).exchange()
+                    .expectStatus().isOk()
+                    .expectBody(String.class).isEqualTo("user=usr_1 merchant=mer_1 role=owner");
+        }
+    }
+
+    @Test
+    void ledgerAndPayoutAdminEndpointsAreNeverRouted() {
+        var authenticated = client.mutateWith(mockJwt().jwt(jwt -> jwt.subject("usr_1").claim("mid", "mer_1")));
+        authenticated.get().uri("/admin/trial-balance").exchange().expectStatus().isNotFound();
+        authenticated.post().uri("/admin/clock/advance?days=1").exchange().expectStatus().isNotFound();
     }
 
     @Test

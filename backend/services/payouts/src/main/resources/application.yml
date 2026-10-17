@@ -1,0 +1,48 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: payouts
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payouts
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so payouts can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: payouts
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets tests push time forward via POST /admin/clock/advance.
+    simulated: true
+  payouts:
+    # How often the scheduled-payout and fake-bank jobs wake up (real time).
+    job-poll-interval: PT5S
+    # How long the fake bank takes to confirm a transfer, measured on the simulated clock.
+    bank-delay: PT1M
+    # Fee for a manual "pay out now" payout, in basis points (100 = 1%).
+    instant-fee-bps: 100

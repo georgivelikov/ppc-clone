@@ -6,7 +6,7 @@ const pnpm = "npx --yes pnpm@10.34.7";
 
 /**
  * End-to-end tests run against the real stack: the browser talks to the Vite dev server, which proxies
- * to the gateway, which routes to identity (Postgres + Kafka). Infrastructure must already be running:
+ * to the gateway, which routes to identity, payments, ledger and payouts (Postgres + Kafka). Infrastructure must already be running:
  *
  *     docker compose -f infra/docker-compose.yml up -d
  *
@@ -44,6 +44,20 @@ export default defineConfig({
       command: `${gradle} :services:acquirer-sim:bootRun`,
       cwd: "../backend",
       url: "http://localhost:8083/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: `${gradle} :services:ledger:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8084/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: `${gradle} :services:payouts:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8085/actuator/health",
       timeout: 240_000,
       reuseExistingServer: !process.env.CI,
     },

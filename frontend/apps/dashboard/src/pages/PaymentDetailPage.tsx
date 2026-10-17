@@ -8,6 +8,9 @@ import { api } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 import { RefundDialog } from "./RefundDialog";
 
+/** Statuses that mean the customer's money was captured and the ledger has (or will have) a fee for it. */
+const SETTLED_STATUSES: Payment["status"][] = ["succeeded", "partially_refunded", "refunded"];
+
 interface TimelineEvent {
   at: string;
   title: string;
@@ -60,6 +63,17 @@ export function PaymentDetailPage() {
   const queryClient = useQueryClient();
   const [refunding, setRefunding] = useState(false);
   const { data: payment, error, isPending } = useQuery({ queryKey: ["payment", id], queryFn: () => api.getPayment(id) });
+
+  // The ledger prices a payment shortly after it succeeds, so the fee can lag behind the status.
+  const settled = payment !== undefined && SETTLED_STATUSES.includes(payment.status);
+  const ledger = useQuery({
+    queryKey: ["balance-transactions", "source", id],
+    queryFn: () => api.listBalanceTransactions({ source: id, limit: 50, livemode: payment?.livemode }),
+    enabled: settled,
+    // Keep checking until the fee shows up, without hammering the service.
+    refetchInterval: (query) => (query.state.data?.data.some((txn) => txn.type === "payment") ? false : 3000),
+  });
+  const paymentTxn = ledger.data?.data.find((txn) => txn.type === "payment");
 
   const cancel = useMutation({
     mutationFn: () => api.cancelPayment(id),
@@ -127,6 +141,23 @@ export function PaymentDetailPage() {
             )}
             {payment.failure_message && <Row label="Failure">{payment.failure_message}</Row>}
           </dl>
+          {settled && (
+            <dl className="mt-2 divide-y divide-border border-t border-border">
+              <Row label="Fee">
+                <span data-testid="payment-fee">
+                  {paymentTxn ? `−${formatMoney(paymentTxn.fee, payment.currency)}` : ledger.isError ? "—" : "Calculating…"}
+                </span>
+              </Row>
+              <Row label="Net">
+                <span data-testid="payment-net">
+                  {paymentTxn ? formatMoney(paymentTxn.net, payment.currency) : "—"}
+                </span>
+              </Row>
+              {paymentTxn?.available_on && (
+                <Row label="Available on">{new Date(paymentTxn.available_on).toLocaleDateString()}</Row>
+              )}
+            </dl>
+          )}
         </Card>
         <Card>
           <h2 className="font-semibold">Payment method</h2>

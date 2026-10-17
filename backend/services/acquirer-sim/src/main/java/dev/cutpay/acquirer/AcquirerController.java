@@ -47,7 +47,8 @@ class AcquirerController {
     record TokenizeRequest(@NotBlank String number, @Min(1) int expMonth, @Min(0) int expYear, String cvc) {
     }
 
-    record TokenizeResponse(String token, String brand, String last4, int expMonth, int expYear, String fingerprint) {
+    record TokenizeResponse(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
+                            String cardType, String cardRegion) {
     }
 
     record AuthorizeRequest(@NotBlank String token, @Min(1) long amount, @NotBlank String currency, String reference) {
@@ -99,8 +100,9 @@ class AcquirerController {
         int expYear = request.expYear() < 100 ? 2000 + request.expYear() : request.expYear();
         String token = "tok_" + UUID.randomUUID().toString().replace("-", "");
         tokens.put(token, new StoredCard(pan, request.expMonth(), expYear));
+        BinTable.BinInfo bin = BinTable.lookup(pan);
         return new TokenizeResponse(token, TestCards.brand(pan), pan.substring(pan.length() - 4), request.expMonth(),
-                expYear, fingerprint(pan));
+                expYear, fingerprint(pan), bin.cardType(), bin.cardRegion());
     }
 
     /** What payments is allowed to know about a card: never the number itself. */
@@ -110,8 +112,9 @@ class AcquirerController {
         if (card == null) {
             throw ApiException.notFound("invalid_token", "Unknown or expired card token");
         }
+        BinTable.BinInfo bin = BinTable.lookup(card.pan());
         return new TokenizeResponse(token, TestCards.brand(card.pan()), card.pan().substring(card.pan().length() - 4),
-                card.expMonth(), card.expYear(), fingerprint(card.pan()));
+                card.expMonth(), card.expYear(), fingerprint(card.pan()), bin.cardType(), bin.cardRegion());
     }
 
     @PostMapping("/authorize")

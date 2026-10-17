@@ -202,7 +202,7 @@ public class PaymentService {
         PaymentIntent intent = intents.findByClientSecret(clientSecret).orElseThrow();
         intent.startProcessing(email);
         var attempt = new PaymentAttempt(Ids.generate("att"), intent.getId(), card.brand(), card.last4(),
-                card.expMonth(), card.expYear(), card.fingerprint());
+                card.expMonth(), card.expYear(), card.fingerprint(), card.cardType(), card.cardRegion());
         attempts.save(attempt);
         intents.save(intent);
         return attempt.getId();
@@ -215,7 +215,7 @@ public class PaymentService {
             case AuthResult.Approved approved -> {
                 attempt.succeeded(approved.acquirerRef());
                 intent.succeed();
-                publish("PaymentSucceeded", intent);
+                publish("PaymentSucceeded", intent, attempt);
             }
             case AuthResult.RequiresAction action -> {
                 attempt.requiresAction(action.acquirerRef());
@@ -248,7 +248,7 @@ public class PaymentService {
             attempt.succeeded(acquirerRef);
             intent.resumeProcessing();
             intent.succeed();
-            publish("PaymentSucceeded", intent);
+            publish("PaymentSucceeded", intent, attempt);
         } else {
             attempt.failed(declineCode == null || declineCode.isBlank() ? "authentication_failed" : declineCode);
             intent.fail("authentication_failed", message == null || message.isBlank()
@@ -260,6 +260,11 @@ public class PaymentService {
     // --- events ----------------------------------------------------------------------------------
 
     private void publish(String eventType, PaymentIntent intent) {
+        publish(eventType, intent, null);
+    }
+
+    /** {@code attempt} is the card attempt that settled the intent; its card details feed the ledger's fees. */
+    private void publish(String eventType, PaymentIntent intent, PaymentAttempt attempt) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("payment_id", intent.getId());
         payload.put("status", intent.getStatus().wire());
@@ -267,6 +272,11 @@ public class PaymentService {
         payload.put("currency", intent.getCurrency());
         payload.put("customer_email", intent.getCustomerEmail());
         payload.put("failure_code", intent.getFailureCode());
+        if (attempt != null) {
+            payload.put("card_brand", attempt.getCardBrand());
+            payload.put("card_type", attempt.getCardType());
+            payload.put("card_region", attempt.getCardRegion());
+        }
         outbox.write(KafkaTopicsConfig.PAYMENT_TOPIC, eventType, intent.getId(), intent.getMerchantId(),
                 intent.isLivemode(), payload);
     }

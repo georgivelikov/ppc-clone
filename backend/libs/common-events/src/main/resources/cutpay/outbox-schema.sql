@@ -17,3 +17,11 @@ CREATE TABLE processed_events (
     event_id     TEXT PRIMARY KEY,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Only for services that run scheduled jobs under JobLock (same layout as ShedLock's JDBC provider).
+CREATE TABLE shedlock (
+    name       VARCHAR(64)  NOT NULL PRIMARY KEY,
+    lock_until TIMESTAMPTZ  NOT NULL,
+    locked_at  TIMESTAMPTZ  NOT NULL,
+    locked_by  VARCHAR(255) NOT NULL
+);

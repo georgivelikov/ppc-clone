@@ -8,7 +8,13 @@ import { PaymentDetailPage, buildTimeline } from "./PaymentDetailPage";
 import { PaymentsPage } from "./PaymentsPage";
 
 vi.mock("../api", () => ({
-  api: { listPayments: vi.fn(), getPayment: vi.fn(), createRefund: vi.fn(), cancelPayment: vi.fn() },
+  api: {
+    listPayments: vi.fn(),
+    getPayment: vi.fn(),
+    createRefund: vi.fn(),
+    cancelPayment: vi.fn(),
+    listBalanceTransactions: vi.fn(),
+  },
 }));
 vi.mock("../auth/AuthProvider", () => ({
   useSession: () => ({ merchant: { display_name: "Rose Cafe", default_currency: "EUR" } }),
@@ -157,5 +163,46 @@ describe("payments pages", () => {
       "Payment succeeded",
       "Refund of €5.00 succeeded",
     ]);
+  });
+
+  it("shows the fee and what the merchant receives once the ledger has priced the payment", async () => {
+    vi.mocked(api.getPayment).mockResolvedValue(payment);
+    vi.mocked(api.listBalanceTransactions).mockResolvedValue({
+      object: "list",
+      has_more: false,
+      data: [
+        {
+          id: "txn_1",
+          object: "balance_transaction",
+          type: "payment",
+          source_id: "pay_1",
+          parent_id: null,
+          currency: "EUR",
+          gross: 2500,
+          fee: 42,
+          net: 2458,
+          description: "Payment pay_1",
+          available_on: "2026-10-19T10:00:00Z",
+          created: "2026-10-17T10:00:00Z",
+          livemode: false,
+        },
+      ],
+    });
+    renderAt("/payments/pay_1");
+
+    // The rows show "Calculating…" until the ledger answers.
+    expect(await screen.findByText("−€0.42")).toBeInTheDocument();
+    expect(screen.getByTestId("payment-fee")).toHaveTextContent("−€0.42");
+    expect(screen.getByTestId("payment-net")).toHaveTextContent("€24.58");
+    expect(api.listBalanceTransactions).toHaveBeenCalledWith(expect.objectContaining({ source: "pay_1" }));
+  });
+
+  it("does not ask the ledger about a payment that has no fee yet", async () => {
+    vi.mocked(api.getPayment).mockResolvedValue({ ...payment, status: "requires_payment_method", attempts: [] });
+    renderAt("/payments/pay_1");
+
+    await screen.findByTestId("payment-amount");
+    expect(screen.queryByTestId("payment-fee")).not.toBeInTheDocument();
+    expect(api.listBalanceTransactions).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,14 @@
 import type {
   AuthResponse,
+  Balance,
+  BalanceSummary,
+  BalanceTransactionList,
+  BalanceTransactionListParams,
+  BankAccount,
+  BankAccountList,
   CheckoutSessionCreated,
   CreatePaymentInput,
+  CreateBankAccountInput,
   CreateRefundInput,
   LoginInput,
   MeResponse,
@@ -10,10 +17,28 @@ import type {
   PaymentList,
   PaymentListParams,
   PaymentSummary,
+  Payout,
+  PayoutDetail,
+  PayoutList,
+  PayoutListParams,
+  PayoutPreview,
+  PayoutReconciliation,
+  PayoutSchedule,
   Refund,
   SignupInput,
   UpdateMerchantInput,
+  UpdatePayoutScheduleInput,
 } from "./types";
+
+/** Builds "?a=1&b=2", leaving out empty values; `livemode` is sent only when it is true (the default is test). */
+function toQuery(params: object): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "" || (key === "livemode" && value === false)) continue;
+    query.set(key, String(value));
+  }
+  return query.size > 0 ? `?${query}` : "";
+}
 
 export class ApiError extends Error {
   constructor(
@@ -127,6 +152,64 @@ export class ApiClient {
 
   paymentSummary(): Promise<PaymentSummary> {
     return this.request("GET", "/v1/payment_stats");
+  }
+
+  // --- balances (ledger) --------------------------------------------------
+
+  getBalance(livemode = false): Promise<Balance> {
+    return this.request("GET", `/v1/balance${toQuery({ livemode })}`);
+  }
+
+  listBalanceTransactions(params: BalanceTransactionListParams = {}): Promise<BalanceTransactionList> {
+    return this.request("GET", `/v1/balance_transactions${toQuery(params)}`);
+  }
+
+  /** Daily card volume and fees per currency; days without payments are included as zeros. */
+  balanceSummary(days = 14, livemode = false): Promise<BalanceSummary> {
+    return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
+  }
+
+  // --- payouts ------------------------------------------------------------
+
+  listPayouts(params: PayoutListParams = {}): Promise<PayoutList> {
+    return this.request("GET", `/v1/payouts${toQuery(params)}`);
+  }
+
+  getPayout(id: string): Promise<PayoutDetail> {
+    return this.request("GET", `/v1/payouts/${encodeURIComponent(id)}`);
+  }
+
+  payoutReconciliation(id: string): Promise<PayoutReconciliation> {
+    return this.request("GET", `/v1/payouts/${encodeURIComponent(id)}/reconciliation`);
+  }
+
+  payoutPreview(currency: string, livemode = false): Promise<PayoutPreview> {
+    return this.request("GET", `/v1/payouts/preview${toQuery({ currency, livemode })}`);
+  }
+
+  /** "Pay out now": pays out everything that is available, for a fee. */
+  createPayout(currency: string, livemode = false): Promise<Payout> {
+    return this.request("POST", `/v1/payouts${toQuery({ livemode })}`, { currency }, { idempotent: true });
+  }
+
+  getPayoutSchedule(): Promise<PayoutSchedule> {
+    return this.request("GET", "/v1/payout_schedule");
+  }
+
+  updatePayoutSchedule(input: UpdatePayoutScheduleInput): Promise<PayoutSchedule> {
+    return this.request("PUT", "/v1/payout_schedule", input);
+  }
+
+  listBankAccounts(livemode = false): Promise<BankAccountList> {
+    return this.request("GET", `/v1/bank_accounts${toQuery({ livemode })}`);
+  }
+
+  createBankAccount(input: CreateBankAccountInput, livemode = false): Promise<BankAccount> {
+    return this.request("POST", `/v1/bank_accounts${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  deleteBankAccount(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/bank_accounts/${encodeURIComponent(id)}`);
   }
 
   // --- internals ----------------------------------------------------------

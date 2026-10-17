@@ -85,4 +85,43 @@ describe("ApiClient", () => {
       client.signup({ email: "a@b.c", password: "x", full_name: "A", business_name: "B", country: "BG" }),
     ).rejects.toMatchObject({ status: 409, code: "email_taken", param: "email" });
   });
+
+  describe("balances and payouts", () => {
+    const ok = (body: unknown) => vi.fn<typeof fetch>().mockResolvedValue(json(200, body));
+    const urlOf = (fetchMock: ReturnType<typeof ok>) => String(fetchMock.mock.calls[0]?.[0]);
+
+    it("leaves out empty filters and the default test mode", async () => {
+      const fetchMock = ok({ object: "list", data: [], has_more: false });
+      await new ApiClient({ fetch: fetchMock }).listBalanceTransactions({
+        type: "",
+        source: "pay_1",
+        livemode: false,
+        limit: 20,
+      });
+      expect(urlOf(fetchMock)).toBe("/v1/balance_transactions?source=pay_1&limit=20");
+    });
+
+    it("asks for live data only when told to", async () => {
+      const fetchMock = ok({ object: "balance" });
+      await new ApiClient({ fetch: fetchMock }).getBalance(true);
+      expect(urlOf(fetchMock)).toBe("/v1/balance?livemode=true");
+    });
+
+    it("sends an idempotency key when paying out now, so a double click pays out once", async () => {
+      const fetchMock = ok({ id: "po_1" });
+      await new ApiClient({ fetch: fetchMock }).createPayout("EUR");
+      const init = fetchMock.mock.calls[0]?.[1];
+      expect(urlOf(fetchMock)).toBe("/v1/payouts");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toEqual({ currency: "EUR" });
+      expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
+    });
+
+    it("encodes ids in paths and sends DELETE for bank accounts", async () => {
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json(200, { id: "ba_1", deleted: true }));
+      await new ApiClient({ fetch: fetchMock }).deleteBankAccount("ba_1");
+      expect(urlOf(fetchMock)).toBe("/v1/bank_accounts/ba_1");
+      expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("DELETE");
+    });
+  });
 });

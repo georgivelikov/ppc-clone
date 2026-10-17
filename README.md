@@ -70,6 +70,8 @@ cd backend
 ./gradlew :services:identity:bootRun      # http://localhost:8081
 ./gradlew :services:payments:bootRun      # http://localhost:8082
 ./gradlew :services:acquirer-sim:bootRun  # http://localhost:8083  (fake card network)
+./gradlew :services:ledger:bootRun        # http://localhost:8084  (double-entry ledger, fees, balances)
+./gradlew :services:payouts:bootRun       # http://localhost:8085  (bank accounts, payouts, fake bank)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard
@@ -109,10 +111,26 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test 
 | 4000 0000 0000 0119 | Processing error (acquirer returns a 5xx) |
 | 4000 0000 0000 7777 | Acquirer times out after 10 s |
 | 5555 5555 5555 4444 | Success (Mastercard) |
+| 4000 0100 0000 0001 | Success, EEA **business** card (higher fee) |
+| 4000 0200 0000 0000 | Success, **non-EEA** consumer card (higher fee) |
+| 4000 0300 0000 0009 | Success, non-EEA business card (higher fee) |
 
 Use any future expiry and any CVC. The 3DS code on the fake bank page is `1234`.
 
 Full list in [phase 1](docs/plans/phase-01-card-payments.md).
+
+## Payouts and time travel
+
+Fees follow the [phase 2 pricing](docs/plans/phase-02-ledger-payouts.md#pricing-mimics-paypercut): 1.29% + €0.10 for EEA consumer cards, 2.69% + €0.10 otherwise. Funds are pending for two days, then available, then paid out to your bank account.
+
+- A bank account IBAN ending in `0000` (for example `DE94370400440532010000`) makes the fake bank reject the payout (`account_closed`); `BG80BNBG96611020345678` works.
+- The ledger and payouts services run on a simulated clock. Move both forward to see a payment become available and get paid out without waiting:
+
+```bash
+curl -X POST 'http://localhost:8084/admin/clock/advance?days=2'
+curl -X POST 'http://localhost:8085/admin/clock/advance?days=2'
+curl http://localhost:8084/admin/trial-balance      # every posting summed: always 0
+```
 
 ## Disclaimer
 

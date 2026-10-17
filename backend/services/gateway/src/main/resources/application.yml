@@ -39,6 +39,14 @@ spring:
               uri: ${cutpay.upstreams.payments}
               predicates:
                 - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats
+            - id: ledger-api
+              uri: ${cutpay.upstreams.ledger}
+              predicates:
+                - Path=/v1/balance,/v1/balance_transactions,/v1/balance_transactions/**,/v1/balance_summary
+            - id: payouts-api
+              uri: ${cutpay.upstreams.payouts}
+              predicates:
+                - Path=/v1/payouts,/v1/payouts/**,/v1/payout_schedule,/v1/bank_accounts,/v1/bank_accounts/**
             - id: checkout-public
               uri: ${cutpay.upstreams.payments}
               predicates:
@@ -81,3 +89,5 @@ cutpay:
     identity: http://localhost:8081
     payments: http://localhost:8082
     acquirer: http://localhost:8083
+    ledger: http://localhost:8084
+    payouts: http://localhost:8085

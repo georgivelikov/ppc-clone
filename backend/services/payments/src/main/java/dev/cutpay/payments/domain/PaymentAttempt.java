@@ -35,6 +35,12 @@ public class PaymentAttempt {
     @Column(name = "card_fingerprint")
     private String cardFingerprint;
 
+    @Column(name = "card_type")
+    private String cardType;
+
+    @Column(name = "card_region")
+    private String cardRegion;
+
     @Column(name = "acquirer_ref")
     private String acquirerRef;
 
@@ -54,7 +60,7 @@ public class PaymentAttempt {
     }
 
     public PaymentAttempt(String id, String paymentIntentId, String brand, String last4, int expMonth, int expYear,
-                          String fingerprint) {
+                          String fingerprint, String cardType, String cardRegion) {
         this.id = id;
         this.paymentIntentId = paymentIntentId;
         this.methodType = "card";
@@ -63,6 +69,8 @@ public class PaymentAttempt {
         this.cardExpMonth = expMonth;
         this.cardExpYear = expYear;
         this.cardFingerprint = fingerprint;
+        this.cardType = cardType;
+        this.cardRegion = cardRegion;
         this.status = "processing";
         this.createdAt = Instant.now();
     }
@@ -121,6 +129,14 @@ public class PaymentAttempt {
 
     public String getCardFingerprint() {
         return cardFingerprint;
+    }
+
+    public String getCardType() {
+        return cardType;
+    }
+
+    public String getCardRegion() {
+        return cardRegion;
     }
 
     public String getAcquirerRef() {

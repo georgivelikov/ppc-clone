@@ -153,3 +153,172 @@ export interface PaymentSummary {
   since: string;
   today: { currency: string; count: number; volume: number }[];
 }
+
+// --- balances and payouts (backend/services/ledger, backend/services/payouts) ---------------------
+
+export interface MoneyAmount {
+  /** Minor units. Negative means the merchant owes money (e.g. a refund after a payout). */
+  amount: number;
+  currency: string;
+}
+
+export interface Balance {
+  object: "balance";
+  livemode: boolean;
+  pending: MoneyAmount[];
+  available: MoneyAmount[];
+  reserved: MoneyAmount[];
+}
+
+export type BalanceTransactionType = "payment" | "refund" | "payout" | "payout_failure";
+
+export interface BalanceTransaction {
+  id: string;
+  object: "balance_transaction";
+  type: BalanceTransactionType;
+  /** The payment, refund or payout this row is about. */
+  source_id: string;
+  /** For refunds: the payment that was refunded. */
+  parent_id: string | null;
+  currency: string;
+  /** Before fees. */
+  gross: number;
+  fee: number;
+  /** What the merchant's balance changed by. */
+  net: number;
+  description: string;
+  available_on: string | null;
+  created: string;
+  livemode: boolean;
+}
+
+export interface BalanceTransactionList {
+  object: "list";
+  data: BalanceTransaction[];
+  has_more: boolean;
+}
+
+export interface BalanceTransactionListParams {
+  type?: BalanceTransactionType | "";
+  /** A payment id also matches the refunds made against it. */
+  source?: string;
+  starting_after?: string;
+  limit?: number;
+  livemode?: boolean;
+}
+
+export interface BalanceSummaryDay {
+  date: string;
+  currency: string;
+  /** Card volume in minor units. */
+  volume: number;
+  fees: number;
+  net: number;
+}
+
+export interface BalanceSummary {
+  object: "list";
+  data: BalanceSummaryDay[];
+}
+
+export type PayoutStatus = "pending" | "in_transit" | "paid" | "failed";
+
+export interface Payout {
+  id: string;
+  object: "payout";
+  /** What reaches the bank, in minor units. */
+  amount: number;
+  /** Instant-payout fee, charged on top of the amount. */
+  fee: number;
+  currency: string;
+  status: PayoutStatus;
+  kind: "scheduled" | "instant";
+  arrival_date: string;
+  bank_account_id: string;
+  failure_code: string | null;
+  created: string;
+  livemode: boolean;
+}
+
+export interface PayoutItem {
+  journal_entry_ref: string;
+  /** The payment, refund or payout the ledger entry came from. */
+  source_id: string;
+  amount: number;
+}
+
+export interface PayoutDetail {
+  payout: Payout;
+  items: PayoutItem[];
+}
+
+export interface PayoutList {
+  object: "list";
+  data: Payout[];
+  has_more: boolean;
+}
+
+export interface PayoutListParams {
+  status?: PayoutStatus | "";
+  starting_after?: string;
+  limit?: number;
+  livemode?: boolean;
+}
+
+/** What "Pay out now" would do right now. */
+export interface PayoutPreview {
+  currency: string;
+  available: number;
+  fee: number;
+  net: number;
+  has_bank_account: boolean;
+}
+
+export interface PayoutReconciliation {
+  payout_id: string;
+  amount: number;
+  fee: number;
+  items_total: number;
+  item_count: number;
+  /** True when the items add up to amount plus fee. */
+  balanced: boolean;
+}
+
+export type PayoutScheduleInterval = "daily" | "weekly" | "manual";
+
+export interface PayoutSchedule {
+  object: "payout_schedule";
+  schedule: PayoutScheduleInterval;
+  /** Days funds stay pending after a payment. */
+  delay_days: number;
+  weekly_anchor: string;
+}
+
+export interface UpdatePayoutScheduleInput {
+  schedule?: PayoutScheduleInterval;
+  delay_days?: number;
+  weekly_anchor?: string;
+}
+
+export interface BankAccount {
+  id: string;
+  object: "bank_account";
+  country: string;
+  iban_last4: string;
+  holder_name: string;
+  currency: string;
+  status: "active" | "removed";
+  livemode: boolean;
+  created: string;
+}
+
+export interface BankAccountList {
+  object: "list";
+  data: BankAccount[];
+}
+
+export interface CreateBankAccountInput {
+  iban: string;
+  holder_name: string;
+  currency?: string;
+}

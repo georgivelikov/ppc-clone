@@ -27,8 +27,8 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: "Home", to: "/", icon: Home },
   { label: "Payments", to: "/payments", icon: CreditCard },
-  { label: "Balances", to: "/balances", icon: Wallet, phase: 2 },
-  { label: "Payouts", to: "/payouts", icon: Banknote, phase: 2 },
+  { label: "Balances", to: "/balances", icon: Wallet },
+  { label: "Payouts", to: "/payouts", icon: Banknote },
   { label: "Links", to: "/links", icon: Link2, phase: 4 },
   { label: "Customers", to: "/customers", icon: Users, phase: 5 },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat, phase: 5 },

@@ -19,4 +19,6 @@ include(
     "services:gateway",
     "services:acquirer-sim",
     "services:payments",
+    "services:ledger",
+    "services:payouts",
 )

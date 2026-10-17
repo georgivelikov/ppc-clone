@@ -1,0 +1,45 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: ledger
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ledger
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so the ledger can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: ledger
+      auto-offset-reset: earliest
+      # Offsets are committed by the listener container after the handler's transaction commits.
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets tests push time forward via POST /admin/clock/advance.
+    simulated: true
+  ledger:
+    # How often the availability job looks for pending funds that became available.
+    availability-poll-interval: PT5S

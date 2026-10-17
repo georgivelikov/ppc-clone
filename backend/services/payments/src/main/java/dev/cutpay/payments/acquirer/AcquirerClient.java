@@ -24,7 +24,9 @@ public class AcquirerClient {
 
     private static final Logger log = LoggerFactory.getLogger(AcquirerClient.class);
 
-    public record CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint) {
+    /** {@code cardType} / {@code cardRegion} come from the issuer BIN lookup and drive the fee schedule. */
+    public record CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
+                           String cardType, String cardRegion) {
     }
 
     public sealed interface AuthResult {
