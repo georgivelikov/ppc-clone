@@ -76,7 +76,8 @@ test.describe("merchant authentication", () => {
     await signUp(page, uniqueEmail());
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Payments" })).toHaveCount(0);
-    await expect(nav.getByText("Payments")).toHaveAttribute("aria-disabled", "true");
+    await expect(nav.getByRole("link", { name: "Payments" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Balances" })).toHaveCount(0);
+    await expect(nav.getByText("Balances")).toHaveAttribute("aria-disabled", "true");
   });
 });

@@ -37,7 +37,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ✅ Built |
-| 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ⏳ Planned |
+| 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ✅ Built |
 | 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ⏳ Planned |
 | 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ⏳ Planned |
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) | ⏳ Planned |
@@ -65,15 +65,18 @@ e2e/        Playwright end-to-end tests
 # 1. Infrastructure: Postgres, Kafka, Redis, Mailpit, Kafka UI
 docker compose -f infra/docker-compose.yml up -d
 
-# 2. Backend (two terminals)
+# 2. Backend (one terminal per service)
 cd backend
 ./gradlew :services:identity:bootRun      # http://localhost:8081
+./gradlew :services:payments:bootRun      # http://localhost:8082
+./gradlew :services:acquirer-sim:bootRun  # http://localhost:8083  (fake card network)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard
 cd frontend
 npx pnpm@10.34.7 install
-npx pnpm@10.34.7 dev                      # http://localhost:5173
+npx pnpm@10.34.7 dev                      # dashboard, http://localhost:5173
+npx pnpm@10.34.7 --filter @cutpay/checkout dev   # hosted checkout, http://localhost:5174
 ```
 
 On Windows use `gradlew.bat` instead of `./gradlew`.
@@ -81,6 +84,7 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 | Tool | URL |
 |---|---|
 | Dashboard | http://localhost:5173 |
+| Hosted checkout | http://localhost:5174 (links are created from the dashboard's Payments page) |
 | API gateway | http://localhost:8080 |
 | Kafka UI | http://localhost:8085 |
 | Mailpit (fake inbox) | http://localhost:8025 |
@@ -93,7 +97,7 @@ cd frontend && npx pnpm@10.34.7 -r test    # Vitest
 cd e2e && npm install && npx playwright install chromium && npx playwright test   # needs step 1 running
 ```
 
-## Test cards (from phase 1)
+## Test cards
 
 | Card number | Result |
 |---|---|
@@ -101,6 +105,12 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test 
 | 4000 0000 0000 3220 | 3DS challenge |
 | 4000 0000 0000 0002 | Declined |
 | 4000 0000 0000 9995 | Insufficient funds |
+| 4000 0000 0000 0069 | Expired card |
+| 4000 0000 0000 0119 | Processing error (acquirer returns a 5xx) |
+| 4000 0000 0000 7777 | Acquirer times out after 10 s |
+| 5555 5555 5555 4444 | Success (Mastercard) |
+
+Use any future expiry and any CVC. The 3DS code on the fake bank page is `1234`.
 
 Full list in [phase 1](docs/plans/phase-01-card-payments.md).
 

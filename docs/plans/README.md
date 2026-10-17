@@ -49,7 +49,7 @@
 | # | Plan | Headline outcome |
 |---|---|---|
 | 0 | [Foundation](phase-00-foundation.md) ✅ | Merchant can sign up and log into an empty dashboard |
-| 1 | [Card payments core](phase-01-card-payments.md) | Pay with test card on hosted checkout, see it in dashboard, refund it |
+| 1 | [Card payments core](phase-01-card-payments.md) ✅ | Pay with test card on hosted checkout, see it in dashboard, refund it |
 | 2 | [Ledger & payouts](phase-02-ledger-payouts.md) | Fees deducted, balance shown, daily payout created |
 | 3 | [Developer platform](phase-03-developer-platform.md) | Demo shop integrates via API keys, SDK and webhooks |
 | 4 | [Links, QR & Virtual POS](phase-04-links-qr-pos.md) | Get paid without a website |

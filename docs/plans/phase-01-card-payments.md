@@ -103,3 +103,16 @@ No consumers yet besides a debug logger (ledger arrives in phase 2).
 
 ## Open questions
 - Should card form be an iframe from day one (like a real PSP) or plain form now and iframe in phase 3? (Default: plain now, iframe in phase 3.)
+
+## Implementation notes (as built)
+Where the code differs from, or adds to, the plan above:
+- **Ports:** payments 8082, acquirer-sim 8083, hosted checkout 5174.
+- **Card vault routes:** the browser reaches the acquirer only through the gateway's `/vault/tokenize` and `/vault/3ds/challenge/{id}/complete`. `/authorize`, `/refund` and `/admin/**` are not routed. `payments` asks the acquirer `GET /tokens/{token}` for brand, last four digits, expiry and fingerprint, so card metadata is never taken from the client.
+- **`failed` is terminal.** To retry after a decline the merchant creates a new payment, as the state table says. Only `requires_action` goes back to `processing` (after a successful 3DS challenge).
+- **Remote calls never hold a database transaction.** Confirm and refund both run as three steps: reserve (short transaction, row lock), call the acquirer, record the result. `amount_refunded` counts succeeded plus pending refunds so concurrent refunds cannot exceed the charge; a failed refund releases its amount.
+- **Acquirer failures:** a timeout, 5xx or open circuit (Resilience4j, 10-call window, 50% threshold, 10 s open) marks the payment `failed` with `processing_error` rather than leaving it in `processing`.
+- **Idempotency:** a servlet filter inside the security chain claims the key before the work runs, so two concurrent requests cannot both execute. 5xx responses are not stored. Keys are scoped per merchant and expire after 24 hours. (Postgres only; the Redis layer from the global conventions is not needed yet.)
+- **Merchant name** is sent by the dashboard when it creates a checkout session and snapshotted on the payment; the public API in phase 3 will look it up instead.
+- **Currency columns** are `VARCHAR(3)`, like in `identity`, rather than `CHAR(3)` (Hibernate schema validation treats `bpchar` as a different type).
+- **Query parameters** are snake_case in the API (`starting_after`, `min_amount`), mapped explicitly because Jackson naming does not apply to query strings.
+- `GET /v1/payment_stats` feeds the dashboard home page (today's volume and count).
