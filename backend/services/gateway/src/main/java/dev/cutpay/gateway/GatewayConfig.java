@@ -20,6 +20,8 @@ public class GatewayConfig {
                 .authorizeExchange(exchanges -> exchanges
                         // Login, signup, refresh and the public key set are reachable without a token.
                         .pathMatchers("/auth/**", "/.well-known/**").permitAll()
+                        // The hosted checkout and the card vault are used by anonymous customers.
+                        .pathMatchers("/checkout/**", "/vault/**").permitAll()
                         .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }))

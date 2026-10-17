@@ -35,6 +35,36 @@ spring:
               uri: ${cutpay.upstreams.identity}
               predicates:
                 - Path=/me,/v1/merchant,/.well-known/**
+            - id: payments-api
+              uri: ${cutpay.upstreams.payments}
+              predicates:
+                - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats
+            - id: checkout-public
+              uri: ${cutpay.upstreams.payments}
+              predicates:
+                - Path=/checkout/**
+              filters:
+                # Anyone can reach these, so limit them per client address.
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@clientIpKeyResolver}"
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+            # Only the card vault and the fake bank's 3DS page are public. Everything else on the
+            # acquirer (/authorize, /refund, /admin/**) is deliberately not routed.
+            - id: acquirer-public
+              uri: ${cutpay.upstreams.acquirer}
+              predicates:
+                - Path=/vault/tokenize,/vault/3ds/challenge/*/complete
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@clientIpKeyResolver}"
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    redis-rate-limiter.requestedTokens: 1
 
 management:
   endpoints:
@@ -49,3 +79,5 @@ management:
 cutpay:
   upstreams:
     identity: http://localhost:8081
+    payments: http://localhost:8082
+    acquirer: http://localhost:8083

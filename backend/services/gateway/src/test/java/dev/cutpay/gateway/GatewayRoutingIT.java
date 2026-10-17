@@ -34,6 +34,8 @@ class GatewayRoutingIT {
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         registry.add("cutpay.upstreams.identity", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
+        registry.add("cutpay.upstreams.payments", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
+        registry.add("cutpay.upstreams.acquirer", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
     }
 
     @Autowired
@@ -68,6 +70,25 @@ class GatewayRoutingIT {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class).isEqualTo("user=null merchant=null role=null");
+    }
+
+    @Test
+    void checkoutAndCardVaultArePublicButMerchantPaymentRoutesAreNot() {
+        client.get().uri("/checkout/sessions/pay_x_secret_y").exchange().expectStatus().isOk();
+        client.post().uri("/vault/tokenize").exchange().expectStatus().isOk();
+        client.post().uri("/vault/3ds/challenge/auth_1/complete").exchange().expectStatus().isOk();
+
+        client.get().uri("/v1/payment_intents").exchange().expectStatus().isUnauthorized();
+        client.post().uri("/v1/refunds").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void internalAndAcquirerAdminEndpointsAreNeverRouted() {
+        var authenticated = client.mutateWith(mockJwt().jwt(jwt -> jwt.subject("usr_1").claim("mid", "mer_1")));
+        authenticated.post().uri("/internal/3ds/callback").exchange().expectStatus().isNotFound();
+        authenticated.post().uri("/vault/admin/config").exchange().expectStatus().isNotFound();
+        authenticated.post().uri("/vault/authorize").exchange().expectStatus().isNotFound();
+        authenticated.post().uri("/vault/refund").exchange().expectStatus().isNotFound();
     }
 
     private static HttpServer startUpstream() {
