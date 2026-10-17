@@ -1,0 +1,28 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: acquirer-sim
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  payments-url: http://localhost:8082
+  acquirer:
+    # Extra delay added to every authorize call, and the share of calls that fail with a 5xx.
+    # Both can be changed at runtime through POST /admin/config (chaos experiments, phase 9).
+    latency-ms: 0
+    failure-rate: 0.0
+    timeout-card-delay: PT10S
+    three-ds-code: "1234"

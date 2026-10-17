@@ -17,4 +17,6 @@ include(
     "libs:common-test",
     "services:identity",
     "services:gateway",
+    "services:acquirer-sim",
+    "services:payments",
 )

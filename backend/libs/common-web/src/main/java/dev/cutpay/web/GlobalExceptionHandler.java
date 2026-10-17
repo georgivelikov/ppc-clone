@@ -11,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Translates exceptions into the platform's error format. */
 @RestControllerAdvice
@@ -39,6 +40,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiError.of("invalid_request_error", "malformed_body", "Request body is not valid JSON", null,
                         requestId()));
+    }
+
+    /** Keeps the status of exceptions thrown with an explicit one (e.g. a 502 from a failed upstream call). */
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<ApiError> handleStatus(ResponseStatusException e) {
+        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
+        String type = e.getStatusCode().is5xxServerError() ? "api_error" : "invalid_request_error";
+        String code = status != null ? status.name().toLowerCase(java.util.Locale.ROOT) : "error";
+        return ResponseEntity.status(e.getStatusCode())
+                .body(ApiError.of(type, code, e.getReason() != null ? e.getReason() : code, null, requestId()));
     }
 
     @ExceptionHandler(Exception.class)
