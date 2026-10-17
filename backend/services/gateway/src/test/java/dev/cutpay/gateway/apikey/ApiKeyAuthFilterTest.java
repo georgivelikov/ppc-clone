@@ -46,7 +46,8 @@ class ApiKeyAuthFilterTest {
         }
     };
 
-    private final ApiKeyAuthFilter filter = new ApiKeyAuthFilter(resolver);
+    private final java.util.List<dev.cutpay.gateway.requestlog.RequestLogEntry> logged = new java.util.ArrayList<>();
+    private final ApiKeyAuthFilter filter = new ApiKeyAuthFilter(resolver, logged::add, java.time.Clock.systemUTC());
 
     private MockServerWebExchange call(HttpMethod method, String path, String authorization) {
         var request = MockServerHttpRequest.method(method, path);
@@ -114,6 +115,27 @@ class ApiKeyAuthFilterTest {
         assertThat(call(HttpMethod.POST, "/v1/api_keys", "Bearer " + SECRET)
                 .getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(passedOn.get()).isNull();
+    }
+
+    @Test
+    void refusalsForARecognisedKeyAreShownInTheRequestLog() {
+        call(HttpMethod.POST, "/v1/payment_intents", "Bearer " + RESTRICTED);
+        call(HttpMethod.POST, "/v1/api_keys", "Bearer " + SECRET);
+
+        assertThat(logged).hasSize(2);
+        assertThat(logged.get(0).status()).isEqualTo(403);
+        assertThat(logged.get(0).merchantId()).isEqualTo("mer_1");
+        assertThat(logged.get(0).livemode()).isTrue(); // the restricted key is a live key
+        assertThat(logged.get(0).actor()).isEqualTo("key_2");
+        assertThat(logged.get(0).actorType()).isEqualTo("api_key");
+        assertThat(logged.get(0).path()).isEqualTo("/v1/payment_intents");
+        assertThat(logged.get(1).path()).isEqualTo("/v1/api_keys");
+    }
+
+    @Test
+    void anUnknownKeyIsNotLoggedBecauseThereIsNoMerchantToShowItTo() {
+        call(HttpMethod.GET, "/v1/payment_intents", "Bearer sk_test_" + "z".repeat(32));
+        assertThat(logged).isEmpty();
     }
 
     @Test

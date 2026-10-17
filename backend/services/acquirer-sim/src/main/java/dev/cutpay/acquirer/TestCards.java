@@ -24,7 +24,7 @@ final class TestCards {
             "4000000000009995", Outcome.decline("insufficient_funds", "Your card has insufficient funds."),
             "4000000000000069", Outcome.decline("expired_card", "Your card has expired."),
             "4000000000000119", Outcome.of(Behaviour.PROCESSING_ERROR),
-            "4000000000007777", Outcome.of(Behaviour.TIMEOUT));
+            "4000000000007775", Outcome.of(Behaviour.TIMEOUT));
 
     private TestCards() {
     }

@@ -11,6 +11,8 @@ import dev.cutpay.payments.payment.PaymentDtos.SessionView;
 import dev.cutpay.payments.payment.PaymentDtos.SummaryView;
 import jakarta.validation.Valid;
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,7 +41,7 @@ class PaymentController {
     PaymentView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                        @Valid @RequestBody CreatePaymentRequest request) {
         PaymentIntent intent = payments.create(merchant(jwt), livemode(jwt, requestedLivemode), request);
-        return payments.get(merchant(jwt), claim(jwt), intent.getId());
+        return payments.get(merchant(jwt), claim(jwt), intent.getId(), Set.of());
     }
 
     /** Creates a payment and returns the hosted checkout URL to send the customer to. */
@@ -63,14 +65,16 @@ class PaymentController {
                      @RequestParam(name = "min_amount", required = false) Long minAmount,
                      @RequestParam(name = "max_amount", required = false) Long maxAmount,
                      @RequestParam(name = "starting_after", required = false) String startingAfter,
+                     @RequestParam(name = "expand[]", required = false) List<String> expand,
                      @RequestParam(defaultValue = "20") int limit) {
         return payments.list(merchant(jwt), livemode(jwt, requestedLivemode), new PaymentService.Filter(status, query, from, to, minAmount, maxAmount,
-                startingAfter, limit));
+                startingAfter, limit, expansions(expand)));
     }
 
     @GetMapping("/v1/payment_intents/{id}")
-    PaymentView get(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
-        return payments.get(merchant(jwt), claim(jwt), id);
+    PaymentView get(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
+                    @RequestParam(name = "expand[]", required = false) List<String> expand) {
+        return payments.get(merchant(jwt), claim(jwt), id, expansions(expand));
     }
 
     @PostMapping("/v1/payment_intents/{id}/cancel")
@@ -104,6 +108,10 @@ class PaymentController {
     /** The mode an API key is limited to, or null for a dashboard session (which can open either by id). */
     private static Boolean claim(Jwt jwt) {
         return jwt.getClaimAsBoolean("livemode");
+    }
+
+    private static Set<String> expansions(List<String> requested) {
+        return requested == null ? Set.of() : Set.copyOf(requested);
     }
 
     private static String merchant(Jwt jwt) {

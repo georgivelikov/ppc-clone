@@ -1,5 +1,6 @@
 package dev.cutpay.acquirer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,6 +66,15 @@ class AcquirerSimTest {
         authorize(tokenize("4000000000000002")).andExpect(jsonPath("$.decline_code").value("card_declined"));
         authorize(tokenize("4000000000009995")).andExpect(jsonPath("$.decline_code").value("insufficient_funds"));
         authorize(tokenize("4000000000000069")).andExpect(jsonPath("$.decline_code").value("expired_card"));
+    }
+
+    @Test
+    void theTimeoutCardIsAcceptedByTheVaultAndAnswersSlowly() throws Exception {
+        // The documented number must pass the card checksum, or the vault rejects it before the delay can happen.
+        String token = tokenize("4000000000007775");
+        long started = System.nanoTime();
+        authorize(token).andExpect(status().isOk());
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(java.time.Duration.ofMillis(100));
     }
 
     @Test

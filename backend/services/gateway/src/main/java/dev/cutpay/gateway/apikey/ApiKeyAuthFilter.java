@@ -1,6 +1,11 @@
 package dev.cutpay.gateway.apikey;
 
 import dev.cutpay.gateway.apikey.ApiKeyResolver.Resolution;
+import dev.cutpay.gateway.requestlog.RequestLogEntry;
+import dev.cutpay.gateway.requestlog.RequestLogSink;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -37,9 +42,13 @@ public class ApiKeyAuthFilter implements WebFilter {
             new Resolution(false, "unavailable", null, false, null, List.of(), null);
 
     private final ApiKeyResolver resolver;
+    private final RequestLogSink requestLog;
+    private final Clock clock;
 
-    public ApiKeyAuthFilter(ApiKeyResolver resolver) {
+    public ApiKeyAuthFilter(ApiKeyResolver resolver, RequestLogSink requestLog, Clock clock) {
         this.resolver = resolver;
+        this.requestLog = requestLog;
+        this.clock = clock;
     }
 
     @Override
@@ -65,10 +74,7 @@ public class ApiKeyAuthFilter implements WebFilter {
                     : reject(exchange, HttpStatus.FORBIDDEN, "permission_error", "publishable_key_not_allowed",
                             "Publishable keys can only be used for checkout and card tokenization");
         }
-        if (KeyPolicy.isTeamOnly(path)) {
-            return reject(exchange, HttpStatus.FORBIDDEN, "permission_error", "api_key_not_allowed",
-                    "This endpoint cannot be called with an API key");
-        }
+        Instant started = clock.instant();
         return resolver.resolve(token)
                 .onErrorReturn(UNAVAILABLE)
                 .flatMap(resolution -> {
@@ -79,8 +85,12 @@ public class ApiKeyAuthFilter implements WebFilter {
                     if (!resolution.valid()) {
                         return invalidKey(exchange);
                     }
+                    if (KeyPolicy.isTeamOnly(path)) {
+                        return rejectAndLog(exchange, resolution, path, started, "api_key_not_allowed",
+                                "This endpoint cannot be called with an API key");
+                    }
                     if (!KeyPolicy.allows(resolution.scopes(), exchange.getRequest().getMethod(), path)) {
-                        return reject(exchange, HttpStatus.FORBIDDEN, "permission_error", "insufficient_scope",
+                        return rejectAndLog(exchange, resolution, path, started, "insufficient_scope",
                                 "This API key does not have permission for this request");
                     }
                     return chain.filter(exchange.mutate().request(request -> request.headers(
@@ -90,6 +100,21 @@ public class ApiKeyAuthFilter implements WebFilter {
 
     private static boolean looksLikeKey(String token) {
         return token.startsWith("sk_") || token.startsWith("pk_") || token.startsWith("rk_");
+    }
+
+    /**
+     * A refusal for a key we recognise is shown in the developer's request log like any other call: "why did my
+     * restricted key get a 403" is exactly what the log is for. (Requests never reach the routed-call log filter
+     * once rejected here.)
+     */
+    private Mono<Void> rejectAndLog(ServerWebExchange exchange, Resolution key, String path, Instant started,
+                                    String code, String message) {
+        var request = exchange.getRequest();
+        requestLog.publish(new RequestLogEntry(key.merchantId(), key.livemode(), request.getMethod().name(), path,
+                HttpStatus.FORBIDDEN.value(), Duration.between(started, clock.instant()).toMillis(), key.keyId(),
+                "api_key", request.getHeaders().getFirst("Idempotency-Key"),
+                request.getHeaders().getFirst("X-Request-Id"), started));
+        return reject(exchange, HttpStatus.FORBIDDEN, "permission_error", code, message);
     }
 
     private static Mono<Void> invalidKey(ServerWebExchange exchange) {

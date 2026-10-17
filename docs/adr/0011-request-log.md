@@ -15,5 +15,5 @@ Developers integrating the API need to see what their code sent and what came ba
 - Test and live entries are separate, like everything else; an API key sees only its own mode.
 
 ## Consequences
-- Calls rejected before routing (unknown API key, bad token) are not logged because there is no merchant to attribute them to.
+- Calls rejected before routing for a key nobody recognises (unknown, malformed or publishable key, bad token) are not logged because there is no merchant to attribute them to. A refusal for a key that *is* recognised (missing scope, or a team-only endpoint) is logged by the key filter itself, since that is the case a developer most needs to see.
 - Under a Kafka outage the log has gaps. That is acceptable for a debugging tool and would not be for an audit trail, which this deliberately is not.

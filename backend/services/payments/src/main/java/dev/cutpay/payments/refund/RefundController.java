@@ -23,9 +23,6 @@ class RefundController {
     record CreateRefundRequest(@NotBlank String paymentIntent, @Min(1) Long amount, @Size(max = 200) String reason) {
     }
 
-    record RefundList(List<RefundView> data) {
-    }
-
     private static boolean livemode(Jwt jwt, boolean requested) {
         return RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requested);
     }
@@ -44,11 +41,11 @@ class RefundController {
     }
 
     @GetMapping("/v1/refunds")
-    RefundList list(@AuthenticationPrincipal Jwt jwt,
+    RefundService.RefundPage list(@AuthenticationPrincipal Jwt jwt,
                     @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                     @RequestParam(name = "payment_intent", required = false) String paymentIntent,
                     @RequestParam(name = "starting_after", required = false) String startingAfter,
                     @RequestParam(defaultValue = "20") int limit) {
-        return new RefundList(refunds.list(jwt.getClaimAsString("mid"), livemode(jwt, requestedLivemode), paymentIntent, startingAfter, limit));
+        return refunds.list(jwt.getClaimAsString("mid"), livemode(jwt, requestedLivemode), paymentIntent, startingAfter, limit);
     }
 }

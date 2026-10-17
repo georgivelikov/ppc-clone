@@ -61,10 +61,14 @@ public class RefundService {
     }
 
     @Transactional(readOnly = true)
-    public List<RefundView> list(String merchantId, boolean livemode, String paymentId, String startingAfter, int limit) {
+    public RefundPage list(String merchantId, boolean livemode, String paymentId, String startingAfter, int limit) {
         int size = Math.max(1, Math.min(limit, 100));
-        return refunds.page(merchantId, livemode, paymentId, startingAfter, PageRequest.of(0, size)).stream()
-                .map(RefundView::of).toList();
+        // One more than asked for, to learn whether there is a next page.
+        var found = refunds.page(merchantId, livemode, paymentId, startingAfter, PageRequest.of(0, size + 1));
+        return new RefundPage("list", found.stream().limit(size).map(RefundView::of).toList(), found.size() > size);
+    }
+
+    public record RefundPage(String object, List<RefundView> data, boolean hasMore) {
     }
 
     private Reserved reserve(String merchantId, Boolean claimedMode, CreateRefund request) {

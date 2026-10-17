@@ -33,6 +33,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -81,11 +82,11 @@ public class PaymentService {
 
     /** {@code claimedMode} is the mode an API key is limited to; null for dashboard sessions, which see both. */
     @Transactional(readOnly = true)
-    public PaymentView get(String merchantId, Boolean claimedMode, String id) {
+    public PaymentView get(String merchantId, Boolean claimedMode, String id, Set<String> expand) {
         PaymentIntent intent = find(merchantId, claimedMode, id)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         return PaymentView.of(intent, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(id),
-                refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id));
+                refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id), expand.contains(EXPAND_LATEST_ATTEMPT));
     }
 
     private java.util.Optional<PaymentIntent> find(String merchantId, Boolean claimedMode, String id) {
@@ -93,8 +94,11 @@ public class PaymentService {
                 : intents.findByIdAndMerchantIdAndLivemode(id, merchantId, claimedMode);
     }
 
+    /** The only expandable field so far: {@code ?expand[]=latest_attempt} replaces the attempt id by the attempt. */
+    public static final String EXPAND_LATEST_ATTEMPT = "latest_attempt";
+
     public record Filter(String status, String query, Instant from, Instant to, Long minAmount, Long maxAmount,
-                         String startingAfter, int limit) {
+                         String startingAfter, int limit, Set<String> expand) {
     }
 
     @Transactional(readOnly = true)
@@ -137,9 +141,10 @@ public class PaymentService {
         var page = intents.findBy(spec, q -> q.sortBy(Sort.by(Sort.Direction.DESC, "id")).limit(limit + 1).all());
         boolean hasMore = page.size() > limit;
         var data = page.stream().limit(limit)
-                .map(p -> PaymentView.of(p, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(p.getId()), java.util.List.of()))
+                .map(p -> PaymentView.of(p, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(p.getId()), java.util.List.of(),
+                        filter.expand().contains(EXPAND_LATEST_ATTEMPT)))
                 .toList();
-        return new PaymentList(data, hasMore);
+        return new PaymentList("list", data, hasMore);
     }
 
     @Transactional

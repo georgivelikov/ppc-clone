@@ -146,6 +146,53 @@ class PaymentsFlowIT {
     }
 
     @Test
+    void latestAttemptIsAnIdUnlessExpandedAndListsAreConsistent() throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_1"}""");
+        String payment = createPayment();
+        String id = field(payment, "id");
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.latest_attempt").doesNotExist()); // nothing tried yet
+        confirm(field(payment, "client_secret"));
+
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.latest_attempt").value(org.hamcrest.Matchers.startsWith("att_")));
+        mvc.perform(get("/v1/payment_intents/" + id).param("expand[]", "latest_attempt").with(merchant()))
+                .andExpect(jsonPath("$.latest_attempt.card_last4").value("4242"))
+                .andExpect(jsonPath("$.latest_attempt.status").value("succeeded"));
+        mvc.perform(get("/v1/payment_intents").param("expand[]", "latest_attempt").with(merchant()))
+                .andExpect(jsonPath("$.object").value("list"))
+                .andExpect(jsonPath("$.has_more").value(false))
+                .andExpect(jsonPath("$.data[0].latest_attempt.card_brand").value("visa"));
+        // Unknown expansions are ignored rather than rejected, so new ones can be added without breaking callers.
+        mvc.perform(get("/v1/payment_intents/" + id).param("expand[]", "nothing").with(merchant()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void refundListsAreObjectsWithPaging() throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_1"}""");
+        ACQUIRER.stubFor(WireMock.post(urlEqualTo("/refund")).willReturn(aResponse()
+                .withHeader("Content-Type", "application/json").withBody("""
+                        {"status":"succeeded","refund_ref":"ref_1"}""")));
+        String payment = createPayment();
+        confirm(field(payment, "client_secret"));
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post("/v1/refunds").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"payment_intent\":\"" + field(payment, "id") + "\",\"amount\":500}"))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.object").value("refund"));
+        }
+        mvc.perform(get("/v1/refunds").param("limit", "1").with(merchant()))
+                .andExpect(jsonPath("$.object").value("list"))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.has_more").value(true));
+        mvc.perform(get("/v1/refunds").param("limit", "5").with(merchant()))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.has_more").value(false));
+    }
+
+    @Test
     void aDeclineEndsInFailedWithAReadableMessage() throws Exception {
         stubAuthorize("""
                 {"status":"declined","decline_code":"card_declined","message":"Your card was declined."}""");

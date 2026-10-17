@@ -90,6 +90,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      command: `${pnpm} --filter @cutpay/site dev`,
+      cwd: "../frontend",
+      url: "http://localhost:5176",
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
       // The demo shop: its own backend (4000, holds the secret key) and its storefront (5175).
       command: `${pnpm} --filter @cutpay/demo-shop dev`,
       cwd: "../frontend",

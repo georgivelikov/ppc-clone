@@ -39,7 +39,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ✅ Built |
 | 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ✅ Built |
 | 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ✅ Built |
-| 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | 🚧 In progress (API keys, mode separation and webhooks done) |
+| 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ✅ Built |
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) | ⏳ Planned |
 | 5 | [Billing](docs/plans/phase-05-billing.md) — subscriptions, invoices, pre-auth, split payments | ⏳ Planned |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
@@ -79,7 +79,9 @@ cd backend
 cd frontend
 npx pnpm@10.34.7 install
 npx pnpm@10.34.7 dev                      # dashboard, http://localhost:5173
-npx pnpm@10.34.7 --filter @cutpay/checkout dev   # hosted checkout, http://localhost:5174
+npx pnpm@10.34.7 --filter @cutpay/checkout dev   # hosted checkout and card element, http://localhost:5174
+npx pnpm@10.34.7 --filter @cutpay/site dev       # marketing site and docs, http://localhost:5176
+npx pnpm@10.34.7 --filter @cutpay/demo-shop dev  # example integration, http://localhost:5175 (backend on 4000)
 ```
 
 On Windows use `gradlew.bat` instead of `./gradlew`.
@@ -88,6 +90,8 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 |---|---|
 | Dashboard | http://localhost:5173 |
 | Hosted checkout | http://localhost:5174 (links are created from the dashboard's Payments page) |
+| Site and docs | http://localhost:5176 (API reference at `/docs/api`, rendered from [docs/api/openapi.yaml](docs/api/openapi.yaml)) |
+| Demo shop | http://localhost:5175 (see below) |
 | API gateway | http://localhost:8080 |
 | Kafka UI | http://localhost:8090 |
 | Mailpit (fake inbox) | http://localhost:8025 |
@@ -110,7 +114,7 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test 
 | 4000 0000 0000 9995 | Insufficient funds |
 | 4000 0000 0000 0069 | Expired card |
 | 4000 0000 0000 0119 | Processing error (acquirer returns a 5xx) |
-| 4000 0000 0000 7777 | Acquirer times out after 10 s |
+| 4000 0000 0000 7775 | Acquirer times out after 10 s |
 | 5555 5555 5555 4444 | Success (Mastercard) |
 | 4000 0100 0000 0001 | Success, EEA **business** card (higher fee) |
 | 4000 0200 0000 0000 | Success, **non-EEA** consumer card (higher fee) |
@@ -119,6 +123,16 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test 
 Use any future expiry and any CVC. The 3DS code on the fake bank page is `1234`.
 
 Full list in [phase 1](docs/plans/phase-01-card-payments.md).
+
+## Build an integration
+
+The platform is meant to be used like a real one:
+
+1. Sign up in the dashboard and open **Developers → API keys** to create a secret key (server) and a publishable key (web page). Each is shown once.
+2. Call the API with `Authorization: Bearer sk_test_…` (see the [API reference](docs/api/openapi.yaml)), or add the card field to a page with the SDK served at `http://localhost:5174/v1/cutpay.js`.
+3. Add a webhook endpoint under **Developers → Webhooks**; requests are signed with `Cutpay-Signature` and retried for three days. **Developers → Logs** shows every call.
+
+The [demo shop](frontend/apps/demo-shop) is a complete example: a Node backend that holds the secret key, prices orders itself and trusts only verified webhooks, with a storefront that pays either through the embedded card field or the hosted checkout. Paste your keys into its Settings page and register `http://localhost:4000/webhooks/cutpay` as a webhook endpoint.
 
 ## Payouts and time travel
 

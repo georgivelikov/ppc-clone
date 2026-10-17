@@ -30,7 +30,7 @@ Test cards (any future expiry, any CVC):
 | 4000 0000 0000 9995 | decline `insufficient_funds` |
 | 4000 0000 0000 0069 | decline `expired_card` |
 | 4000 0000 0000 0119 | `processing_error` (5xx) |
-| 4000 0000 0000 7777 | 10 s latency → timeout |
+| 4000 0000 0000 7775 | 10 s latency → timeout |
 
 Endpoints: `POST /authorize`, `POST /capture`, `POST /refund`, `POST /3ds/challenge/{id}/complete`.
 Card data **never** stored by `payments`: checkout posts PAN to `acquirer-sim /tokenize` → returns `tok_…` (mimics a PCI vault). Payments only stores brand, last4, exp, fingerprint.

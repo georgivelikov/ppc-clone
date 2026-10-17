@@ -34,6 +34,8 @@ export function LogsPage() {
         livemode,
       }),
     getNextPageParam: (last) => (last.has_more ? last.data.at(-1)?.id : undefined),
+    // New calls keep arriving while you debug, so look again every few seconds.
+    refetchInterval: 5000,
   });
   const rows = logs.data?.pages.flatMap((page) => page.data) ?? [];
 

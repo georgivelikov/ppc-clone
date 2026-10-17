@@ -1,0 +1,1545 @@
+openapi: 3.1.0
+info:
+  title: Cutpay API
+  version: "2026-10-01"
+  summary: Accept card payments, see your balance and get paid out.
+  description: |
+    The Cutpay API is organised around REST. It has predictable resource URLs, accepts and returns JSON,
+    and uses standard HTTP status codes and verbs.
+
+    ## Authentication
+    Authenticate with an API key in the `Authorization` header: `Authorization: Bearer sk_test_...`.
+    Keys come in three kinds:
+
+    - **Secret keys** (`sk_test_...`, `sk_live_...`) have full access. Keep them on your server.
+    - **Restricted keys** (`rk_test_...`, `rk_live_...`) are limited to the resources you choose, for example
+      `payments:read`. A scope ending in `:write` also allows reading.
+    - **Publishable keys** (`pk_test_...`, `pk_live_...`) are safe to put in web pages. They can only be used
+      with the checkout SDK and cannot call this API.
+
+    A key works in one mode. **Test mode** and **live mode** data are completely separate: a test key never sees
+    live objects and the other way round.
+
+    ## Idempotency
+    Send an `Idempotency-Key` header on `POST` requests. Repeating a request with the same key and body replays
+    the first response (marked `Idempotent-Replayed: true`) instead of creating a second object. Using the same
+    key with a different body returns `409 idempotency_key_reuse`. Keys expire after 24 hours.
+
+    ## Versioning
+    Pin the behaviour you integrated against with `Cutpay-Version: 2026-10-01`. Without it you get the latest
+    version. Every response repeats the version used in the `Cutpay-Version` header.
+
+    ## Money
+    Amounts are integers in the smallest currency unit, so `2500` with `EUR` is €25.00.
+
+    ## Lists
+    List endpoints return `{ "object": "list", "data": [...], "has_more": true }` and page with `limit` and
+    `starting_after` (the `id` of the last object you received).
+
+    ## Expanding
+    Some fields hold an id by default and can be replaced by the full object with `expand[]`, for example
+    `GET /v1/payment_intents/{id}?expand[]=latest_attempt`.
+
+    ## Webhooks
+    Cutpay sends events to your endpoints as signed HTTP requests; see the webhook endpoint operations and the
+    webhooks guide. Verify the `Cutpay-Signature` header before trusting a request.
+  license:
+    name: Educational project
+    identifier: MIT
+servers:
+  - url: http://localhost:8080
+    description: Local development
+security:
+  - apiKey: []
+tags:
+  - name: Payments
+    description: Create and track card payments.
+  - name: Refunds
+    description: Return money to a customer.
+  - name: Balance
+    description: Pending, available and reserved funds, and every movement behind them.
+  - name: Payouts
+    description: Money sent to your bank account.
+  - name: Webhooks
+    description: Endpoints that receive events, and the log of what was sent.
+  - name: Events
+    description: Everything that happened in your account.
+paths:
+  /v1/payment_intents:
+    post:
+      tags: [Payments]
+      operationId: createPaymentIntent
+      summary: Create a payment
+      description: |
+        Creates a payment waiting for a card. Give the returned `client_secret` to the checkout SDK, or use
+        `/v1/checkout_sessions` for the hosted page.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/ApiVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentIntent"
+      responses:
+        "201":
+          description: The payment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntent"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags: [Payments]
+      operationId: listPaymentIntents
+      summary: List payments
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - name: q
+          in: query
+          description: Matches the payment id or the customer email.
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Only payments created at or after this time.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Only payments created before this time.
+          schema:
+            type: string
+            format: date-time
+        - name: min_amount
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: max_amount
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - $ref: "#/components/parameters/ExpandPayment"
+      responses:
+        "200":
+          description: A page of payments, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntentList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/payment_intents/{id}:
+    get:
+      tags: [Payments]
+      operationId: getPaymentIntent
+      summary: Retrieve a payment
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/ExpandPayment"
+      responses:
+        "200":
+          description: The payment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payment_intents/{id}/cancel:
+    post:
+      tags: [Payments]
+      operationId: cancelPaymentIntent
+      summary: Cancel a payment
+      description: Only a payment that has not been paid yet can be canceled.
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The canceled payment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/checkout_sessions:
+    post:
+      tags: [Payments]
+      operationId: createCheckoutSession
+      summary: Create a hosted checkout
+      description: Creates a payment and returns the address of the page where the customer pays.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentIntent"
+      responses:
+        "201":
+          description: The payment and where to send the customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/refunds:
+    post:
+      tags: [Refunds]
+      operationId: createRefund
+      summary: Refund a payment
+      description: |
+        Refunds all or part of a succeeded payment. The processing fee is not returned. A payment can be refunded
+        several times until its whole amount has been returned.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_intent]
+              properties:
+                payment_intent:
+                  type: string
+                  description: The payment to refund.
+                amount:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: Defaults to everything still refundable.
+                reason:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: The refund.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Refund"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Refunds]
+      operationId: listRefunds
+      summary: List refunds
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: payment_intent
+          in: query
+          description: Only refunds of this payment.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of refunds, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/balance:
+    get:
+      tags: [Balance]
+      operationId: getBalance
+      summary: Retrieve your balance
+      description: |
+        `pending` funds are not yet available, `available` funds can be paid out. A negative amount means you
+        owe money, for example after a refund that followed a payout.
+      responses:
+        "200":
+          description: Your balance, per currency.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/balance_transactions:
+    get:
+      tags: [Balance]
+      operationId: listBalanceTransactions
+      summary: List balance transactions
+      description: Every payment, refund and payout that moved your balance, with fees and net amounts.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [payment, refund, payout]
+        - name: source
+          in: query
+          description: A payment id (also matches its refunds), refund id or payout id.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A page of balance transactions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceTransactionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/payouts:
+    get:
+      tags: [Payouts]
+      operationId: listPayouts
+      summary: List payouts
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PayoutStatus"
+      responses:
+        "200":
+          description: A page of payouts, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Payouts]
+      operationId: createPayout
+      summary: Pay out now
+      description: |
+        Pays out everything that is available straight away. Instant payouts cost 1% on top; waiting for the next
+        scheduled payout is free. Use `GET /v1/payouts/preview` to see the cost first.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currency:
+                  type: string
+                  default: EUR
+      responses:
+        "201":
+          description: The payout.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payout"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/payouts/preview:
+    get:
+      tags: [Payouts]
+      operationId: previewPayout
+      summary: Preview an instant payout
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: EUR
+      responses:
+        "200":
+          description: What an instant payout would cost and deliver.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [currency, available, fee, net, has_bank_account]
+                properties:
+                  currency:
+                    type: string
+                  available:
+                    type: integer
+                    format: int64
+                  fee:
+                    type: integer
+                    format: int64
+                  net:
+                    type: integer
+                    format: int64
+                  has_bank_account:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/payouts/{id}:
+    get:
+      tags: [Payouts]
+      operationId: getPayout
+      summary: Retrieve a payout
+      description: Includes the transactions the payout settles.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The payout and what is in it.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payout, items]
+                properties:
+                  payout:
+                    $ref: "#/components/schemas/Payout"
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [journal_entry_ref, source_id, amount]
+                      properties:
+                        journal_entry_ref:
+                          type: string
+                        source_id:
+                          type: string
+                          description: The payment, refund or payout this came from.
+                        amount:
+                          type: integer
+                          format: int64
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/bank_accounts:
+    get:
+      tags: [Payouts]
+      operationId: listBankAccounts
+      summary: List bank accounts
+      responses:
+        "200":
+          description: Active bank accounts, newest first. The full IBAN is never returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object:
+                    type: string
+                    const: list
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BankAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Payouts]
+      operationId: createBankAccount
+      summary: Add a bank account
+      description: |
+        The IBAN is checked (country, length and checksum). With the simulated bank, an IBAN ending in `0000`
+        is accepted but its payouts fail with `account_closed`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [iban, holder_name]
+              properties:
+                iban:
+                  type: string
+                  example: BG80BNBG96611020345678
+                holder_name:
+                  type: string
+                currency:
+                  type: string
+                  default: EUR
+      responses:
+        "201":
+          description: The bank account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/bank_accounts/{id}:
+    delete:
+      tags: [Payouts]
+      operationId: deleteBankAccount
+      summary: Remove a bank account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The account was removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deleted"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/payout_schedule:
+    get:
+      tags: [Payouts]
+      operationId: getPayoutSchedule
+      summary: Retrieve the payout schedule
+      responses:
+        "200":
+          description: The schedule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutSchedule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Payouts]
+      operationId: updatePayoutSchedule
+      summary: Update the payout schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                schedule:
+                  type: string
+                  enum: [daily, weekly, manual]
+                delay_days:
+                  type: integer
+                  minimum: 0
+                  maximum: 30
+                  description: How many days payments wait before they can be paid out.
+                weekly_anchor:
+                  type: string
+                  description: Day of the week for weekly payouts, for example `MONDAY`.
+      responses:
+        "200":
+          description: The new schedule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutSchedule"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/webhook_endpoints:
+    post:
+      tags: [Webhooks]
+      operationId: createWebhookEndpoint
+      summary: Add a webhook endpoint
+      description: |
+        The response contains the signing `secret` (`whsec_...`) **once**. In live mode the URL must use https and
+        cannot point at an internal address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                enabled_events:
+                  type: array
+                  description: Event types, `family.*` wildcards or `*`. Defaults to everything.
+                  items:
+                    type: string
+                  minItems: 1
+                  examples:
+                    - ["payment_intent.succeeded", "payout.*"]
+                description:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: The endpoint, with its secret.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEndpoint"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [Webhooks]
+      operationId: listWebhookEndpoints
+      summary: List webhook endpoints
+      responses:
+        "200":
+          description: The endpoints, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object:
+                    type: string
+                    const: list
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WebhookEndpoint"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/webhook_endpoints/{id}:
+    parameters:
+      - $ref: "#/components/parameters/EndpointId"
+    get:
+      tags: [Webhooks]
+      operationId: getWebhookEndpoint
+      summary: Retrieve a webhook endpoint
+      responses:
+        "200":
+          description: The endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEndpoint"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Webhooks]
+      operationId: updateWebhookEndpoint
+      summary: Update a webhook endpoint
+      description: Set `status` to `enabled` to switch on an endpoint that was disabled after repeated failures.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                enabled_events:
+                  type: array
+                  items:
+                    type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [enabled, disabled]
+      responses:
+        "200":
+          description: The updated endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEndpoint"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Webhooks]
+      operationId: deleteWebhookEndpoint
+      summary: Delete a webhook endpoint
+      responses:
+        "200":
+          description: The endpoint was deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deleted"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/webhook_endpoints/{id}/test:
+    post:
+      tags: [Webhooks]
+      operationId: sendTestWebhook
+      summary: Send a test event
+      description: Queues a `webhook_endpoint.test` event for this endpoint only, whatever it is subscribed to.
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+      responses:
+        "201":
+          description: The queued delivery.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery_id, endpoint]
+                properties:
+                  delivery_id:
+                    type: string
+                  endpoint:
+                    type: string
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/webhook_deliveries:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhookDeliveries
+      summary: List webhook deliveries
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: endpoint
+          in: query
+          schema:
+            type: string
+        - name: event
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, succeeded, failed]
+      responses:
+        "200":
+          description: A page of deliveries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/webhook_deliveries/{id}:
+    get:
+      tags: [Webhooks]
+      operationId: getWebhookDelivery
+      summary: Retrieve a webhook delivery
+      description: Includes every attempt with the response your server gave.
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: The delivery.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/webhook_deliveries/{id}/retry:
+    post:
+      tags: [Webhooks]
+      operationId: retryWebhookDelivery
+      summary: Resend a webhook delivery
+      description: Sends the delivery again right away, even if it already succeeded.
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "202":
+          description: The delivery, queued to be sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: List events
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/EventType"
+      responses:
+        "200":
+          description: A page of events, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data, has_more]
+                properties:
+                  object:
+                    type: string
+                    const: list
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Event"
+                  has_more:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/events/{id}:
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Retrieve an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The event, exactly as it was sent to endpoints.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+webhooks:
+  event:
+    post:
+      tags: [Webhooks]
+      operationId: receiveEvent
+      summary: An event, sent to your endpoint
+      description: |
+        Cutpay sends a `POST` with the event as JSON. Answer with any `2xx` status within 10 seconds to
+        acknowledge it; anything else, or no answer, makes Cutpay retry after 1 minute, 5 minutes, 30 minutes,
+        2 hours, 5 hours and then every 10 hours, for up to 3 days.
+
+        Requests carry `Cutpay-Signature: t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256 of
+        `<t>.<raw body>` using your endpoint's signing secret. Check it on the **raw** body and reject requests
+        whose timestamp is more than 5 minutes old. The same event can arrive more than once (use the event
+        `id` to deduplicate), and events can arrive out of order.
+      security: []
+      parameters:
+        - name: Cutpay-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            examples:
+              - t=1760000000,v1=53dc054739ad94d3532227ba8d397f66ed2166a6b66940c2006692fa6db6829f
+        - name: Cutpay-Event-Id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Event"
+      responses:
+        "200":
+          description: Acknowledged. Any 2xx status works.
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: "sk_test_... / sk_live_... / rk_..."
+      description: A secret or restricted API key. Publishable keys cannot call this API.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Makes the request safe to retry. Up to 255 characters; kept for 24 hours.
+      schema:
+        type: string
+        maxLength: 255
+    ApiVersion:
+      name: Cutpay-Version
+      in: header
+      required: false
+      description: The API version to use. Defaults to the latest.
+      schema:
+        type: string
+        enum: ["2026-10-01"]
+    Limit:
+      name: limit
+      in: query
+      description: How many objects to return (1 to 100).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    StartingAfter:
+      name: starting_after
+      in: query
+      description: The `id` of the last object of the previous page.
+      schema:
+        type: string
+    ExpandPayment:
+      name: expand[]
+      in: query
+      description: Fields to replace with the full object.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum: [latest_attempt]
+    PaymentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [pay_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    EndpointId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [we_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    DeliveryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [whd_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+  responses:
+    InvalidRequest:
+      description: The request was not valid. `error.param` names the offending field when there is one.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: The API key is missing, wrong, revoked or expired.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The key is valid but may not do this, for example a restricted key without the scope.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such object in this mode.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The object is in a state that does not allow this, or the idempotency key was misused.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [type, code, message]
+          properties:
+            type:
+              type: string
+              examples: [invalid_request_error]
+            code:
+              type: string
+              description: A stable machine-readable code.
+              examples: [payment_not_found]
+            message:
+              type: string
+            param:
+              type: string
+            request_id:
+              type: string
+    Deleted:
+      type: object
+      required: [id, object, deleted]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        deleted:
+          type: boolean
+    Metadata:
+      type: object
+      description: Your own key-value data, kept on the object and returned as you sent it.
+      additionalProperties:
+        type: string
+    PaymentStatus:
+      type: string
+      enum:
+        - requires_payment_method
+        - processing
+        - requires_action
+        - succeeded
+        - failed
+        - canceled
+        - partially_refunded
+        - refunded
+    CreatePaymentIntent:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 99999999
+          description: In the smallest currency unit.
+        currency:
+          type: string
+          description: Three-letter ISO code.
+          examples: [EUR]
+        description:
+          type: string
+          maxLength: 500
+        customer_email:
+          type: string
+          format: email
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        return_url:
+          type: string
+          format: uri
+          description: Where the customer returns after paying on the hosted page.
+        merchant_name:
+          type: string
+          maxLength: 160
+          description: Shown to the customer on the checkout.
+    PaymentAttempt:
+      type: object
+      properties:
+        id:
+          type: string
+        method_type:
+          type: string
+          examples: [card]
+        card_brand:
+          type: string
+          enum: [visa, mastercard, amex, unknown]
+        card_last4:
+          type: string
+        card_exp_month:
+          type: integer
+        card_exp_year:
+          type: integer
+        status:
+          type: string
+        decline_code:
+          type: [string, "null"]
+        three_ds_status:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+    PaymentIntent:
+      type: object
+      required: [id, object, livemode, amount, currency, status, created_at]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: payment_intent
+        livemode:
+          type: boolean
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        capture_method:
+          type: string
+        description:
+          type: [string, "null"]
+        customer_email:
+          type: [string, "null"]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        client_secret:
+          type: string
+          description: Hand this to the checkout SDK. Treat it like a password for this one payment.
+        return_url:
+          type: [string, "null"]
+        amount_refunded:
+          type: integer
+          format: int64
+        failure_code:
+          type: [string, "null"]
+        failure_message:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentAttempt"
+        refunds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Refund"
+        latest_attempt:
+          description: The newest attempt's id, or the attempt itself with `expand[]=latest_attempt`.
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/PaymentAttempt"
+            - type: "null"
+    PaymentIntentList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentIntent"
+        has_more:
+          type: boolean
+    CheckoutSession:
+      type: object
+      required: [payment_id, client_secret, url]
+      properties:
+        payment_id:
+          type: string
+        client_secret:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: Send the customer here.
+    Refund:
+      type: object
+      required: [id, object, payment_intent, amount, currency, status]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: refund
+        payment_intent:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        reason:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [pending, succeeded, failed]
+        failure_code:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+    RefundList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Refund"
+        has_more:
+          type: boolean
+    Amount:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+    Balance:
+      type: object
+      required: [object, livemode, pending, available, reserved]
+      properties:
+        object:
+          type: string
+          const: balance
+        livemode:
+          type: boolean
+        pending:
+          type: array
+          items:
+            $ref: "#/components/schemas/Amount"
+        available:
+          type: array
+          items:
+            $ref: "#/components/schemas/Amount"
+        reserved:
+          type: array
+          items:
+            $ref: "#/components/schemas/Amount"
+    BalanceTransaction:
+      type: object
+      required: [id, object, type, currency, gross, fee, net]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: balance_transaction
+        type:
+          type: string
+          enum: [payment, refund, payout]
+        source_id:
+          type: string
+        parent_id:
+          type: [string, "null"]
+        currency:
+          type: string
+        gross:
+          type: integer
+          format: int64
+          description: The amount that moved, before fees.
+        fee:
+          type: integer
+          format: int64
+        net:
+          type: integer
+          format: int64
+          description: What your balance changed by.
+        description:
+          type: [string, "null"]
+        available_on:
+          type: [string, "null"]
+          format: date-time
+        created:
+          type: string
+          format: date-time
+        livemode:
+          type: boolean
+    BalanceTransactionList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceTransaction"
+        has_more:
+          type: boolean
+    PayoutStatus:
+      type: string
+      enum: [pending, in_transit, paid, failed]
+    Payout:
+      type: object
+      required: [id, object, amount, fee, currency, status, kind]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: payout
+        amount:
+          type: integer
+          format: int64
+          description: What reaches the bank.
+        fee:
+          type: integer
+          format: int64
+          description: The instant-payout fee, charged on top.
+        currency:
+          type: string
+        status:
+          $ref: "#/components/schemas/PayoutStatus"
+        kind:
+          type: string
+          enum: [scheduled, instant]
+        arrival_date:
+          type: string
+          format: date
+        bank_account_id:
+          type: string
+        failure_code:
+          type: [string, "null"]
+          examples: [account_closed]
+        created:
+          type: string
+          format: date-time
+        livemode:
+          type: boolean
+    PayoutList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payout"
+        has_more:
+          type: boolean
+    BankAccount:
+      type: object
+      required: [id, object, country, iban_last4, holder_name, currency, status]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: bank_account
+        country:
+          type: string
+        iban_last4:
+          type: string
+        holder_name:
+          type: string
+        currency:
+          type: string
+        status:
+          type: string
+        livemode:
+          type: boolean
+        created:
+          type: string
+          format: date-time
+    PayoutSchedule:
+      type: object
+      required: [object, schedule, delay_days, weekly_anchor]
+      properties:
+        object:
+          type: string
+          const: payout_schedule
+        schedule:
+          type: string
+          enum: [daily, weekly, manual]
+        delay_days:
+          type: integer
+        weekly_anchor:
+          type: string
+    EventType:
+      type: string
+      enum:
+        - payment_intent.created
+        - payment_intent.requires_action
+        - payment_intent.succeeded
+        - payment_intent.payment_failed
+        - payment_intent.canceled
+        - charge.refunded
+        - refund.created
+        - refund.failed
+        - payout.created
+        - payout.paid
+        - payout.failed
+        - webhook_endpoint.test
+    Event:
+      type: object
+      required: [id, object, type, api_version, livemode, created_at, data]
+      properties:
+        id:
+          type: string
+          description: Stable across retries; use it to deduplicate.
+        object:
+          type: string
+          const: event
+        type:
+          $ref: "#/components/schemas/EventType"
+        api_version:
+          type: string
+        livemode:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          required: [object]
+          properties:
+            object:
+              type: object
+              description: The payment intent, refund, payout or endpoint the event is about.
+              additionalProperties: true
+    WebhookEndpoint:
+      type: object
+      required: [id, object, url, enabled_events, status, livemode]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: webhook_endpoint
+        url:
+          type: string
+          format: uri
+        description:
+          type: [string, "null"]
+        enabled_events:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [enabled, disabled]
+        disabled_reason:
+          type: [string, "null"]
+        livemode:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        secret:
+          type: [string, "null"]
+          description: The signing secret. Only in the response that creates the endpoint.
+    DeliveryAttempt:
+      type: object
+      required: [attempt, duration_ms, created_at]
+      properties:
+        attempt:
+          type: integer
+        response_code:
+          type: [integer, "null"]
+          description: Null when your server did not answer.
+        response_body_snippet:
+          type: [string, "null"]
+          description: The first 500 characters of your answer.
+        error:
+          type: [string, "null"]
+        duration_ms:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+    WebhookDelivery:
+      type: object
+      required: [id, object, event_id, event_type, endpoint_id, status, attempts]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: webhook_delivery
+        event_id:
+          type: string
+        event_type:
+          $ref: "#/components/schemas/EventType"
+        endpoint_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, succeeded, failed]
+        attempts:
+          type: integer
+        next_attempt_at:
+          type: [string, "null"]
+          format: date-time
+        last_response_code:
+          type: [integer, "null"]
+        livemode:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        attempt_log:
+          type: [array, "null"]
+          description: Only when retrieving a single delivery.
+          items:
+            $ref: "#/components/schemas/DeliveryAttempt"
+    WebhookDeliveryList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDelivery"
+        has_more:
+          type: boolean

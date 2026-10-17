@@ -31,6 +31,9 @@ async function payHundredEuros(page: Page, context: import("@playwright/test").B
   await checkout.getByLabel("CVC").fill("123");
   await checkout.getByRole("button", { name: /^Pay/ }).click();
   await expect(checkout.getByRole("heading", { name: "Payment successful" })).toBeVisible();
+  // The dialog that offered the link is still open on the dashboard tab and would cover the sidebar.
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).first().click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 /** The ledger and payouts services run on a simulated clock; this moves both forward. */
@@ -43,6 +46,7 @@ async function advanceClocks(request: import("@playwright/test").APIRequestConte
 
 test.describe("balances and payouts", () => {
   test("a payment is pending, becomes available after the delay and is paid out", async ({ page, context, request }) => {
+    test.setTimeout(90_000);
     await signUp(page);
     await payHundredEuros(page, context);
 
@@ -51,19 +55,34 @@ test.describe("balances and payouts", () => {
     await expect(page.getByTestId("balance-available")).toHaveText("€0.00");
 
     await advanceClocks(request, 2);
-    await page.reload();
-    await expect(page.getByTestId("balance-available")).toHaveText("€98.61", { timeout: 15_000 });
+    // The ledger moves funds to available on a 5 second timer, so look again until it has.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByTestId("balance-available")).toHaveText("€98.61", { timeout: 2_000 });
+    }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] });
     await expect(page.getByTestId("balance-pending")).toHaveText("€0.00");
 
     await page.goto("/settings/payouts");
     await page.getByLabel("IBAN").fill("BG80 BNBG 9661 1020 3456 78");
+    await page.getByLabel("Account holder").fill("Rose Cafe Ltd");
     await page.getByRole("button", { name: "Add bank account" }).click();
-    await expect(page.getByText("•••• 5678")).toBeVisible();
+    // Only the country and the last four digits come back from the API.
+    await expect(page.getByText("BG•• •••• 5678", { exact: false })).toBeVisible();
 
     await nav(page, "Payouts");
     await page.getByRole("button", { name: "Pay out now" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: /Pay out/ }).click();
-    await page.getByRole("link", { name: /€/ }).first().click();
-    await expect(page.getByText("Paid", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("dialog").getByRole("button", { name: "Confirm payout" }).click();
+
+    // Confirming opens the new payout, which is on its way: the fake bank needs a simulated minute.
+    await expect(page).toHaveURL(/\/payouts\/po_/);
+    await expect(page.getByText("In transit", { exact: true })).toBeVisible();
+    for (const port of [8085]) {
+      const res = await request.post(`http://localhost:${port}/admin/clock/advance?minutes=2`);
+      expect(res.ok()).toBeTruthy();
+    }
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByText("Paid", { exact: true })).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] });
   });
 });

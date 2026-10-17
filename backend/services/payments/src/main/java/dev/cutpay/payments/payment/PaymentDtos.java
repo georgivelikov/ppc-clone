@@ -42,10 +42,10 @@ public final class PaymentDtos {
         }
     }
 
-    public record RefundView(String id, String paymentIntent, long amount, String currency, String reason,
-                             String status, String failureCode, Instant createdAt) {
+    public record RefundView(String id, String object, String paymentIntent, long amount, String currency,
+                             String reason, String status, String failureCode, Instant createdAt) {
         public static RefundView of(Refund r) {
-            return new RefundView(r.getId(), r.getPaymentIntentId(), r.getAmount(), r.getCurrency(), r.getReason(),
+            return new RefundView(r.getId(), "refund", r.getPaymentIntentId(), r.getAmount(), r.getCurrency(), r.getReason(),
                     r.getStatus(), r.getFailureCode(), r.getCreatedAt());
         }
     }
@@ -54,19 +54,32 @@ public final class PaymentDtos {
                               String status, String captureMethod, String description, String customerEmail,
                               Map<String, String> metadata, String clientSecret, String returnUrl,
                               long amountRefunded, String failureCode, String failureMessage, Instant createdAt,
-                              Instant updatedAt, List<AttemptView> attempts, List<RefundView> refunds) {
+                              Instant updatedAt, List<AttemptView> attempts, List<RefundView> refunds,
+                              Object latestAttempt) {
 
         static PaymentView of(PaymentIntent p, List<PaymentAttempt> attempts, List<Refund> refunds) {
+            return of(p, attempts, refunds, false);
+        }
+
+        /**
+         * {@code latestAttempt} is the id of the newest attempt, or the whole attempt when the caller asked
+         * for {@code expand[]=latest_attempt}.
+         */
+        static PaymentView of(PaymentIntent p, List<PaymentAttempt> attempts, List<Refund> refunds,
+                              boolean expandLatestAttempt) {
+            Object latest = attempts.isEmpty() ? null
+                    : expandLatestAttempt ? AttemptView.of(attempts.get(attempts.size() - 1))
+                    : attempts.get(attempts.size() - 1).getId();
             return new PaymentView(p.getId(), "payment_intent", p.isLivemode(), p.getAmount(), p.getCurrency(),
                     p.getStatus().wire(), p.getCaptureMethod(), p.getDescription(), p.getCustomerEmail(),
                     p.getMetadata(), p.getClientSecret(), p.getReturnUrl(), p.getAmountRefunded(),
                     p.getFailureCode(), p.getFailureMessage(), p.getCreatedAt(), p.getUpdatedAt(),
                     attempts.stream().map(AttemptView::of).toList(),
-                    refunds.stream().map(RefundView::of).toList());
+                    refunds.stream().map(RefundView::of).toList(), latest);
         }
     }
 
-    public record PaymentList(List<PaymentView> data, boolean hasMore) {
+    public record PaymentList(String object, List<PaymentView> data, boolean hasMore) {
     }
 
     public record NextAction(String type, String challengeId) {
