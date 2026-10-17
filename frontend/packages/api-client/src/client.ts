@@ -1,8 +1,16 @@
 import type {
   AuthResponse,
+  CheckoutSessionCreated,
+  CreatePaymentInput,
+  CreateRefundInput,
   LoginInput,
   MeResponse,
   Merchant,
+  Payment,
+  PaymentList,
+  PaymentListParams,
+  PaymentSummary,
+  Refund,
   SignupInput,
   UpdateMerchantInput,
 } from "./types";
@@ -87,6 +95,40 @@ export class ApiClient {
     return this.request("PATCH", "/v1/merchant", input);
   }
 
+  // --- payments -----------------------------------------------------------
+
+  /** Creates a payment and returns the hosted checkout URL to send the customer to. */
+  createCheckoutSession(input: CreatePaymentInput): Promise<CheckoutSessionCreated> {
+    return this.request("POST", "/v1/checkout_sessions", input, { idempotent: true });
+  }
+
+  listPayments(params: PaymentListParams = {}): Promise<PaymentList> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    const suffix = query.size > 0 ? `?${query}` : "";
+    return this.request("GET", `/v1/payment_intents${suffix}`);
+  }
+
+  getPayment(id: string): Promise<Payment> {
+    return this.request("GET", `/v1/payment_intents/${encodeURIComponent(id)}`);
+  }
+
+  cancelPayment(id: string): Promise<Payment> {
+    return this.request("POST", `/v1/payment_intents/${encodeURIComponent(id)}/cancel`, undefined, {
+      idempotent: true,
+    });
+  }
+
+  createRefund(input: CreateRefundInput): Promise<Refund> {
+    return this.request("POST", "/v1/refunds", input, { idempotent: true });
+  }
+
+  paymentSummary(): Promise<PaymentSummary> {
+    return this.request("GET", "/v1/payment_stats");
+  }
+
   // --- internals ----------------------------------------------------------
 
   private storeSession(session: AuthResponse): AuthResponse {
@@ -110,12 +152,15 @@ export class ApiClient {
     method: string,
     path: string,
     body?: unknown,
-    options: { auth?: boolean; retried?: boolean } = {},
+    options: { auth?: boolean; retried?: boolean; idempotent?: boolean; idempotencyKey?: string } = {},
   ): Promise<T> {
     const useAuth = options.auth ?? true;
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (useAuth && this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+    // One key per user action, reused on the automatic retry after a token refresh so it cannot double-submit.
+    const idempotencyKey = options.idempotencyKey ?? (options.idempotent ? crypto.randomUUID() : undefined);
+    if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
 
     const response = await this.fetchImpl(this.baseUrl + path, {
       method,
@@ -126,7 +171,7 @@ export class ApiClient {
 
     if (response.status === 401 && useAuth && !options.retried) {
       const session = await this.restoreSession();
-      if (session) return this.request<T>(method, path, body, { ...options, retried: true });
+      if (session) return this.request<T>(method, path, body, { ...options, retried: true, idempotencyKey });
       this.onSessionExpired?.();
     }
 
