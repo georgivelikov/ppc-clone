@@ -1,0 +1,77 @@
+# Cutpay
+
+An **educational clone** of [Paypercut](https://paypercut.com/), the Sofia-based payments platform for SMBs across Central & Eastern Europe — built to learn how a modern payment service provider works end to end.
+
+> ⚠️ **Study project only.** No real money moves. Every bank, card network, BNPL provider, wallet and KYC provider is a local simulator. Not affiliated with Paypercut; "Cutpay" uses its own name and design.
+
+## What it covers
+
+- **Online checkout** — hosted page and embeddable SDK, cards with 3DS, Apple Pay / Google Pay (simulated), BLIK
+- **Payment links & QR codes** — get paid without a website
+- **Virtual POS terminal** — keyed-in card payments from the dashboard
+- **Billing & payouts** — subscriptions, invoices, pre-authorisation, split payments, scheduled settlement
+- **BNPL aggregator** — several fake BNPL providers behind one integration, with smart routing
+- **Multi-currency & localisation** — EUR, RON, PLN, HUF, CZK, GBP, USD, CHF; checkout in en/bg/ro/pl/hu/el
+- **Merchant dashboard** — payments, balances, payouts, customers, developers (API keys, webhooks, logs), team, reports
+- **Digital onboarding** — simulated KYC/KYB, sandbox before live
+
+## Tech stack
+
+| Layer | Technologies |
+|---|---|
+| Backend | Java 21, Spring Boot 3, Gradle multi-module, Spring Data JPA, Flyway |
+| Messaging | Apache Kafka (KRaft), Schema Registry, Spring Kafka |
+| Database | PostgreSQL 16 (database per service), Redis |
+| Frontend | React 18, TypeScript, Vite, pnpm workspaces, TanStack Query, Tailwind + shadcn/ui |
+| Infra | Docker Compose, Mailpit, Kafka UI, Prometheus, Grafana, Tempo, OpenTelemetry |
+| Testing | JUnit 5, Testcontainers, Playwright, k6 |
+
+## Architecture
+
+Event-driven microservices: `gateway`, `identity`, `payments`, `acquirer-sim`, `ledger`, `payouts`, `links`, `billing`, `bnpl`, `bnpl-sim`, `webhooks`, `notifications`, and more — each owning its own database and communicating through Kafka using the transactional outbox / idempotent inbox patterns. Money is always stored as integer minor units with an ISO currency code.
+
+See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conventions and open design decisions.
+
+## Roadmap
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ⏳ Planned |
+| 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ⏳ Planned |
+| 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ⏳ Planned |
+| 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ⏳ Planned |
+| 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) | ⏳ Planned |
+| 5 | [Billing](docs/plans/phase-05-billing.md) — subscriptions, invoices, pre-auth, split payments | ⏳ Planned |
+| 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
+| 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ⏳ Planned |
+| 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ⏳ Planned |
+| 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | ⏳ Planned |
+
+## Repository layout (target)
+
+```
+backend/    Gradle multi-module: libs/ and services/
+frontend/   pnpm workspace: apps/ (dashboard, checkout, demo-shop, site) and packages/
+infra/      docker-compose and observability config
+docs/       plans, ADRs, API specs
+e2e/        Playwright end-to-end tests
+```
+
+## Getting started
+
+_Coming in phase 0._ Prerequisites will be: Docker Desktop, JDK 21, Node.js 20+ and pnpm.
+
+## Test cards (planned)
+
+| Card number | Result |
+|---|---|
+| 4242 4242 4242 4242 | Success |
+| 4000 0000 0000 3220 | 3DS challenge |
+| 4000 0000 0000 0002 | Declined |
+| 4000 0000 0000 9995 | Insufficient funds |
+
+Full list in [phase 1](docs/plans/phase-01-card-payments.md).
+
+## Disclaimer
+
+This repository exists purely for learning. It does not process real payments, must not be used with real card data, and is not affiliated with or endorsed by Paypercut.
