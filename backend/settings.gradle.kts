@@ -15,10 +15,12 @@ include(
     "libs:common-web",
     "libs:common-events",
     "libs:common-test",
+    "libs:webhook-signature",
     "services:identity",
     "services:gateway",
     "services:acquirer-sim",
     "services:payments",
     "services:ledger",
     "services:payouts",
+    "services:webhooks",
 )

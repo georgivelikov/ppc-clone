@@ -38,6 +38,7 @@ class GatewayRoutingIT {
         registry.add("cutpay.upstreams.acquirer", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
         registry.add("cutpay.upstreams.ledger", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
         registry.add("cutpay.upstreams.payouts", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
+        registry.add("cutpay.upstreams.webhooks", () -> "http://localhost:" + UPSTREAM.getAddress().getPort());
     }
 
     @Autowired
@@ -103,6 +104,21 @@ class GatewayRoutingIT {
                     .expectStatus().isOk()
                     .expectBody(String.class).isEqualTo("user=usr_1 merchant=mer_1 role=owner");
         }
+    }
+
+    @Test
+    void webhookRoutesNeedATokenAndReachTheWebhooksService() {
+        for (String path : new String[] {"/v1/webhook_endpoints", "/v1/webhook_endpoints/we_1",
+                "/v1/webhook_deliveries", "/v1/events", "/v1/events/evt_1"}) {
+            client.get().uri(path).exchange().expectStatus().isUnauthorized();
+        }
+        var merchant = client.mutateWith(mockJwt().jwt(jwt -> jwt.subject("usr_1").claim("mid", "mer_1")
+                .claim("role", "owner")));
+        for (String path : new String[] {"/v1/webhook_endpoints", "/v1/webhook_deliveries", "/v1/events"}) {
+            merchant.get().uri(path).exchange().expectStatus().isOk()
+                    .expectBody(String.class).isEqualTo("user=usr_1 merchant=mer_1 role=owner");
+        }
+        client.post().uri("/v1/webhook_deliveries/whd_1/retry").exchange().expectStatus().isUnauthorized();
     }
 
     @Test

@@ -47,6 +47,10 @@ spring:
               uri: ${cutpay.upstreams.payouts}
               predicates:
                 - Path=/v1/payouts,/v1/payouts/**,/v1/payout_schedule,/v1/bank_accounts,/v1/bank_accounts/**
+            - id: webhooks-api
+              uri: ${cutpay.upstreams.webhooks}
+              predicates:
+                - Path=/v1/webhook_endpoints,/v1/webhook_endpoints/**,/v1/webhook_deliveries,/v1/webhook_deliveries/**,/v1/events,/v1/events/**
             - id: checkout-public
               uri: ${cutpay.upstreams.payments}
               predicates:
@@ -91,3 +95,4 @@ cutpay:
     acquirer: http://localhost:8083
     ledger: http://localhost:8084
     payouts: http://localhost:8085
+    webhooks: http://localhost:8086

@@ -1,0 +1,55 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: webhooks
+  datasource:
+    url: jdbc:postgresql://localhost:5432/webhooks
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so webhooks can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: webhooks
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets tests push time forward via POST /admin/clock/advance (retries, auto-disable).
+    simulated: true
+  webhooks:
+    # How often the delivery worker looks for due deliveries (real time).
+    poll-interval: PT1S
+    # How many deliveries one poll claims.
+    batch-size: 20
+    # Per-attempt HTTP timeout.
+    request-timeout: PT10S
+    # A claimed delivery that is not finished within this long becomes due again (worker crashed).
+    lease: PT2M
+    # Retries stop this long after the event was created.
+    give-up-after: P3D
+    # An endpoint that has failed continuously for this long is disabled.
+    disable-after: P3D
+    api-version: "2026-10-01"

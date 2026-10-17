@@ -62,6 +62,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      command: `${gradle} :services:webhooks:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8086/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
       command: `${gradle} :services:gateway:bootRun`,
       cwd: "../backend",
       url: "http://localhost:8080/actuator/health",

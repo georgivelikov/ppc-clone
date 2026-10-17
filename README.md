@@ -38,8 +38,8 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 |---|---|---|
 | 0 | [Foundation](docs/plans/phase-00-foundation.md) — infra, monorepo, gateway, auth, dashboard shell | ✅ Built |
 | 1 | [Card payments core](docs/plans/phase-01-card-payments.md) — payment intents, fake acquirer, hosted checkout, 3DS, refunds | ✅ Built |
-| 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ⏳ Planned |
-| 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ⏳ Planned |
+| 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ✅ Built |
+| 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | 🚧 In progress (API keys, mode separation and webhooks done) |
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) | ⏳ Planned |
 | 5 | [Billing](docs/plans/phase-05-billing.md) — subscriptions, invoices, pre-auth, split payments | ⏳ Planned |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
@@ -72,6 +72,7 @@ cd backend
 ./gradlew :services:acquirer-sim:bootRun  # http://localhost:8083  (fake card network)
 ./gradlew :services:ledger:bootRun        # http://localhost:8084  (double-entry ledger, fees, balances)
 ./gradlew :services:payouts:bootRun       # http://localhost:8085  (bank accounts, payouts, fake bank)
+./gradlew :services:webhooks:bootRun      # http://localhost:8086  (webhook endpoints, events, deliveries)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard
