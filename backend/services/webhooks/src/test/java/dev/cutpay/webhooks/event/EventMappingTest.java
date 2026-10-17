@@ -92,4 +92,21 @@ class EventMappingTest {
         assertThat(EventTypes.isValidSubscription("nothing.*")).isFalse();
         assertThat(EventTypes.isValidSubscription("payout.*,x")).isFalse();
     }
+
+    @Test
+    void paymentLinkEventsMapToPaymentLinkTypes() {
+        var created = JSON.readTree("""
+                {"link_id":"plink_1","slug":"AbCdEfGhJk","url":"http://x/l/AbCdEfGhJk","type":"fixed",
+                 "title":"Table 4","currency":"EUR","amount":1500}""");
+        Mapped c = EventMapper.map("PaymentLinkCreated", created).orElseThrow();
+        assertThat(c.type()).isEqualTo("payment_link.created");
+        assertThat(c.object()).containsEntry("id", "plink_1").containsEntry("object", "payment_link")
+                .containsEntry("amount", 1500L).containsEntry("active", true);
+
+        var deactivated = JSON.readTree("""
+                {"link_id":"plink_1","slug":"AbCdEfGhJk","reason":"max_uses_reached"}""");
+        Mapped d = EventMapper.map("PaymentLinkDeactivated", deactivated).orElseThrow();
+        assertThat(d.type()).isEqualTo("payment_link.deactivated");
+        assertThat(d.object()).containsEntry("active", false).containsEntry("reason", "max_uses_reached");
+    }
 }

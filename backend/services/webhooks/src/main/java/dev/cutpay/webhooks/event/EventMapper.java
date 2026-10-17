@@ -31,6 +31,8 @@ public final class EventMapper {
             case "PayoutCreated" -> payout("payout.created", p);
             case "PayoutPaid" -> payout("payout.paid", p);
             case "PayoutFailed" -> payout("payout.failed", p);
+            case "PaymentLinkCreated" -> link("payment_link.created", p);
+            case "PaymentLinkDeactivated" -> link("payment_link.deactivated", p);
             default -> Optional.empty();
         };
     }
@@ -71,6 +73,23 @@ public final class EventMapper {
         optional(object, "arrival_date", p);
         optional(object, "kind", p);
         optional(object, "failure_code", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> link(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "link_id"));
+        object.put("object", "payment_link");
+        object.put("slug", text(p, "slug"));
+        optional(object, "url", p);
+        optional(object, "type", p);
+        optional(object, "title", p);
+        optional(object, "currency", p);
+        if (!p.path("amount").isMissingNode()) {
+            object.put("amount", p.path("amount").asLong());
+        }
+        object.put("active", "payment_link.created".equals(type));
+        optional(object, "reason", p);
         return Optional.of(new Mapped(type, object));
     }
 

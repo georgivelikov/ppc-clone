@@ -23,4 +23,5 @@ include(
     "services:ledger",
     "services:payouts",
     "services:webhooks",
+    "services:links",
 )

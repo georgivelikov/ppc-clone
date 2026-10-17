@@ -47,7 +47,11 @@ spring:
             - id: payments-api
               uri: ${cutpay.upstreams.payments}
               predicates:
-                - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats
+                - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats,/v1/terminal/**
+            - id: links-api
+              uri: ${cutpay.upstreams.links}
+              predicates:
+                - Path=/v1/payment_links,/v1/payment_links/**,/v1/qr
             - id: ledger-api
               uri: ${cutpay.upstreams.ledger}
               predicates:
@@ -60,6 +64,18 @@ spring:
               uri: ${cutpay.upstreams.webhooks}
               predicates:
                 - Path=/v1/webhook_endpoints,/v1/webhook_endpoints/**,/v1/webhook_deliveries,/v1/webhook_deliveries/**,/v1/events,/v1/events/**,/v1/logs,/v1/logs/**
+            - id: links-public
+              uri: ${cutpay.upstreams.links}
+              predicates:
+                - Path=/links/**
+              filters:
+                # Public and unauthenticated, so limit it per client address like the checkout.
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@clientIpKeyResolver}"
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
             - id: checkout-public
               uri: ${cutpay.upstreams.payments}
               predicates:
@@ -108,3 +124,4 @@ cutpay:
     ledger: http://localhost:8084
     payouts: http://localhost:8085
     webhooks: http://localhost:8086
+    links: http://localhost:8087

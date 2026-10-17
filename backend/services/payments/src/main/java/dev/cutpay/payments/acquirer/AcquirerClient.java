@@ -52,7 +52,7 @@ public class AcquirerClient {
         }
     }
 
-    record AuthorizeRequest(String token, long amount, String currency, String reference) {
+    record AuthorizeRequest(String token, long amount, String currency, String reference, String channel) {
     }
 
     record AuthorizeResponse(String status, String acquirerRef, String declineCode, String message) {
@@ -102,10 +102,10 @@ public class AcquirerClient {
         }
     }
 
-    public AuthResult authorize(String token, long amount, String currency, String reference) {
+    public AuthResult authorize(String token, long amount, String currency, String reference, String channel) {
         try {
             AuthorizeResponse response = breaker.executeSupplier(() -> http.post().uri("/authorize")
-                    .body(new AuthorizeRequest(token, amount, currency, reference))
+                    .body(new AuthorizeRequest(token, amount, currency, reference, channel))
                     .retrieve().body(AuthorizeResponse.class));
             if (response == null) {
                 return new AuthResult.Unavailable("empty response");

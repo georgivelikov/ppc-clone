@@ -14,6 +14,9 @@ class KeyPolicyTest {
         assertThat(KeyPolicy.isTeamOnly("/v1/api_keys")).isTrue();
         assertThat(KeyPolicy.isTeamOnly("/v1/api_keys/key_1/roll")).isTrue();
         assertThat(KeyPolicy.isTeamOnly("/v1/merchant")).isTrue();
+        assertThat(KeyPolicy.isTeamOnly("/v1/terminal/charges")).isTrue(); // the virtual POS is for people
+        assertThat(KeyPolicy.isTeamOnly("/v1/qr")).isTrue();
+        assertThat(KeyPolicy.isTeamOnly("/v1/payment_links")).isFalse();
         assertThat(KeyPolicy.isTeamOnly("/me")).isTrue();
         assertThat(KeyPolicy.isTeamOnly("/auth/login")).isTrue();
         assertThat(KeyPolicy.isTeamOnly("/v1/payment_intents")).isFalse();
@@ -33,6 +36,16 @@ class KeyPolicyTest {
         List<String> scopes = List.of("refunds:write");
         assertThat(KeyPolicy.allows(scopes, HttpMethod.POST, "/v1/refunds")).isTrue();
         assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/refunds")).isTrue();
+    }
+
+    @Test
+    void paymentLinksHaveTheirOwnScope() {
+        assertThat(KeyPolicy.allows(List.of("payment_links:write"), HttpMethod.POST, "/v1/payment_links")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("payment_links:read"), HttpMethod.GET, "/v1/payment_links/plink_1/payments"))
+                .isTrue();
+        assertThat(KeyPolicy.allows(List.of("payment_links:read"), HttpMethod.PATCH, "/v1/payment_links/plink_1"))
+                .isFalse();
+        assertThat(KeyPolicy.allows(List.of("payments:write"), HttpMethod.POST, "/v1/payment_links")).isFalse();
     }
 
     @Test

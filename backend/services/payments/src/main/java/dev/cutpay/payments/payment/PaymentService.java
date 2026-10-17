@@ -53,9 +53,12 @@ public class PaymentService {
     private final AcquirerClient acquirer;
     private final OutboxWriter outbox;
     private final TransactionTemplate tx;
+    private final PaymentStreams streams;
 
     public PaymentService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
-                          AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx) {
+                          AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx,
+                          PaymentStreams streams) {
+        this.streams = streams;
         this.intents = intents;
         this.attempts = attempts;
         this.refunds = refunds;
@@ -68,13 +71,18 @@ public class PaymentService {
 
     @Transactional
     public PaymentIntent create(String merchantId, boolean livemode, CreatePaymentRequest request) {
+        return create(merchantId, livemode, request, PaymentIntent.CHANNEL_ONLINE);
+    }
+
+    @Transactional
+    public PaymentIntent create(String merchantId, boolean livemode, CreatePaymentRequest request, String channel) {
         if (!SupportedCurrencies.isSupported(request.currency())) {
             throw ApiException.invalidRequest("unsupported_currency", "Currency is not supported", "currency");
         }
         Money money = Money.ofMinor(request.amount(), request.currency().toUpperCase(Locale.ROOT));
         String id = Ids.generate("pay");
         var intent = new PaymentIntent(id, id + "_secret_" + randomSecret(), merchantId, request.merchantName(), livemode,
-                money, request.description(), request.customerEmail(), request.metadata(), request.returnUrl());
+                money, request.description(), request.customerEmail(), request.metadata(), request.returnUrl(), channel);
         intents.save(intent);
         publish("PaymentIntentCreated", intent);
         return intent;
@@ -202,7 +210,7 @@ public class PaymentService {
         }
 
         AuthResult result = acquirer.authorize(request.token(), snapshot.getAmount(), snapshot.getCurrency(),
-                snapshot.getId());
+                snapshot.getId(), snapshot.getChannel());
         tx.execute(status -> {
             settle(snapshot.getId(), attemptId, result);
             return null;
@@ -284,6 +292,8 @@ public class PaymentService {
         payload.put("currency", intent.getCurrency());
         payload.put("customer_email", intent.getCustomerEmail());
         payload.put("failure_code", intent.getFailureCode());
+        payload.put("channel", intent.getChannel());
+        payload.put("metadata", intent.getMetadata());
         if (attempt != null) {
             payload.put("card_brand", attempt.getCardBrand());
             payload.put("card_type", attempt.getCardType());
@@ -291,6 +301,8 @@ public class PaymentService {
         }
         outbox.write(KafkaTopicsConfig.PAYMENT_TOPIC, eventType, intent.getId(), intent.getMerchantId(),
                 intent.isLivemode(), payload);
+        // Screens watching this payment (the "charge with QR" page) hear about it as soon as it commits.
+        streams.publishAfterCommit(intent.getId(), intent.getStatus().wire(), intent.getFailureCode());
     }
 
     private static String randomSecret() {

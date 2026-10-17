@@ -17,6 +17,9 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "payment_intents")
 public class PaymentIntent {
 
+    public static final String CHANNEL_ONLINE = "online";
+    public static final String CHANNEL_MOTO = "moto";
+
     @Id
     private String id;
 
@@ -66,6 +69,10 @@ public class PaymentIntent {
     @Column(name = "failure_message")
     private String failureMessage;
 
+    /** {@code online} for hosted checkout and the API, {@code moto} for orders keyed in by the merchant. */
+    @Column(nullable = false)
+    private String channel;
+
     @Version
     private long version;
 
@@ -81,7 +88,15 @@ public class PaymentIntent {
     public PaymentIntent(String id, String clientSecret, String merchantId, String merchantName, boolean livemode,
                          Money money, String description, String customerEmail, Map<String, String> metadata,
                          String returnUrl) {
+        this(id, clientSecret, merchantId, merchantName, livemode, money, description, customerEmail, metadata,
+                returnUrl, CHANNEL_ONLINE);
+    }
+
+    public PaymentIntent(String id, String clientSecret, String merchantId, String merchantName, boolean livemode,
+                         Money money, String description, String customerEmail, Map<String, String> metadata,
+                         String returnUrl, String channel) {
         this.id = id;
+        this.channel = channel;
         this.clientSecret = clientSecret;
         this.merchantId = merchantId;
         this.merchantName = merchantName;
@@ -205,6 +220,10 @@ public class PaymentIntent {
 
     public Map<String, String> getMetadata() {
         return metadata;
+    }
+
+    public String getChannel() {
+        return channel;
     }
 
     public String getClientSecret() {

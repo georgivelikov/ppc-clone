@@ -106,4 +106,13 @@ class AcquirerSimTest {
                         .content("{\"code\":\"1234\"}"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void aMailOrTelephoneOrderSkipsThe3dsChallenge() throws Exception {
+        String token = tokenize("4000000000003220");
+        mvc.perform(post("/authorize").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s","amount":1000,"currency":"EUR","channel":"moto"}""".formatted(token)))
+                .andExpect(jsonPath("$.status").value("approved"));
+    }
 }

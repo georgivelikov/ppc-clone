@@ -1,0 +1,48 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: links
+  datasource:
+    url: jdbc:postgresql://localhost:5432/links
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so links can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: links
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets e2e tests push time forward via POST /admin/clock/advance (reservations, link expiry).
+    simulated: true
+  links:
+    # Where the hosted checkout lives; a link is shared as {checkout-url}/l/{slug}.
+    checkout-url: http://localhost:5174
+    payments-url: http://localhost:8082
+    # How long a customer who opened a link keeps their place before the use is given back.
+    reservation-ttl: PT15M
+    job-poll-interval: PT10S

@@ -51,7 +51,8 @@ class AcquirerController {
                             String cardType, String cardRegion) {
     }
 
-    record AuthorizeRequest(@NotBlank String token, @Min(1) long amount, @NotBlank String currency, String reference) {
+    record AuthorizeRequest(@NotBlank String token, @Min(1) long amount, @NotBlank String currency, String reference,
+                            String channel) {
     }
 
     record AuthorizeResponse(String status, String acquirerRef, String declineCode, String message) {
@@ -145,7 +146,10 @@ class AcquirerController {
         }
 
         String ref = "auth_" + UUID.randomUUID().toString().replace("-", "");
-        if (outcome.behaviour() == TestCards.Behaviour.THREE_DS) {
+        // Mail/telephone orders are outside strong customer authentication: the merchant keys the card in, so
+        // there is no cardholder present to answer a challenge and the issuer is not allowed to ask for one.
+        boolean moto = "moto".equals(request.channel());
+        if (outcome.behaviour() == TestCards.Behaviour.THREE_DS && !moto) {
             challenges.put(ref, new PendingChallenge(ref, request.amount(), request.currency()));
             return new AuthorizeResponse("requires_action", ref, null, "3-D Secure authentication required");
         }

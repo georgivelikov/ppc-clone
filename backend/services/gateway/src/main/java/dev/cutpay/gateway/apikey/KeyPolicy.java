@@ -8,7 +8,7 @@ import org.springframework.http.HttpMethod;
 final class KeyPolicy {
 
     /** Routes that exist for signed-in team members only. No API key, whatever its type, may use them. */
-    private static final List<String> TEAM_ONLY = List.of("/v1/api_keys", "/v1/merchant", "/v1/logs", "/me", "/auth");
+    private static final List<String> TEAM_ONLY = List.of("/v1/api_keys", "/v1/merchant", "/v1/logs", "/v1/terminal", "/v1/qr", "/me", "/auth");
 
     /** Paths where the browser-safe publishable key is accepted (see ADR 0009). */
     private static final List<String> PUBLISHABLE_PATHS = List.of("/checkout", "/vault");
@@ -17,6 +17,7 @@ final class KeyPolicy {
             Map.entry("/v1/payment_intents", "payments"),
             Map.entry("/v1/checkout_sessions", "payments"),
             Map.entry("/v1/payment_stats", "payments"),
+            Map.entry("/v1/payment_links", "payment_links"),
             Map.entry("/v1/refunds", "refunds"),
             Map.entry("/v1/balance", "balance"),
             Map.entry("/v1/balance_transactions", "balance"),

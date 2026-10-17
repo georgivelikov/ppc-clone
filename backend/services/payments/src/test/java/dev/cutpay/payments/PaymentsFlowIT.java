@@ -3,6 +3,8 @@ package dev.cutpay.payments;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -500,5 +502,91 @@ class PaymentsFlowIT {
     private org.springframework.test.web.servlet.ResultActions refund(String paymentId, long amount) throws Exception {
         return mvc.perform(post("/v1/refunds").with(merchant()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"payment_intent\":\"%s\",\"amount\":%d}".formatted(paymentId, amount)));
+    }
+
+    // --- phase 4: terminal, links and live status ------------------------------------------------------
+
+    @Test
+    void aTerminalChargeIsAMotoPaymentAndTheAcquirerIsToldSoItCanSkip3ds() throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_moto"}""");
+        String body = mvc.perform(post("/v1/terminal/charges").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":4200,\"currency\":\"EUR\",\"description\":\"Phone order\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.channel").value("moto"))
+                .andExpect(jsonPath("$.status").value("requires_payment_method"))
+                .andReturn().getResponse().getContentAsString();
+        String secret = field(body, "client_secret");
+
+        mvc.perform(post("/checkout/sessions/%s/confirm".formatted(secret)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"tok_visa\"}"))
+                .andExpect(jsonPath("$.status").value("succeeded"));
+
+        ACQUIRER.verify(WireMock.postRequestedFor(urlEqualTo("/authorize"))
+                .withRequestBody(WireMock.matchingJsonPath("$.channel", WireMock.equalTo("moto"))));
+        mvc.perform(get("/v1/payment_intents/" + field(body, "id")).with(merchant()))
+                .andExpect(jsonPath("$.channel").value("moto"));
+    }
+
+    @Test
+    void anOrdinaryPaymentIsOnlineAndTheAcquirerIsToldThatToo() throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_online"}""");
+        String secret = field(createPayment(), "client_secret");
+        confirm(secret);
+        ACQUIRER.verify(WireMock.postRequestedFor(urlEqualTo("/authorize"))
+                .withRequestBody(WireMock.matchingJsonPath("$.channel", WireMock.equalTo("online"))));
+    }
+
+    @Test
+    void theLinksServiceCanStartAPaymentForAMerchantAndItsMetadataTravelsOnTheEvent() throws Exception {
+        String body = mvc.perform(post("/internal/payments").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"merchant_id":"%s","livemode":false,"merchant_name":"Rose Cafe",
+                                 "payment":{"amount":1500,"currency":"EUR","description":"Table 4",
+                                            "metadata":{"link_id":"plink_1"},"return_url":"http://x/y"}}"""
+                                .formatted(merchantId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.client_secret").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String id = field(body, "payment_id");
+        assertThat(field(body, "url")).endsWith("/c/" + field(body, "client_secret"));
+
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.metadata.link_id").value("plink_1"))
+                .andExpect(jsonPath("$.channel").value("online"));
+        mvc.perform(get("/checkout/sessions/" + field(body, "client_secret")))
+                .andExpect(jsonPath("$.merchant_name").value("Rose Cafe"));
+        String payload = jdbc.sql("SELECT payload FROM outbox WHERE event_key = :id AND event_type = 'PaymentIntentCreated'")
+                .param("id", id).query(String.class).single();
+        assertThat(json.readTree(payload).get("payload").get("metadata").get("link_id").asString()).isEqualTo("plink_1");
+    }
+
+    @Test
+    void aStreamStartsWithTheCurrentStatusAndFollowsTheEnd() throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_stream"}""");
+        String payment = createPayment();
+        String id = field(payment, "id");
+        String secret = field(payment, "client_secret");
+
+        var result = mvc.perform(get("/v1/payment_intents/" + id + "/stream").with(merchant())
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(request().asyncStarted()).andReturn();
+        confirm(secret);
+
+        await().atMost(java.time.Duration.ofSeconds(5)).untilAsserted(() -> {
+            String sse = result.getResponse().getContentAsString();
+            assertThat(sse).contains("event:status").contains("requires_payment_method").contains("succeeded");
+        });
+    }
+
+    @Test
+    void aStreamCannotBeOpenedOnSomeoneElsesPayment() throws Exception {
+        String id = field(createPayment(), "id");
+        String other = "mer_" + UUID.randomUUID().toString().replace("-", "");
+        mvc.perform(get("/v1/payment_intents/" + id + "/stream").accept(MediaType.TEXT_EVENT_STREAM)
+                        .with(jwt().jwt(j -> j.claim("mid", other))))
+                .andExpect(status().isNotFound());
     }
 }

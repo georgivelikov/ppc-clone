@@ -6,6 +6,7 @@ import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,7 +23,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> handleApi(ApiException e) {
-        return ResponseEntity.status(e.status())
+        // JSON whatever the client asked for: a stream client (Accept: text/event-stream) must still get the error.
+        return ResponseEntity.status(e.status()).contentType(MediaType.APPLICATION_JSON)
                 .body(ApiError.of(e.type(), e.code(), e.getMessage(), e.param(), requestId()));
     }
 

@@ -51,7 +51,7 @@ public final class PaymentDtos {
     }
 
     public record PaymentView(String id, String object, boolean livemode, long amount, String currency,
-                              String status, String captureMethod, String description, String customerEmail,
+                              String status, String captureMethod, String channel, String description, String customerEmail,
                               Map<String, String> metadata, String clientSecret, String returnUrl,
                               long amountRefunded, String failureCode, String failureMessage, Instant createdAt,
                               Instant updatedAt, List<AttemptView> attempts, List<RefundView> refunds,
@@ -71,7 +71,7 @@ public final class PaymentDtos {
                     : expandLatestAttempt ? AttemptView.of(attempts.get(attempts.size() - 1))
                     : attempts.get(attempts.size() - 1).getId();
             return new PaymentView(p.getId(), "payment_intent", p.isLivemode(), p.getAmount(), p.getCurrency(),
-                    p.getStatus().wire(), p.getCaptureMethod(), p.getDescription(), p.getCustomerEmail(),
+                    p.getStatus().wire(), p.getCaptureMethod(), p.getChannel(), p.getDescription(), p.getCustomerEmail(),
                     p.getMetadata(), p.getClientSecret(), p.getReturnUrl(), p.getAmountRefunded(),
                     p.getFailureCode(), p.getFailureMessage(), p.getCreatedAt(), p.getUpdatedAt(),
                     attempts.stream().map(AttemptView::of).toList(),

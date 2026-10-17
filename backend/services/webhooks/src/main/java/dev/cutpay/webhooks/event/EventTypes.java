@@ -13,6 +13,7 @@ public final class EventTypes {
             "payment_intent.payment_failed", "payment_intent.canceled",
             "refund.created", "charge.refunded", "refund.failed",
             "payout.created", "payout.paid", "payout.failed",
+            "payment_link.created", "payment_link.deactivated",
             TEST);
 
     private EventTypes() {

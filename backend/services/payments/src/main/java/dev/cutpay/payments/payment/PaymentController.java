@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,15 +25,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 class PaymentController {
 
     private final PaymentService payments;
+    private final PaymentStreams streams;
     private final String checkoutUrl;
 
-    PaymentController(PaymentService payments, @Value("${cutpay.checkout-url}") String checkoutUrl) {
+    PaymentController(PaymentService payments, PaymentStreams streams,
+                      @Value("${cutpay.checkout-url}") String checkoutUrl) {
         this.payments = payments;
+        this.streams = streams;
         this.checkoutUrl = checkoutUrl;
     }
 
@@ -75,6 +80,16 @@ class PaymentController {
     PaymentView get(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
                     @RequestParam(name = "expand[]", required = false) List<String> expand) {
         return payments.get(merchant(jwt), claim(jwt), id, expansions(expand));
+    }
+
+    /**
+     * Server-Sent Events: the current status first, then every change, closing once the payment is final.
+     * The payment is looked up with the caller's scope first, so a stream can only be opened on your own payments.
+     */
+    @GetMapping(value = "/v1/payment_intents/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter stream(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
+        PaymentView payment = payments.get(merchant(jwt), claim(jwt), id, Set.of());
+        return streams.subscribe(id, payment.status(), payment.failureCode());
     }
 
     @PostMapping("/v1/payment_intents/{id}/cancel")
