@@ -91,12 +91,13 @@ class SubscriptionController {
     }
 
     record UpcomingView(String object, String currency, Instant periodStart, Instant periodEnd, List<LineView> lines,
-                        long subtotal, long tax, long total) {
+                        long subtotal, long tax, long creditApplied, long total) {
     }
 
-    record StatsView(String object, Map<String, Long> mrr, Map<String, Long> byStatus, long endedLast30Days) {
+    record StatsView(String object, Map<String, Long> mrr, Map<String, Long> byStatus, long endedLast30Days,
+                     List<SubscriptionService.MonthChurn> churnByMonth) {
         static StatsView of(Stats s) {
-            return new StatsView("subscription_stats", s.mrr(), s.byStatus(), s.endedLast30Days());
+            return new StatsView("subscription_stats", s.mrr(), s.byStatus(), s.endedLast30Days(), s.churnByMonth());
         }
     }
 
@@ -180,7 +181,7 @@ class SubscriptionController {
         var upcoming = service.upcoming(merchant(jwt), claim(jwt), id);
         return new UpcomingView("upcoming_invoice", upcoming.currency(), upcoming.periodStart(), upcoming.periodEnd(),
                 upcoming.lines().stream().map(LineView::of).toList(), upcoming.subtotal(), upcoming.tax(),
-                upcoming.total());
+                upcoming.creditApplied(), upcoming.total());
     }
 
     @GetMapping("/v1/subscription_stats")

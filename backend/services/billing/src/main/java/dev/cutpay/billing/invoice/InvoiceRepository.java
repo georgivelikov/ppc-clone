@@ -27,7 +27,7 @@ public class InvoiceRepository {
             status, billing_reason, collection_method, currency, subtotal, tax, total, amount_paid, tax_rate_bps,
             description, default_payment_method, payment_intent_id, last_failed_payment_id, failure_code, hosted_token,
             attempt_count, first_failed_at, period_start, period_end, due_date, created_at, finalized_at, paid_at,
-            voided_at, updated_at
+            voided_at, updated_at, credit_applied
             """;
 
     public record Line(String id, String description, long unitAmount, int quantity, long amount, String priceId,
@@ -41,7 +41,7 @@ public class InvoiceRepository {
                           String paymentIntentId, String lastFailedPaymentId, String failureCode, String hostedToken,
                           int attemptCount, Instant firstFailedAt, Instant periodStart, Instant periodEnd,
                           Instant dueDate, Instant createdAt, Instant finalizedAt, Instant paidAt, Instant voidedAt,
-                          Instant updatedAt, List<Line> lines) {
+                          Instant updatedAt, long creditApplied, List<Line> lines) {
         public boolean open() {
             return OPEN.equals(status);
         }
@@ -66,11 +66,13 @@ public class InvoiceRepository {
                         INSERT INTO invoices (id, merchant_id, merchant_name, livemode, subscription_id, customer_id,
                             customer_email, customer_name, number, status, billing_reason, collection_method, currency,
                             subtotal, tax, total, amount_paid, tax_rate_bps, description, default_payment_method,
-                            hosted_token, period_start, period_end, due_date, created_at, finalized_at, updated_at)
+                            hosted_token, period_start, period_end, due_date, created_at, finalized_at, updated_at,
+                            credit_applied)
                         VALUES (:id, :merchant, :merchantName, :livemode, :subscription, :customer, :email, :name,
                             :number, :status, :reason, :method, :currency, :subtotal, :tax, :total, 0, :taxRate,
-                            :description, :pm, :token, :periodStart, :periodEnd, :due, :now, :finalized, :now)
+                            :description, :pm, :token, :periodStart, :periodEnd, :due, :now, :finalized, :now, :credit)
                         """)
+                .param("credit", i.creditApplied())
                 .param("id", i.id()).param("merchant", i.merchantId()).param("merchantName", i.merchantName())
                 .param("livemode", i.livemode()).param("subscription", i.subscriptionId(), Types.VARCHAR)
                 .param("customer", i.customerId()).param("email", i.customerEmail()).param("name", i.customerName())
@@ -158,6 +160,12 @@ public class InvoiceRepository {
                         """)
                 .param("id", id).param("number", number).param("due", ts(dueDate), Types.TIMESTAMP_WITH_TIMEZONE)
                 .param("now", ts(now)).update();
+    }
+
+    /** Takes credit off a draft that is being finalized: {@code total} is what is left to pay by card. */
+    public void applyCredit(String id, long creditApplied, long total) {
+        jdbc.sql("UPDATE invoices SET credit_applied = :credit, total = :total WHERE id = :id")
+                .param("id", id).param("credit", creditApplied).param("total", total).update();
     }
 
     public void setStatus(String id, String status, Instant now) {
@@ -305,7 +313,7 @@ public class InvoiceRepository {
                 i.currency(), i.subtotal(), i.tax(), i.total(), i.amountPaid(), i.taxRateBps(), i.description(),
                 i.defaultPaymentMethod(), i.paymentIntentId(), i.lastFailedPaymentId(), i.failureCode(), i.hostedToken(),
                 i.attemptCount(), i.firstFailedAt(), i.periodStart(), i.periodEnd(), i.dueDate(), i.createdAt(),
-                i.finalizedAt(), i.paidAt(), i.voidedAt(), i.updatedAt(), lines);
+                i.finalizedAt(), i.paidAt(), i.voidedAt(), i.updatedAt(), i.creditApplied(), lines);
     }
 
     private Invoice map(ResultSet rs, int row) throws SQLException {
@@ -320,6 +328,6 @@ public class InvoiceRepository {
                 rs.getInt("attempt_count"), instant(rs, "first_failed_at"), instant(rs, "period_start"),
                 instant(rs, "period_end"), instant(rs, "due_date"), instant(rs, "created_at"),
                 instant(rs, "finalized_at"), instant(rs, "paid_at"), instant(rs, "voided_at"),
-                instant(rs, "updated_at"), List.of());
+                instant(rs, "updated_at"), rs.getLong("credit_applied"), List.of());
     }
 }

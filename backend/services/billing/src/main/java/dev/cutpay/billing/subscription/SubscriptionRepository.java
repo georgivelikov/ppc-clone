@@ -219,6 +219,23 @@ public class SubscriptionRepository {
                 .query(Long.class).single();
     }
 
+    /** The subscriptions that existed when a month began, and how many of them ended during it. */
+    public record Cohort(long atStart, long ended) {
+    }
+
+    public Cohort cohort(String merchantId, boolean livemode, Instant monthStart, Instant monthEnd) {
+        return jdbc.sql("""
+                        SELECT count(*) AS at_start,
+                               count(*) FILTER (WHERE ended_at IS NOT NULL AND ended_at < :end) AS ended
+                          FROM subscriptions
+                         WHERE merchant_id = :merchant AND livemode = :livemode AND created_at < :start
+                           AND (ended_at IS NULL OR ended_at >= :start)
+                        """)
+                .param("merchant", merchantId).param("livemode", livemode).param("start", ts(monthStart))
+                .param("end", ts(monthEnd))
+                .query((rs, n) -> new Cohort(rs.getLong("at_start"), rs.getLong("ended"))).single();
+    }
+
     /** What the paying subscriptions are worth, one row per subscription item. */
     public record Recurring(String currency, long unitAmount, int quantity, Interval interval, int intervalCount) {
     }

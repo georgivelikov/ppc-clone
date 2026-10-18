@@ -79,16 +79,24 @@ export function InvoicePage() {
         </tbody>
       </table>
       <dl className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
-        {invoice.tax > 0 && (
+        {(invoice.tax > 0 || invoice.credit_applied > 0) && (
           <>
             <div className="flex justify-between">
               <dt className="text-muted">Subtotal</dt>
               <dd className="tabular-nums">{formatMoney(invoice.subtotal, invoice.currency)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted">Tax</dt>
-              <dd className="tabular-nums">{formatMoney(invoice.tax, invoice.currency)}</dd>
-            </div>
+            {invoice.tax > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-muted">Tax</dt>
+                <dd className="tabular-nums">{formatMoney(invoice.tax, invoice.currency)}</dd>
+              </div>
+            )}
+            {invoice.credit_applied > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-muted">Credit used</dt>
+                <dd className="tabular-nums">−{formatMoney(invoice.credit_applied, invoice.currency)}</dd>
+              </div>
+            )}
           </>
         )}
         <div className="flex justify-between text-base font-semibold">

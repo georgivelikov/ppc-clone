@@ -40,7 +40,7 @@ A draft is editable and invisible to the customer. Finalizing assigns the next n
 
 ## Consequences and known gaps
 - If payments is unreachable *after* it created and charged a payment, billing treats the attempt as failed and may charge again at the next retry; the payment event for the first charge then marks the invoice paid and a later success would be a second charge (it is logged). A reconciliation pass over payments by `invoice_id` would close this.
-- A credit that exceeds the next invoice is dropped instead of becoming a customer balance.
+- Credit is kept per merchant, mode, customer and currency, as signed entries that add up to a balance row (locked while it is spent). A renewal that comes to less than zero grants the difference; a renewal or a finalized one-off invoice spends what it can before the card is charged, so `total` is what is left to pay and `credit_applied` what the credit paid. A voided invoice returns what it used. Credit is not paid out, expires never and cannot be adjusted by hand yet.
 - Tax is a single percentage per subscription or invoice, rounded half up on the whole subtotal. There is no tax engine.
-- MRR counts active and past-due subscriptions at the monthly value of their items (a week is 52/12 months). Churn is the share of the paying subscriptions of the last 30 days that ended.
+- MRR counts active and past-due subscriptions at the monthly value of their items (a week is 52/12 months). Churn is the share of the paying subscriptions of the last 30 days that ended. The chart by month uses a simpler cohort: of the subscriptions that existed when a calendar month (UTC) began, the share that ended during it. It includes trials, because the data does not say when a subscription first paid.
 - Cancelling refunds nothing, and there is no proration on cancel.

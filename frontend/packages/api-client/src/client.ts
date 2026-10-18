@@ -70,6 +70,7 @@ import type {
   SubscriptionListParams,
   SubscriptionStats,
   UpcomingInvoice,
+  CreditBalance,
   UpdateProductInput,
   UpdateSubscriptionInput,
 } from "./billing";
@@ -413,6 +414,10 @@ export class ApiClient {
 
   upcomingInvoice(subscriptionId: string): Promise<UpcomingInvoice> {
     return this.request("GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}/upcoming_invoice`);
+  }
+
+  creditBalance(customerId: string, livemode = false): Promise<CreditBalance> {
+    return this.request("GET", `/v1/credit_balances${toQuery({ customer: customerId, livemode })}`);
   }
 
   subscriptionStats(livemode = false): Promise<SubscriptionStats> {

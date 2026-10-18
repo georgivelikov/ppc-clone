@@ -156,6 +156,15 @@ export interface SubscriptionStats {
   mrr: Record<string, number>;
   by_status: Partial<Record<SubscriptionStatus, number>>;
   ended_last_30_days: number;
+  /** The last six calendar months (UTC), oldest first. */
+  churn_by_month: MonthChurn[];
+}
+
+/** Of the subscriptions that existed when `month` ("2026-10") began, `ended` ended during it. */
+export interface MonthChurn {
+  month: string;
+  at_start: number;
+  ended: number;
 }
 
 export type InvoiceStatus = "draft" | "open" | "paid" | "void" | "uncollectible";
@@ -195,6 +204,8 @@ export interface Invoice {
   currency: string;
   subtotal: number;
   tax: number;
+  /** Paid from the customer's credit; `total` is what is left after it. */
+  credit_applied: number;
   total: number;
   amount_paid: number;
   amount_due: number;
@@ -257,7 +268,27 @@ export interface UpcomingInvoice {
   lines: InvoiceLine[];
   subtotal: number;
   tax: number;
+  /** What the customer's credit would cover of it. */
+  credit_applied: number;
   total: number;
+}
+
+export interface CreditEntry {
+  id: string;
+  currency: string;
+  /** Positive when credit was added, negative when it was spent. */
+  amount: number;
+  balance_after: number;
+  reason: "invoice_credit" | "applied_to_invoice" | "returned_from_voided_invoice";
+  invoice_id: string | null;
+  created_at: string;
+}
+
+export interface CreditBalance {
+  object: "credit_balance";
+  customer: string;
+  balances: { currency: string; amount: number }[];
+  history: CreditEntry[];
 }
 
 export interface BillingSettings {

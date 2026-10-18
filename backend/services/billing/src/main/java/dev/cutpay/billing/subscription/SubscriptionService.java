@@ -2,6 +2,8 @@ package dev.cutpay.billing.subscription;
 
 import dev.cutpay.billing.catalog.CatalogService;
 import dev.cutpay.billing.catalog.CatalogService.Price;
+import dev.cutpay.billing.credit.CreditRepository.Balance;
+import dev.cutpay.billing.credit.CreditService;
 import dev.cutpay.billing.events.BillingEvents;
 import dev.cutpay.billing.events.NotificationLog;
 import dev.cutpay.billing.invoice.InvoiceRepository;
@@ -18,6 +20,8 @@ import dev.cutpay.web.Ids;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -61,11 +65,18 @@ public class SubscriptionService {
     }
 
     public record Upcoming(String currency, Instant periodStart, Instant periodEnd, List<Line> lines, long subtotal,
-                           long tax, long total) {
+                           long tax, long creditApplied, long total) {
     }
 
-    public record Stats(Map<String, Long> mrr, Map<String, Long> byStatus, long endedLast30Days) {
+    /** One month of churn: {@code atStart} subscriptions existed when it began and {@code ended} of them ended in it. */
+    public record MonthChurn(String month, long atStart, long ended) {
     }
+
+    public record Stats(Map<String, Long> mrr, Map<String, Long> byStatus, long endedLast30Days,
+                        List<MonthChurn> churnByMonth) {
+    }
+
+    private static final int CHURN_MONTHS = 6;
 
     private record Resolved(Price price, String productName, int quantity) {
         Item item() {
@@ -76,6 +87,7 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptions;
     private final InvoiceRepository invoices;
     private final InvoiceService invoiceService;
+    private final CreditService credits;
     private final CatalogService catalog;
     private final PaymentsClient payments;
     private final BillingEvents events;
@@ -84,11 +96,13 @@ public class SubscriptionService {
     private final Clock clock;
 
     public SubscriptionService(SubscriptionRepository subscriptions, InvoiceRepository invoices,
-                               InvoiceService invoiceService, CatalogService catalog, PaymentsClient payments,
-                               BillingEvents events, NotificationLog notifications, TransactionTemplate tx, Clock clock) {
+                               InvoiceService invoiceService, CreditService credits, CatalogService catalog,
+                               PaymentsClient payments, BillingEvents events, NotificationLog notifications,
+                               TransactionTemplate tx, Clock clock) {
         this.subscriptions = subscriptions;
         this.invoices = invoices;
         this.invoiceService = invoiceService;
+        this.credits = credits;
         this.catalog = catalog;
         this.payments = payments;
         this.events = events;
@@ -186,7 +200,24 @@ public class SubscriptionService {
         Map<String, Long> byStatus = new java.util.TreeMap<>();
         subscriptions.countByStatus(merchantId, livemode).forEach(c -> byStatus.put(c.status(), c.count()));
         long ended = subscriptions.endedSince(merchantId, livemode, clock.instant().minus(Duration.ofDays(30)));
-        return new Stats(mrr, byStatus, ended);
+        return new Stats(mrr, byStatus, ended, churnByMonth(merchantId, livemode, CHURN_MONTHS));
+    }
+
+    /**
+     * Churn of each of the last {@code months} calendar months (UTC), the current one included: of the subscriptions
+     * that existed when the month began, how many ended during it. Oldest month first.
+     */
+    List<MonthChurn> churnByMonth(String merchantId, boolean livemode, int months) {
+        YearMonth current = YearMonth.from(clock.instant().atZone(ZoneOffset.UTC));
+        List<MonthChurn> result = new ArrayList<>();
+        for (int back = months - 1; back >= 0; back--) {
+            YearMonth month = current.minusMonths(back);
+            Instant start = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant end = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            var cohort = subscriptions.cohort(merchantId, livemode, start, end);
+            result.add(new MonthChurn(month.toString(), cohort.atStart(), cohort.ended()));
+        }
+        return result;
     }
 
     // --- changing a subscription -------------------------------------------------------------------
@@ -217,7 +248,11 @@ public class SubscriptionService {
                     item.priceId(), item.proration(), item.periodStart(), item.periodEnd()));
         }
         Totals totals = Totals.of(lines, sub.taxRateBps());
-        return new Upcoming(sub.currency(), start, end, lines, totals.subtotal(), totals.tax(), Math.max(0, totals.total()));
+        long payable = Math.max(0, totals.total());
+        long held = credits.balances(sub.merchantId(), sub.livemode(), sub.customerId()).stream()
+                .filter(b -> b.currency().equals(sub.currency())).mapToLong(Balance::amount).sum();
+        long credit = Math.min(held, payable);
+        return new Upcoming(sub.currency(), start, end, lines, totals.subtotal(), totals.tax(), credit, payable - credit);
     }
 
     public Details update(String merchantId, Boolean claimedMode, String id, Changes changes) {

@@ -121,6 +121,24 @@ describe("payments pages", () => {
     await waitFor(() => expect(api.listPayments).toHaveBeenLastCalledWith(expect.objectContaining({ status: "failed" })));
   });
 
+  it("shows only held payments with the Uncaptured toggle, and the status filter follows it", async () => {
+    vi.mocked(api.listPayments).mockResolvedValue({ data: [], has_more: false });
+    renderAt("/payments");
+    await screen.findByText(/No payments yet/);
+
+    const toggle = screen.getByRole("button", { name: "Uncaptured only" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(toggle);
+
+    await waitFor(() => expect(api.listPayments).toHaveBeenLastCalledWith(expect.objectContaining({ status: "requires_capture" })));
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Filter by status")).toHaveValue("requires_capture");
+
+    await userEvent.click(toggle);
+    await waitFor(() => expect(api.listPayments).toHaveBeenLastCalledWith(expect.objectContaining({ status: "" })));
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("refunds part of a payment and rejects more than what is left", async () => {
     vi.mocked(api.getPayment).mockResolvedValue(payment);
     vi.mocked(api.createRefund).mockResolvedValue({

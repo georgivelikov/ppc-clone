@@ -69,6 +69,14 @@ export function PaymentsPage() {
             </option>
           ))}
         </select>
+        <Button
+          type="button"
+          variant={status === "requires_capture" ? "primary" : "secondary"}
+          aria-pressed={status === "requires_capture"}
+          onClick={() => setStatus(status === "requires_capture" ? "" : "requires_capture")}
+        >
+          Uncaptured only
+        </Button>
       </div>
 
       <Card className="overflow-x-auto p-0">

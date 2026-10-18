@@ -23,6 +23,7 @@ const open: PublicInvoice = {
   currency: "EUR",
   subtotal: 19000,
   tax: 3800,
+  credit_applied: 0,
   total: 22800,
   amount_paid: 0,
   description: "Catering for the launch",

@@ -108,6 +108,7 @@ const invoice = (over: Partial<Invoice> = {}): Invoice => ({
   currency: "EUR",
   subtotal: 10000,
   tax: 0,
+  credit_applied: 0,
   total: 10000,
   amount_paid: 0,
   amount_due: 10000,
@@ -201,6 +202,12 @@ describe("subscriptions", () => {
       mrr: { EUR: 250000 },
       by_status: { active: 18, trialing: 3, past_due: 2 },
       ended_last_30_days: 2,
+      churn_by_month: [
+        { month: "2026-07", at_start: 0, ended: 0 },
+        { month: "2026-08", at_start: 10, ended: 1 },
+        { month: "2026-09", at_start: 20, ended: 3 },
+        { month: "2026-10", at_start: 22, ended: 2 },
+      ],
     });
     vi.mocked(api.listSubscriptions).mockResolvedValue({ object: "list", data: [subscription()], has_more: false });
     vi.mocked(api.getBillingSettings).mockResolvedValue({ object: "billing_settings", retry_days: [1, 3, 5, 7], final_action: "cancel" });
@@ -211,11 +218,17 @@ describe("subscriptions", () => {
     expect(screen.getByTestId("count-trial-past-due")).toHaveTextContent("3 · 2");
     // 2 of the 22 paying subscribers of the month ended (20 still pay).
     expect(screen.getByTestId("churn")).toHaveTextContent("9.1%");
+    // Month by month, from the month the first subscription existed; empty months are left out.
+    expect(screen.queryByTestId("churn-2026-07")).not.toBeInTheDocument();
+    expect(screen.getByTestId("churn-2026-08")).toHaveTextContent("Aug 2026");
+    expect(screen.getByTestId("churn-2026-08")).toHaveTextContent("10.0% (1 of 10)");
+    expect(screen.getByTestId("churn-2026-09")).toHaveTextContent("15.0% (3 of 20)");
+    expect(screen.getByTestId("churn-2026-10")).toHaveTextContent("9.1% (2 of 22)");
     expect(await screen.findByText("Anna Petrova")).toBeInTheDocument();
   });
 
   it("checks the retry days before saving them", async () => {
-    vi.mocked(api.subscriptionStats).mockResolvedValue({ object: "subscription_stats", mrr: {}, by_status: {}, ended_last_30_days: 0 });
+    vi.mocked(api.subscriptionStats).mockResolvedValue({ object: "subscription_stats", mrr: {}, by_status: {}, ended_last_30_days: 0, churn_by_month: [] });
     vi.mocked(api.listSubscriptions).mockResolvedValue({ object: "list", data: [], has_more: false });
     vi.mocked(api.getBillingSettings).mockResolvedValue({ object: "billing_settings", retry_days: [1, 3, 5, 7], final_action: "cancel" });
     vi.mocked(api.updateBillingSettings).mockResolvedValue({ object: "billing_settings", retry_days: [2, 4], final_action: "unpaid" });
@@ -245,6 +258,7 @@ describe("subscriptions", () => {
       period_end: "2026-12-01T00:00:00Z",
       subtotal: 1000,
       tax: 0,
+      credit_applied: 0,
       total: 1000,
       lines: [{ id: "il_u", description: "Basic", unit_amount: 1000, quantity: 1, amount: 1000, price: "price_basic", proration: false, period_start: null, period_end: null }],
     });

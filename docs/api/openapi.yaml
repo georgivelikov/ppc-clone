@@ -988,6 +988,29 @@ paths:
                 $ref: "#/components/schemas/SubscriptionStats"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/credit_balances:
+    get:
+      tags: [Billing]
+      operationId: getCreditBalance
+      summary: Credit a customer holds
+      description: >-
+        A plan change that credits more than the next invoice costs leaves the rest as credit. Later invoices
+        use it before the card is charged, and a voided invoice gives back what it used.
+      parameters:
+        - name: customer
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The balance per currency and the latest changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditBalance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/invoices:
     post:
       tags: [Billing]
@@ -3032,6 +3055,10 @@ components:
         tax:
           type: integer
           format: int64
+        credit_applied:
+          type: integer
+          format: int64
+          description: What the customer's credit would cover. `total` is what is left to charge.
         total:
           type: integer
           format: int64
@@ -3053,6 +3080,65 @@ components:
             type: integer
         ended_last_30_days:
           type: integer
+        churn_by_month:
+          type: array
+          description: >-
+            The last six calendar months (UTC), oldest first. Of the subscriptions that existed when the month
+            began, `ended` is how many ended during it.
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                examples: ["2026-10"]
+              at_start:
+                type: integer
+              ended:
+                type: integer
+    CreditBalance:
+      type: object
+      properties:
+        object:
+          type: string
+          const: credit_balance
+        customer:
+          type: string
+        balances:
+          type: array
+          description: What the customer holds, one entry per currency. Empty when there is none.
+          items:
+            type: object
+            properties:
+              currency:
+                type: string
+              amount:
+                type: integer
+                format: int64
+        history:
+          type: array
+          description: The latest changes, newest first.
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              currency:
+                type: string
+              amount:
+                type: integer
+                format: int64
+                description: Positive when credit was added, negative when it was spent.
+              balance_after:
+                type: integer
+                format: int64
+              reason:
+                type: string
+                enum: [invoice_credit, applied_to_invoice, returned_from_voided_invoice]
+              invoice_id:
+                type: [string, "null"]
+              created_at:
+                type: string
+                format: date-time
     InvoiceStatus:
       type: string
       enum: [draft, open, paid, void, uncollectible]
@@ -3131,6 +3217,10 @@ components:
         tax:
           type: integer
           format: int64
+        credit_applied:
+          type: integer
+          format: int64
+          description: Paid from the customer's credit. `total` is what is left to pay after it.
         total:
           type: integer
           format: int64

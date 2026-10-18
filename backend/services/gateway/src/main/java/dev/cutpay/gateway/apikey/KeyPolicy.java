@@ -25,6 +25,7 @@ final class KeyPolicy {
             Map.entry("/v1/subscriptions", "billing"),
             Map.entry("/v1/subscription_stats", "billing"),
             Map.entry("/v1/invoices", "billing"),
+            Map.entry("/v1/credit_balances", "billing"),
             Map.entry("/v1/billing_settings", "billing"),
             Map.entry("/v1/billing_notifications", "billing"),
             Map.entry("/v1/setup_intents", "customers"),

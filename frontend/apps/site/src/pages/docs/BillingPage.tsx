@@ -154,6 +154,11 @@ export function BillingPage() {
         at once with <code>bill_immediately</code>. <code>POST /v1/subscriptions/&#123;id&#125;/proration_preview</code> shows them before you
         decide. A change during a trial is not prorated.
       </p>
+      <p className="mt-2 text-sm">
+        When the credit of a downgrade is larger than the next invoice, the rest stays with the customer as credit. The next invoices use it
+        before the card is charged (<code>credit_applied</code> on the invoice, and <code>total</code> is what is left to pay), and a voided
+        invoice gives back what it used. <code>GET /v1/credit_balances?customer=cus_…</code> shows the balance and how it changed.
+      </p>
 
       <h3 className="mt-8 text-lg font-semibold">When a payment fails</h3>
       <p className="mt-2 text-sm">

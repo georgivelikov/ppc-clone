@@ -103,6 +103,7 @@ class BillingFlowIT {
     KafkaTemplate<String, String> kafka;
 
     private String merchantId;
+    private String lastSubscription;
 
     @BeforeEach
     void freshMerchantAndStubs() {
@@ -534,6 +535,91 @@ class BillingFlowIT {
                 .andExpect(jsonPath("$.lines.length()").value(1)).andExpect(jsonPath("$.total").value(3000));
     }
 
+    // --- credit ------------------------------------------------------------------------------------------------
+
+    private long creditBalance() throws Exception {
+        String body = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v1/credit_balances")
+                        .param("customer", "cus_ok").with(merchant()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var balances = json.readTree(body).get("balances");
+        return balances.size() == 0 ? 0 : balances.get(0).get("amount").asLong();
+    }
+
+    /** Downgrades far enough that the proration credit is larger than the next renewal; returns the credit left over. */
+    private long downgradeAndRenew() throws Exception {
+        String pro = createPrice(9000, "month", 0);
+        String basic = createPrice(1000, "month", 0);
+        String id = subscribeOk(pro);
+        lastSubscription = id;
+        advance(Duration.ofDays(5));
+        String items = "{\"items\":[{\"price\":\"%s\",\"quantity\":1}]}".formatted(basic);
+        long net = json.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/v1/subscriptions/%s/proration_preview".formatted(id)).with(merchant())
+                        .contentType(MediaType.APPLICATION_JSON).content(items))
+                .andReturn().getResponse().getContentAsString()).get("net").asLong();
+        assertThat(net).isLessThan(-1000);
+        mvc.perform(patch("/v1/subscriptions/" + id).with(merchant()).contentType(MediaType.APPLICATION_JSON).content(items))
+                .andExpect(status().isOk());
+        advance(Duration.ofDays(27));
+        bill();
+        invoicesOf(id).andExpect(jsonPath("$.data[0].status").value("paid")).andExpect(jsonPath("$.data[0].total").value(0))
+                .andExpect(jsonPath("$.data[0].credit_applied").value(0));
+        assertThat(creditBalance()).isEqualTo(-(1000 + net));
+        return -(1000 + net);
+    }
+
+    /** Ends the subscription of the test so later renewals in this shared clock do not touch other tests. */
+    private void cancelLast() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/subscriptions/%s/cancel".formatted(lastSubscription))
+                .with(merchant())).andExpect(status().isOk());
+    }
+
+    @Test
+    void creditLeftOverByADowngradeIsKeptAndSpentOnTheNextRenewalWithoutChargingTheCard() throws Exception {
+        long left = downgradeAndRenew();
+        String id = lastSubscription;
+
+        advance(Duration.ofDays(32));
+        bill();
+        invoicesOf(id).andExpect(jsonPath("$.data[0].status").value("paid")).andExpect(jsonPath("$.data[0].total").value(0))
+                .andExpect(jsonPath("$.data[0].credit_applied").value(1000)).andExpect(jsonPath("$.data[0].amount_paid").value(0));
+        assertThat(creditBalance()).isEqualTo(left - 1000);
+        // The entries add up to the balance.
+        assertThat(count("SELECT (SELECT sum(amount) FROM customer_credit_entries WHERE merchant_id = :p1) - (SELECT balance FROM customer_credit WHERE merchant_id = :p1)", merchantId))
+                .isZero();
+        cancelLast();
+    }
+
+    @Test
+    void creditPaysPartOfAOneOffInvoiceAndComesBackWhenItIsVoided() throws Exception {
+        long left = downgradeAndRenew();
+        String id = draftInvoice();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/invoices/%s/finalize".formatted(id)).with(merchant()))
+                .andExpect(jsonPath("$.status").value("open")).andExpect(jsonPath("$.credit_applied").value(left))
+                .andExpect(jsonPath("$.total").value(22800 - left)).andExpect(jsonPath("$.amount_due").value(22800 - left));
+        assertThat(creditBalance()).isZero();
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/invoices/%s/void".formatted(id)).with(merchant()))
+                .andExpect(jsonPath("$.status").value("void"));
+        assertThat(creditBalance()).isEqualTo(left);
+        cancelLast();
+    }
+
+    @Test
+    void anInvoiceCoveredByCreditIsPaidWithoutTheCardAtFinalizing() throws Exception {
+        long left = downgradeAndRenew();
+        // A line the credit covers in full.
+        String small = field(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/invoices")
+                        .with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customer\":\"cus_ok\",\"currency\":\"EUR\",\"lines\":[{\"description\":\"Tip\",\"unit_amount\":500,\"quantity\":1}]}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/invoices/%s/finalize".formatted(small)).with(merchant()))
+                .andExpect(jsonPath("$.status").value("paid")).andExpect(jsonPath("$.credit_applied").value(500))
+                .andExpect(jsonPath("$.total").value(0));
+        assertThat(creditBalance()).isEqualTo(left - 500);
+        cancelLast();
+    }
+
     @Test
     void aPlanInAnotherIntervalCannotReplaceTheCurrentOne() throws Exception {
         String monthly = createPrice(1000, "month", 0);
@@ -757,6 +843,31 @@ class BillingFlowIT {
                 .andExpect(jsonPath("$.mrr.EUR").value(2500))
                 .andExpect(jsonPath("$.by_status.active").value(2))
                 .andExpect(jsonPath("$.by_status.trialing").value(1));
+    }
+
+    @Test
+    void churnIsReportedForEachOfTheLastSixMonthsAsTheShareOfWhatExistedAtItsStart() throws Exception {
+        String price = createPrice(1500, "month", 0);
+        String first = subscribeOk(price);
+        subscribeOk(price);
+        subscribeOk(price);
+        // Forty days is always into a later calendar month, so all three exist when the current month begins.
+        advance(Duration.ofDays(40));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/v1/subscriptions/%s/cancel".formatted(first))
+                .with(merchant())).andExpect(status().isOk());
+
+        String body = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v1/subscription_stats").with(merchant()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.churn_by_month.length()").value(6))
+                .andReturn().getResponse().getContentAsString();
+        var months = json.readTree(body).get("churn_by_month");
+        var thisMonth = months.get(5);
+        assertThat(thisMonth.get("month").asString()).isEqualTo(java.time.YearMonth.from(clock.instant().atZone(java.time.ZoneOffset.UTC)).toString());
+        assertThat(thisMonth.get("at_start").asLong()).isEqualTo(3);
+        assertThat(thisMonth.get("ended").asLong()).isEqualTo(1);
+        assertThat(months.get(0).get("month").asString()).isLessThan(thisMonth.get("month").asString());
+        // Nothing existed in the oldest month shown, so it has nothing that could have ended.
+        assertThat(months.get(0).get("at_start").asLong()).isZero();
+        assertThat(months.get(0).get("ended").asLong()).isZero();
     }
 
     @Test

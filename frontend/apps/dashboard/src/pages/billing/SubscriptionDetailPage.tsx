@@ -291,6 +291,12 @@ export function SubscriptionDetailPage() {
                   </li>
                 ))}
               </ul>
+              {upcoming.data.credit_applied > 0 && (
+                <p className="mt-2 flex justify-between text-sm text-muted">
+                  <span>Credit used</span>
+                  <span className="tabular-nums">−{formatMoney(upcoming.data.credit_applied, upcoming.data.currency)}</span>
+                </p>
+              )}
               <p className="mt-2 flex justify-between border-t border-border pt-2 font-medium">
                 <span>Total</span>
                 <span className="tabular-nums" data-testid="upcoming-total">

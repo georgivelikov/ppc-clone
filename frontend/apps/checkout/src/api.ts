@@ -169,6 +169,8 @@ export interface PublicInvoice {
   currency: string;
   subtotal: number;
   tax: number;
+  /** Paid from the customer's credit; `total` is what is left after it. */
+  credit_applied: number;
   total: number;
   amount_paid: number;
   description: string | null;

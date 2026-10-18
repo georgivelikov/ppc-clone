@@ -97,6 +97,10 @@ public class InvoicePdf {
                         text, Element.ALIGN_LEFT));
                 totals.addCell(row(money(invoice.tax(), invoice.currency()), text, Element.ALIGN_RIGHT));
             }
+            if (invoice.creditApplied() > 0) {
+                totals.addCell(row("Credit applied", text, Element.ALIGN_LEFT));
+                totals.addCell(row("-" + money(invoice.creditApplied(), invoice.currency()), text, Element.ALIGN_RIGHT));
+            }
             totals.addCell(row("Total", bold, Element.ALIGN_LEFT));
             totals.addCell(row(money(invoice.total(), invoice.currency()), bold, Element.ALIGN_RIGHT));
             if (invoice.amountPaid() > 0) {

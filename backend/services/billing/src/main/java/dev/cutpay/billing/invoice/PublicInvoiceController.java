@@ -24,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 class PublicInvoiceController {
 
     record PublicInvoice(String number, String status, String merchantName, String customerName, String customerEmail,
-                         String currency, long subtotal, long tax, long total, long amountPaid, String description,
-                         Instant dueDate, Instant paidAt, List<LineView> lines, boolean payable) {
+                         String currency, long subtotal, long tax, long creditApplied, long total, long amountPaid,
+                         String description, Instant dueDate, Instant paidAt, List<LineView> lines, boolean payable) {
     }
 
     record PayLink(String url) {
@@ -47,7 +47,8 @@ class PublicInvoiceController {
     PublicInvoice get(@PathVariable String token) {
         Invoice i = visible(token);
         return new PublicInvoice(i.number(), i.status(), i.merchantName(), i.customerName(), i.customerEmail(),
-                i.currency(), i.subtotal(), i.tax(), i.total(), i.amountPaid(), i.description(), i.dueDate(), i.paidAt(),
+                i.currency(), i.subtotal(), i.tax(), i.creditApplied(), i.total(), i.amountPaid(), i.description(),
+                i.dueDate(), i.paidAt(),
                 i.lines().stream().map(LineView::of).toList(), i.open());
     }
 

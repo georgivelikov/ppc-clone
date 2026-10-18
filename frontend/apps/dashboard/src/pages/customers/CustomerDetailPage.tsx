@@ -12,6 +12,12 @@ import { useSession } from "../../auth/AuthProvider";
 import { useTestMode } from "../../layout/testMode";
 import { intervalLabel } from "../../lib/billing";
 
+const CREDIT_REASON = {
+  invoice_credit: "Credit from a plan change",
+  applied_to_invoice: "Used on an invoice",
+  returned_from_voided_invoice: "Returned from a voided invoice",
+} as const;
+
 function describeCard(method: PaymentMethod): string {
   const brand = method.card.brand ? method.card.brand.charAt(0).toUpperCase() + method.card.brand.slice(1) : "Card";
   return `${brand} •••• ${method.card.last4 ?? "????"}`;
@@ -196,6 +202,12 @@ export function CustomerDetailPage() {
     enabled: customer.isSuccess,
   });
 
+  const credit = useQuery({
+    queryKey: ["customer-credit", id],
+    queryFn: () => api.creditBalance(id, customer.data?.livemode),
+    enabled: customer.isSuccess,
+  });
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["payment-methods", id] });
     await queryClient.invalidateQueries({ queryKey: ["customer", id] });
@@ -325,6 +337,31 @@ export function CustomerDetailPage() {
           </ul>
         )}
       </Card>
+
+      {(credit.data?.history ?? []).length > 0 && (
+        <Card aria-label="Credit">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="font-semibold">Credit</h2>
+            <p className="text-sm" data-testid="credit-balance">
+              {credit.data!.balances.length === 0
+                ? "No credit left"
+                : credit.data!.balances.map((b) => formatMoney(b.amount, b.currency)).join(", ")}
+            </p>
+          </div>
+          <p className="mt-1 text-sm text-muted">The next invoices use it before the card is charged.</p>
+          <ul className="mt-3 divide-y divide-border">
+            {credit.data!.history.map((entry) => (
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+                <span>{CREDIT_REASON[entry.reason]}</span>
+                <span className={entry.amount < 0 ? "text-muted" : "font-medium"}>
+                  {entry.amount < 0 ? "−" : "+"}
+                  {formatMoney(Math.abs(entry.amount), entry.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card aria-label="Invoices">
         <h2 className="font-semibold">Invoices</h2>

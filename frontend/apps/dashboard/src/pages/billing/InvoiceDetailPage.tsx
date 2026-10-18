@@ -198,6 +198,14 @@ export function InvoiceDetailPage() {
               <dd className="tabular-nums">{formatMoney(invoice.tax, invoice.currency)}</dd>
             </div>
           )}
+          {invoice.credit_applied > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-muted">Credit used</dt>
+              <dd className="tabular-nums" data-testid="invoice-credit">
+                −{formatMoney(invoice.credit_applied, invoice.currency)}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between font-semibold">
             <dt>Total</dt>
             <dd className="tabular-nums" data-testid="invoice-total">

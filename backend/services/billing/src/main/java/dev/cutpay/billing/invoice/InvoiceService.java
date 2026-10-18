@@ -1,6 +1,7 @@
 package dev.cutpay.billing.invoice;
 
 import dev.cutpay.billing.config.BillingProperties;
+import dev.cutpay.billing.credit.CreditService;
 import dev.cutpay.billing.events.BillingEvents;
 import dev.cutpay.billing.events.NotificationLog;
 import dev.cutpay.billing.invoice.InvoiceRepository.Invoice;
@@ -66,6 +67,7 @@ public class InvoiceService {
     }
 
     private final InvoiceRepository invoices;
+    private final CreditService credits;
     private final SubscriptionRepository subscriptions;
     private final BillingEvents events;
     private final NotificationLog notifications;
@@ -75,10 +77,11 @@ public class InvoiceService {
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public InvoiceService(InvoiceRepository invoices, SubscriptionRepository subscriptions, BillingEvents events,
-                          NotificationLog notifications, PaymentsClient payments, BillingSettings settings,
-                          BillingProperties properties, TransactionTemplate tx, Clock clock) {
+    public InvoiceService(InvoiceRepository invoices, CreditService credits, SubscriptionRepository subscriptions,
+                          BillingEvents events, NotificationLog notifications, PaymentsClient payments,
+                          BillingSettings settings, BillingProperties properties, TransactionTemplate tx, Clock clock) {
         this.invoices = invoices;
+        this.credits = credits;
         this.subscriptions = subscriptions;
         this.events = events;
         this.notifications = notifications;
@@ -145,7 +148,7 @@ public class InvoiceService {
         var invoice = new Invoice(Ids.generate("in"), merchantId, request.merchantName(), livemode, null,
                 customer.id(), customer.email(), customer.name(), null, InvoiceRepository.DRAFT, "manual", method,
                 currency, totals.subtotal(), totals.tax(), totals.total(), 0, taxBps, request.description(), null, null,
-                null, null, newToken(), 0, null, null, null, due, now, null, null, null, now, lines);
+                null, null, newToken(), 0, null, null, null, due, now, null, null, null, now, 0, lines);
         tx.executeWithoutResult(status -> invoices.insert(invoice));
         return invoices.find(invoice.id()).orElseThrow();
     }
@@ -160,9 +163,17 @@ public class InvoiceService {
                 throw ApiException.invalidRequest("invoice_total_not_positive", "An invoice must come to more than zero", null);
             }
             Instant now = clock.instant();
+            long credit = credits.spend(merchantId, invoice.livemode(), invoice.customerId(), invoice.currency(),
+                    invoice.total(), id);
+            if (credit > 0) {
+                invoices.applyCredit(id, credit, invoice.total() - credit);
+            }
             invoices.finalizeDraft(id, invoices.nextNumber(merchantId, invoice.livemode()), invoice.dueDate(), now);
             Invoice finalized = invoices.find(id).orElseThrow();
             events.invoice("InvoiceFinalized", finalized);
+            if (finalized.total() == 0) {
+                return markPaid(finalized, null); // the customer's credit covers it all
+            }
             announce(finalized);
             return finalized;
         });
@@ -187,6 +198,8 @@ public class InvoiceService {
             Instant now = clock.instant();
             invoices.setStatus(id, InvoiceRepository.VOID, now);
             invoices.cancelPendingAttempts(id, now);
+            credits.giveBack(merchantId, invoice.livemode(), invoice.customerId(), invoice.currency(),
+                    invoice.creditApplied(), id);
             Invoice voided = invoices.find(id).orElseThrow();
             events.invoice("InvoiceVoided", voided);
             return voided;
@@ -212,19 +225,24 @@ public class InvoiceService {
         Totals totals = Totals.of(lines, sub.taxRateBps());
         Instant due = "send_invoice".equals(sub.collectionMethod()) ? now.plus(Duration.ofDays(7)) : now;
         String id = Ids.generate("in");
+        // Credits that came to more than the lines cost stay with the customer; credit they already hold is spent first.
+        long surplus = Math.max(0, -totals.total());
+        long credit = credits.spend(sub.merchantId(), sub.livemode(), sub.customerId(), sub.currency(),
+                Math.max(0, totals.total()), id);
         var invoice = new Invoice(id, sub.merchantId(), sub.merchantName(), sub.livemode(), sub.id(), sub.customerId(),
                 sub.customerEmail(), sub.customerName(), invoices.nextNumber(sub.merchantId(), sub.livemode()),
                 InvoiceRepository.OPEN, reason, sub.collectionMethod(), sub.currency(), totals.subtotal(), totals.tax(),
-                Math.max(0, totals.total()), 0, sub.taxRateBps(), null, sub.defaultPaymentMethod(), null, null, null,
-                newToken(), 0, null, periodStart, periodEnd, due, now, now, null, null, now, lines);
+                Math.max(0, totals.total()) - credit, 0, sub.taxRateBps(), null, sub.defaultPaymentMethod(), null, null,
+                null, newToken(), 0, null, periodStart, periodEnd, due, now, now, null, null, now, credit, lines);
         invoices.insert(invoice);
         if (includePending) {
             invoices.claimPending(sub.id(), id);
         }
+        credits.grant(sub.merchantId(), sub.livemode(), sub.customerId(), sub.currency(), surplus, id);
         Invoice stored = invoices.find(id).orElseThrow();
         events.invoice("InvoiceFinalized", stored);
         if (stored.total() == 0) {
-            // Credits cover everything, so there is nothing to collect.
+            // Credit covers everything, so there is nothing to collect.
             return markPaid(stored, null);
         }
         return stored;

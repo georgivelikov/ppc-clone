@@ -55,7 +55,7 @@ spring:
             - id: billing-api
               uri: ${cutpay.upstreams.billing}
               predicates:
-                - Path=/v1/products,/v1/products/**,/v1/prices,/v1/prices/**,/v1/subscriptions,/v1/subscriptions/**,/v1/subscription_stats,/v1/invoices,/v1/invoices/**,/v1/billing_settings,/v1/billing_notifications
+                - Path=/v1/products,/v1/products/**,/v1/prices,/v1/prices/**,/v1/subscriptions,/v1/subscriptions/**,/v1/subscription_stats,/v1/invoices,/v1/invoices/**,/v1/credit_balances,/v1/billing_settings,/v1/billing_notifications
             - id: invoices-public
               uri: ${cutpay.upstreams.billing}
               predicates:

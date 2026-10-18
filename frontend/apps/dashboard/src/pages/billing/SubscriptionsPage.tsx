@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
 import { SUBSCRIPTION_LABEL, SubscriptionStatusBadge } from "../../components/BillingBadges";
+import { ChurnChart } from "../../components/ChurnChart";
 import { useTestMode } from "../../layout/testMode";
 import { intervalLabel } from "../../lib/billing";
 
@@ -49,6 +50,9 @@ function Figures({ livemode }: { livemode: boolean }) {
         </p>
         <p className="text-xs text-muted">{stats.data?.ended_last_30_days ?? 0} ended</p>
       </Card>
+      <div className="sm:col-span-2 lg:col-span-4">
+        <ChurnChart months={stats.data?.churn_by_month ?? []} />
+      </div>
     </div>
   );
 }

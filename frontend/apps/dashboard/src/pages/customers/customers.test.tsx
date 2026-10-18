@@ -1,6 +1,6 @@
 import type { Customer, PaymentMethod } from "@cutpay/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +22,7 @@ vi.mock("../../api", () => ({
     listPayments: vi.fn(),
     listSubscriptions: vi.fn(),
     listInvoices: vi.fn(),
+    creditBalance: vi.fn(),
   },
 }));
 vi.mock("../../auth/AuthProvider", () => ({
@@ -75,6 +76,34 @@ describe("customers", () => {
     vi.mocked(api.listPayments).mockResolvedValue({ data: [], has_more: false });
     vi.mocked(api.listSubscriptions).mockResolvedValue({ object: "list", data: [], has_more: false });
     vi.mocked(api.listInvoices).mockResolvedValue({ object: "list", data: [], has_more: false });
+    vi.mocked(api.creditBalance).mockResolvedValue({ object: "credit_balance", customer: "cus_1", balances: [], history: [] });
+  });
+
+  it("shows the credit a customer holds and where it came from, and hides the card when there is none", async () => {
+    vi.mocked(api.getCustomer).mockResolvedValue(customer);
+    vi.mocked(api.listPaymentMethods).mockResolvedValue({ object: "list", data: [] });
+    renderAt("/customers/cus_1");
+    await screen.findByLabelText("Invoices");
+    expect(screen.queryByLabelText("Credit")).not.toBeInTheDocument();
+
+    vi.mocked(api.creditBalance).mockResolvedValue({
+      object: "credit_balance",
+      customer: "cus_1",
+      balances: [{ currency: "EUR", amount: 4709 }],
+      history: [
+        { id: "cce_2", currency: "EUR", amount: -1000, balance_after: 4709, reason: "applied_to_invoice", invoice_id: "in_2", created_at: "2026-10-18T10:00:00Z" },
+        { id: "cce_1", currency: "EUR", amount: 5709, balance_after: 5709, reason: "invoice_credit", invoice_id: "in_1", created_at: "2026-09-18T10:00:00Z" },
+      ],
+    });
+    cleanup();
+    renderAt("/customers/cus_1");
+
+    expect(await screen.findByTestId("credit-balance")).toHaveTextContent("€47.09");
+    const card = screen.getByLabelText("Credit");
+    expect(within(card).getByText("Credit from a plan change")).toBeInTheDocument();
+    expect(within(card).getByText("Used on an invoice")).toBeInTheDocument();
+    expect(within(card).getByText("−€10.00")).toBeInTheDocument();
+    expect(api.creditBalance).toHaveBeenLastCalledWith("cus_1", false);
   });
 
   it("lists customers and searches by what was typed", async () => {

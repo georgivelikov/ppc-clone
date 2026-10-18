@@ -546,6 +546,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/credit_balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Credit a customer holds
+         * @description A plan change that credits more than the next invoice costs leaves the rest as credit. Later invoices use it before the card is charged, and a voided invoice gives back what it used.
+         */
+        get: operations["getCreditBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invoices": {
         parameters: {
             query?: never;
@@ -1632,6 +1652,11 @@ export interface components {
             subtotal?: number;
             /** Format: int64 */
             tax?: number;
+            /**
+             * Format: int64
+             * @description What the customer's credit would cover. `total` is what is left to charge.
+             */
+            credit_applied?: number;
             /** Format: int64 */
             total?: number;
         };
@@ -1646,6 +1671,41 @@ export interface components {
                 [key: string]: number;
             };
             ended_last_30_days?: number;
+            /** @description The last six calendar months (UTC), oldest first. Of the subscriptions that existed when the month began, `ended` is how many ended during it. */
+            churn_by_month?: {
+                /** @example 2026-10 */
+                month?: string;
+                at_start?: number;
+                ended?: number;
+            }[];
+        };
+        CreditBalance: {
+            /** @constant */
+            object?: "credit_balance";
+            customer?: string;
+            /** @description What the customer holds, one entry per currency. Empty when there is none. */
+            balances?: {
+                currency?: string;
+                /** Format: int64 */
+                amount?: number;
+            }[];
+            /** @description The latest changes, newest first. */
+            history?: {
+                id?: string;
+                currency?: string;
+                /**
+                 * Format: int64
+                 * @description Positive when credit was added, negative when it was spent.
+                 */
+                amount?: number;
+                /** Format: int64 */
+                balance_after?: number;
+                /** @enum {string} */
+                reason?: "invoice_credit" | "applied_to_invoice" | "returned_from_voided_invoice";
+                invoice_id?: string | null;
+                /** Format: date-time */
+                created_at?: string;
+            }[];
         };
         /** @enum {string} */
         InvoiceStatus: "draft" | "open" | "paid" | "void" | "uncollectible";
@@ -1692,6 +1752,11 @@ export interface components {
             subtotal?: number;
             /** Format: int64 */
             tax?: number;
+            /**
+             * Format: int64
+             * @description Paid from the customer's credit. `total` is what is left to pay after it.
+             */
+            credit_applied?: number;
             /** Format: int64 */
             total: number;
             /** Format: int64 */
@@ -3308,6 +3373,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionStats"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCreditBalance: {
+        parameters: {
+            query: {
+                customer: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The balance per currency and the latest changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditBalance"];
                 };
             };
             401: components["responses"]["Unauthorized"];
