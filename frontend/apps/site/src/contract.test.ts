@@ -95,7 +95,7 @@ describe("the OpenAPI description", () => {
   it("lists exactly the event types the webhooks service can send", () => {
     const source = read("backend/services/webhooks/src/main/java/dev/cutpay/webhooks/event/EventTypes.java");
     const block = source.slice(source.indexOf("Set.of("), source.indexOf(");", source.indexOf("Set.of(")));
-    const javaTypes = [...block.matchAll(/"([a-z_]+\.[a-z_]+)"/g)].map((m) => m[1]);
+    const javaTypes = [...block.matchAll(/"([a-z_]+(?:\.[a-z_]+)+)"/g)].map((m) => m[1]);
     javaTypes.push("webhook_endpoint.test"); // written as a constant in the source
     const documented = spec.components.schemas.EventType.enum as string[];
     expect([...new Set(javaTypes)].sort()).toEqual([...documented].sort());
@@ -116,7 +116,7 @@ describe("the docs agree with the platform", () => {
   it("lists every special test card of the simulated card network", () => {
     const source = read("backend/services/acquirer-sim/src/main/java/dev/cutpay/acquirer/TestCards.java");
     const numbers = [...source.matchAll(/"(4\d{15})", Outcome/g)].map((m) => m[1]);
-    expect(numbers.length).toBe(7);
+    expect(numbers.length).toBe(8);
     const documented = TEST_CARDS.map((card) => card.number.replaceAll(" ", ""));
     for (const number of numbers) expect(documented, number).toContain(number);
   });

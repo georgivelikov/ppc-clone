@@ -10,15 +10,18 @@ export function formatMoney(minor: number, currency: string, locale = "en"): str
   return new Intl.NumberFormat(locale, { style: "currency", currency }).format(minor / 10 ** digits);
 }
 
-/** Converts what a person typed ("12.34") to minor units (1234); null if it is not a valid positive amount. */
-export function toMinorUnits(input: string, currency: string): number | null {
+/**
+ * Converts what a person typed ("12.34") to minor units (1234); null if it is not a valid positive amount. With
+ * {@code allowNegative}, "-5.00" is accepted too (a discount), but zero never is.
+ */
+export function toMinorUnits(input: string, currency: string, allowNegative = false): number | null {
   const normalised = input.trim().replace(",", ".");
-  if (!/^\d+(\.\d+)?$/.test(normalised)) return null;
+  if (!(allowNegative ? /^-?\d+(\.\d+)?$/ : /^\d+(\.\d+)?$/).test(normalised)) return null;
   const digits = fractionDigits(currency);
-  const [, fraction = ""] = normalised.split(".");
+  const [, fraction = ""] = normalised.replace("-", "").split(".");
   if (fraction.length > digits) return null;
   const minor = Math.round(Number(normalised) * 10 ** digits);
-  return minor > 0 && Number.isSafeInteger(minor) ? minor : null;
+  return minor !== 0 && (allowNegative || minor > 0) && Number.isSafeInteger(minor) ? minor : null;
 }
 
 /** Minor units as a plain decimal for an input field, e.g. 1250 EUR -> "12.50". */

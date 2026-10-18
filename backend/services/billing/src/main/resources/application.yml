@@ -1,0 +1,48 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: billing
+  datasource:
+    url: jdbc:postgresql://localhost:5432/billing
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so billing can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: billing
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets e2e tests push time forward via POST /admin/clock/advance (trials, renewals, retries).
+    simulated: true
+  billing:
+    # Where the hosted checkout lives; an invoice is paid at {checkout-url}/i/{token}.
+    checkout-url: http://localhost:5174
+    payments-url: http://localhost:8082
+    job-poll-interval: PT5S
+    # An unpaid first invoice leaves the subscription incomplete for this long, then it is canceled.
+    incomplete-expiry: PT24H

@@ -6,6 +6,7 @@ export const TEST_CARDS = [
   { number: "4000 0000 0000 0069", result: "Declined", note: "expired_card: Your card has expired." },
   { number: "4000 0000 0000 3220", result: "3-D Secure", note: "The customer is asked for a one-time code. Enter 1234 to approve; any other code fails the payment. A card saved after that can be charged later without the customer." },
   { number: "4000 0027 6000 3184", result: "3-D Secure every time", note: "Asks for authentication on every charge. Saved for later, it cannot be charged without the customer: an off-session payment fails with authentication_required (a subscription goes past due)." },
+  { number: "4000 0000 0000 0341", result: "Declined when charged", note: "Can be saved to a customer, but every charge is declined. Use it to see a subscription go past due and be retried." },
   { number: "4000 0000 0000 0119", result: "Processing error", note: "The card network answers with an error, and the payment fails with a retry message." },
   { number: "4000 0000 0000 7775", result: "Timeout", note: "The card network answers only after ten seconds, far too late, so the payment fails with a retry message." },
 ] as const;

@@ -20,6 +20,8 @@ vi.mock("../../api", () => ({
     getSetupIntent: vi.fn(),
     createPayment: vi.fn(),
     listPayments: vi.fn(),
+    listSubscriptions: vi.fn(),
+    listInvoices: vi.fn(),
   },
 }));
 vi.mock("../../auth/AuthProvider", () => ({
@@ -71,6 +73,8 @@ describe("customers", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(api.listPayments).mockResolvedValue({ data: [], has_more: false });
+    vi.mocked(api.listSubscriptions).mockResolvedValue({ object: "list", data: [], has_more: false });
+    vi.mocked(api.listInvoices).mockResolvedValue({ object: "list", data: [], has_more: false });
   });
 
   it("lists customers and searches by what was typed", async () => {

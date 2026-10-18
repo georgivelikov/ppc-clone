@@ -49,6 +49,31 @@ import type {
   UpdateCustomerInput,
 } from "./customers";
 import type {
+  BillingNotification,
+  BillingSettings,
+  CreateInvoiceInput,
+  CreatePriceInput,
+  CreateProductInput,
+  CreateSubscriptionInput,
+  Invoice,
+  InvoiceList,
+  InvoiceListParams,
+  PayInvoiceResult,
+  Price,
+  PriceList,
+  Product,
+  ProductList,
+  ProrationPreview,
+  Subscription,
+  SubscriptionItemInput,
+  SubscriptionList,
+  SubscriptionListParams,
+  SubscriptionStats,
+  UpcomingInvoice,
+  UpdateProductInput,
+  UpdateSubscriptionInput,
+} from "./billing";
+import type {
   ApiKey,
   ApiKeyList,
   CreateApiKeyInput,
@@ -318,6 +343,119 @@ export class ApiClient {
 
   getSetupIntent(id: string): Promise<SetupIntent> {
     return this.request("GET", `/v1/setup_intents/${encodeURIComponent(id)}`);
+  }
+
+  // --- billing: products, subscriptions and invoices ----------------------
+
+  createProduct(input: CreateProductInput, livemode = false): Promise<Product> {
+    return this.request("POST", `/v1/products${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listProducts(params: { livemode?: boolean; active?: boolean; starting_after?: string; limit?: number } = {}): Promise<ProductList> {
+    return this.request("GET", `/v1/products${toQuery(params)}`);
+  }
+
+  updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
+    return this.request("PATCH", `/v1/products/${encodeURIComponent(id)}`, input);
+  }
+
+  createPrice(input: CreatePriceInput, livemode = false): Promise<Price> {
+    return this.request("POST", `/v1/prices${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listPrices(params: { livemode?: boolean; product?: string; active?: boolean; starting_after?: string; limit?: number } = {}): Promise<PriceList> {
+    return this.request("GET", `/v1/prices${toQuery(params)}`);
+  }
+
+  /** Archives a price (or brings it back) or changes its label. The amount and interval never change. */
+  updatePrice(id: string, input: { active?: boolean; nickname?: string }): Promise<Price> {
+    return this.request("PATCH", `/v1/prices/${encodeURIComponent(id)}`, input);
+  }
+
+  createSubscription(input: CreateSubscriptionInput, livemode = false): Promise<Subscription> {
+    return this.request("POST", `/v1/subscriptions${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listSubscriptions(params: SubscriptionListParams = {}): Promise<SubscriptionList> {
+    return this.request("GET", `/v1/subscriptions${toQuery(params)}`);
+  }
+
+  getSubscription(id: string): Promise<Subscription> {
+    return this.request("GET", `/v1/subscriptions/${encodeURIComponent(id)}`);
+  }
+
+  updateSubscription(id: string, input: UpdateSubscriptionInput): Promise<Subscription> {
+    return this.request("PATCH", `/v1/subscriptions/${encodeURIComponent(id)}`, input);
+  }
+
+  cancelSubscription(id: string, atPeriodEnd = false): Promise<Subscription> {
+    return this.request("POST", `/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { at_period_end: atPeriodEnd });
+  }
+
+  pauseSubscription(id: string): Promise<Subscription> {
+    return this.request("POST", `/v1/subscriptions/${encodeURIComponent(id)}/pause`, undefined);
+  }
+
+  resumeSubscription(id: string): Promise<Subscription> {
+    return this.request("POST", `/v1/subscriptions/${encodeURIComponent(id)}/resume`, undefined);
+  }
+
+  /** What changing the plan would credit and charge for the rest of the period. Changes nothing. */
+  previewSubscriptionChange(id: string, items: SubscriptionItemInput[]): Promise<ProrationPreview> {
+    return this.request("POST", `/v1/subscriptions/${encodeURIComponent(id)}/proration_preview`, { items });
+  }
+
+  upcomingInvoice(subscriptionId: string): Promise<UpcomingInvoice> {
+    return this.request("GET", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}/upcoming_invoice`);
+  }
+
+  subscriptionStats(livemode = false): Promise<SubscriptionStats> {
+    return this.request("GET", `/v1/subscription_stats${toQuery({ livemode })}`);
+  }
+
+  createInvoice(input: CreateInvoiceInput, livemode = false): Promise<Invoice> {
+    return this.request("POST", `/v1/invoices${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listInvoices(params: InvoiceListParams = {}): Promise<InvoiceList> {
+    return this.request("GET", `/v1/invoices${toQuery(params)}`);
+  }
+
+  getInvoice(id: string): Promise<Invoice> {
+    return this.request("GET", `/v1/invoices/${encodeURIComponent(id)}`);
+  }
+
+  finalizeInvoice(id: string): Promise<Invoice> {
+    return this.request("POST", `/v1/invoices/${encodeURIComponent(id)}/finalize`, undefined);
+  }
+
+  /** Charges the saved card. A card that is refused comes back as `paid: false`, not as an error. */
+  payInvoice(id: string): Promise<PayInvoiceResult> {
+    return this.request("POST", `/v1/invoices/${encodeURIComponent(id)}/pay`, undefined);
+  }
+
+  voidInvoice(id: string): Promise<Invoice> {
+    return this.request("POST", `/v1/invoices/${encodeURIComponent(id)}/void`, undefined);
+  }
+
+  deleteInvoice(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/invoices/${encodeURIComponent(id)}`);
+  }
+
+  invoicePdf(id: string): Promise<Blob> {
+    return this.fetchBlob(`/v1/invoices/${encodeURIComponent(id)}/pdf`);
+  }
+
+  getBillingSettings(): Promise<BillingSettings> {
+    return this.request("GET", "/v1/billing_settings");
+  }
+
+  updateBillingSettings(input: { retry_days: number[]; final_action: "cancel" | "unpaid" }): Promise<BillingSettings> {
+    return this.request("PUT", "/v1/billing_settings", input);
+  }
+
+  billingNotifications(relatedId: string, livemode = false): Promise<{ object: "list"; data: BillingNotification[] }> {
+    return this.request("GET", `/v1/billing_notifications${toQuery({ related_id: relatedId, livemode })}`);
   }
 
   // --- balances (ledger) --------------------------------------------------

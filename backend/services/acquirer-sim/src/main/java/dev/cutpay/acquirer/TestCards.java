@@ -6,7 +6,7 @@ import java.util.Optional;
 /** The documented test cards (docs/plans/phase-01-card-payments.md). Any other valid number is approved. */
 final class TestCards {
 
-    enum Behaviour { APPROVE, THREE_DS, THREE_DS_ALWAYS, DECLINE, PROCESSING_ERROR, TIMEOUT }
+    enum Behaviour { APPROVE, THREE_DS, THREE_DS_ALWAYS, DECLINE, DECLINE_ON_CHARGE, PROCESSING_ERROR, TIMEOUT }
 
     record Outcome(Behaviour behaviour, String declineCode, String message) {
         static Outcome of(Behaviour behaviour) {
@@ -22,6 +22,8 @@ final class TestCards {
             "4000000000003220", Outcome.of(Behaviour.THREE_DS),
             // Asks for authentication on every charge, also when the cardholder is not there (off-session).
             "4000002760003184", Outcome.of(Behaviour.THREE_DS_ALWAYS),
+            // Can be saved, but every charge is declined: a subscription whose card went bad.
+            "4000000000000341", Outcome.of(Behaviour.DECLINE_ON_CHARGE),
             "4000000000000002", Outcome.decline("card_declined", "Your card was declined."),
             "4000000000009995", Outcome.decline("insufficient_funds", "Your card has insufficient funds."),
             "4000000000000069", Outcome.decline("expired_card", "Your card has expired."),

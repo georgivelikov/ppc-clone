@@ -59,6 +59,7 @@ export default defineConfig({
     proxy: {
       "/checkout": gateway,
       "/links": gateway,
+      "/invoices": gateway,
       "/vault": gateway,
     },
   },

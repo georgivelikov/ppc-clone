@@ -10,6 +10,13 @@ import { EventsPage } from "./pages/developers/EventsPage";
 import { LogsPage } from "./pages/developers/LogsPage";
 import { WebhookDetailPage } from "./pages/developers/WebhookDetailPage";
 import { WebhooksPage } from "./pages/developers/WebhooksPage";
+import { InvoiceDetailPage } from "./pages/billing/InvoiceDetailPage";
+import { InvoiceEditorPage } from "./pages/billing/InvoiceEditorPage";
+import { InvoicesPage } from "./pages/billing/InvoicesPage";
+import { NewSubscriptionPage } from "./pages/billing/NewSubscriptionPage";
+import { ProductsPage } from "./pages/billing/ProductsPage";
+import { SubscriptionDetailPage } from "./pages/billing/SubscriptionDetailPage";
+import { SubscriptionsPage } from "./pages/billing/SubscriptionsPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
 import { CustomersPage } from "./pages/customers/CustomersPage";
 import { CreateLinkPage } from "./pages/links/CreateLinkPage";
@@ -42,6 +49,13 @@ export function App() {
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="payments/:id" element={<PaymentDetailPage />} />
             <Route path="customers" element={<CustomersPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="subscriptions" element={<SubscriptionsPage />} />
+            <Route path="subscriptions/new" element={<NewSubscriptionPage />} />
+            <Route path="subscriptions/:id" element={<SubscriptionDetailPage />} />
+            <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="invoices/new" element={<InvoiceEditorPage />} />
+            <Route path="invoices/:id" element={<InvoiceDetailPage />} />
             <Route path="customers/:id" element={<CustomerDetailPage />} />
             <Route path="links" element={<LinksPage />} />
             <Route path="links/new" element={<CreateLinkPage />} />

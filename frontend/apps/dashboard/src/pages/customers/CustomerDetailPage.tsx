@@ -6,9 +6,11 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../../api";
 import { Dialog } from "../../components/Dialog";
+import { InvoiceStatusBadge, SubscriptionStatusBadge } from "../../components/BillingBadges";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useSession } from "../../auth/AuthProvider";
 import { useTestMode } from "../../layout/testMode";
+import { intervalLabel } from "../../lib/billing";
 
 function describeCard(method: PaymentMethod): string {
   const brand = method.card.brand ? method.card.brand.charAt(0).toUpperCase() + method.card.brand.slice(1) : "Card";
@@ -183,6 +185,16 @@ export function CustomerDetailPage() {
     queryFn: () => api.listPayments({ customer: id, limit: 10, livemode: customer.data?.livemode }),
     enabled: customer.isSuccess,
   });
+  const subscriptions = useQuery({
+    queryKey: ["customer-subscriptions", id],
+    queryFn: () => api.listSubscriptions({ customer: id, limit: 10, livemode: customer.data?.livemode }),
+    enabled: customer.isSuccess,
+  });
+  const invoices = useQuery({
+    queryKey: ["customer-invoices", id],
+    queryFn: () => api.listInvoices({ customer: id, limit: 10, livemode: customer.data?.livemode }),
+    enabled: customer.isSuccess,
+  });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["payment-methods", id] });
@@ -282,6 +294,50 @@ export function CustomerDetailPage() {
                     Remove
                   </Button>
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card aria-label="Subscriptions">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Subscriptions</h2>
+          <Link to={`/subscriptions/new?customer=${c.id}`}>
+            <Button size="sm" variant="secondary">
+              Start a subscription
+            </Button>
+          </Link>
+        </div>
+        {(subscriptions.data?.data ?? []).length === 0 ? (
+          <p className="mt-3 text-sm text-muted">No subscriptions.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border">
+            {subscriptions.data!.data.map((sub) => (
+              <li key={sub.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+                <Link to={`/subscriptions/${sub.id}`} className="font-medium text-brand-700 hover:underline">
+                  {sub.items.map((item) => item.product_name).join(", ")} ·{" "}
+                  {formatMoney(sub.items.reduce((sum, item) => sum + item.amount, 0), sub.currency)} {intervalLabel(sub.interval, sub.interval_count)}
+                </Link>
+                <SubscriptionStatusBadge status={sub.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card aria-label="Invoices">
+        <h2 className="font-semibold">Invoices</h2>
+        {(invoices.data?.data ?? []).length === 0 ? (
+          <p className="mt-3 text-sm text-muted">No invoices.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border">
+            {invoices.data!.data.map((invoice) => (
+              <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+                <Link to={`/invoices/${invoice.id}`} className="font-medium text-brand-700 hover:underline">
+                  {invoice.number ?? "Draft"} · {formatMoney(invoice.total, invoice.currency)}
+                </Link>
+                <InvoiceStatusBadge status={invoice.status} />
               </li>
             ))}
           </ul>

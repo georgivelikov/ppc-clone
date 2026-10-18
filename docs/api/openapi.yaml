@@ -56,6 +56,8 @@ tags:
     description: Create and track card payments.
   - name: Customers
     description: People and companies you sell to, and the cards they saved for later.
+  - name: Billing
+    description: Products and prices, subscriptions and invoices.
   - name: Payment links
     description: Get paid without a website, with a shareable link or a QR code.
   - name: Refunds
@@ -441,6 +443,647 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /v1/products:
+    post:
+      tags: [Billing]
+      operationId: createProduct
+      summary: Create a product
+      description: Something you sell. Give it one or more prices to make it buyable.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProduct"
+      responses:
+        "201":
+          description: The product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [Billing]
+      operationId: listProducts
+      summary: List products
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Products, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/products/{id}:
+    get:
+      tags: [Billing]
+      operationId: getProduct
+      summary: Retrieve a product
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: The product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Billing]
+      operationId: updateProduct
+      summary: Update or archive a product
+      description: Set `active` to `false` to archive it. Fields you leave out stay as they are.
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProduct"
+      responses:
+        "200":
+          description: The updated product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/prices:
+    post:
+      tags: [Billing]
+      operationId: createPrice
+      summary: Create a price
+      description: |
+        A price with an `interval` recurs (a subscription price), one without is a single payment. A price never
+        changes: to charge something else, archive it and create a new one, so existing subscriptions keep their terms.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrice"
+      responses:
+        "201":
+          description: The price.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Price"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Billing]
+      operationId: listPrices
+      summary: List prices
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: product
+          in: query
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Prices, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/prices/{id}:
+    get:
+      tags: [Billing]
+      operationId: getPrice
+      summary: Retrieve a price
+      parameters:
+        - $ref: "#/components/parameters/PriceId"
+      responses:
+        "200":
+          description: The price.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Price"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Billing]
+      operationId: updatePrice
+      summary: Archive a price or change its label
+      description: Only `active` and `nickname` can change. The amount and interval never do.
+      parameters:
+        - $ref: "#/components/parameters/PriceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                active:
+                  type: boolean
+                nickname:
+                  type: string
+      responses:
+        "200":
+          description: The updated price.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Price"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/subscriptions:
+    post:
+      tags: [Billing]
+      operationId: createSubscription
+      summary: Start a subscription
+      description: |
+        Bills a customer on a recurring price. Without a trial the first invoice is charged to the customer's saved
+        card at once; if that fails the subscription is `incomplete`. With a trial (`trial_days`, or the trial of the
+        price) the first invoice is created when the trial ends. A subscription is billed in advance: each period is
+        invoiced as it starts. Failed payments are retried (see `/v1/billing_settings`) and the subscription is
+        `past_due` meanwhile.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubscription"
+      responses:
+        "201":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Billing]
+      operationId: listSubscriptions
+      summary: List subscriptions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/SubscriptionStatus"
+        - name: customer
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subscriptions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/subscriptions/{id}:
+    get:
+      tags: [Billing]
+      operationId: getSubscription
+      summary: Retrieve a subscription
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Billing]
+      operationId: updateSubscription
+      summary: Change a subscription
+      description: |
+        Replace its `items` to change plan or quantity. The unused part of the old plan is credited and the rest of the
+        period is charged at the new one, as proration lines that join the next invoice, or are invoiced and charged
+        now with `bill_immediately`. Use `proration_behavior: none` to skip them.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubscription"
+      responses:
+        "200":
+          description: The updated subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/subscriptions/{id}/cancel:
+    post:
+      tags: [Billing]
+      operationId: cancelSubscription
+      summary: Cancel a subscription
+      description: Cancels now, or with `at_period_end` when the paid period runs out. Nothing is refunded.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                at_period_end:
+                  type: boolean
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/subscriptions/{id}/pause:
+    post:
+      tags: [Billing]
+      operationId: pauseSubscription
+      summary: Pause collection
+      description: No new invoices are created while it is paused.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/subscriptions/{id}/resume:
+    post:
+      tags: [Billing]
+      operationId: resumeSubscription
+      summary: Resume collection
+      description: If the paid period is still running nothing is billed yet. Otherwise a new period starts now and is billed.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/subscriptions/{id}/proration_preview:
+    post:
+      tags: [Billing]
+      operationId: previewSubscriptionChange
+      summary: Preview the proration of a plan change
+      description: Shows the credit and charge lines a change would create, without changing anything.
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SubscriptionItemInput"
+      responses:
+        "200":
+          description: The lines and their net amount (negative is a credit).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProrationPreview"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/subscriptions/{id}/upcoming_invoice:
+    get:
+      tags: [Billing]
+      operationId: getUpcomingInvoice
+      summary: Preview the next invoice
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "200":
+          description: What the next renewal will charge, including any waiting proration lines.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpcomingInvoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/subscription_stats:
+    get:
+      tags: [Billing]
+      operationId: getSubscriptionStats
+      summary: Recurring revenue and subscriber counts
+      description: MRR is the monthly value of active and past due subscriptions per currency. Trials are not revenue yet.
+      responses:
+        "200":
+          description: The figures.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/invoices:
+    post:
+      tags: [Billing]
+      operationId: createInvoice
+      summary: Create a one-off invoice
+      description: Creates a draft. Finalize it to number it and get a link the customer can pay at.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoice"
+      responses:
+        "201":
+          description: The draft invoice.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Billing]
+      operationId: listInvoices
+      summary: List invoices
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/InvoiceStatus"
+        - name: customer
+          in: query
+          schema:
+            type: string
+        - name: subscription
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoices, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/invoices/{id}:
+    get:
+      tags: [Billing]
+      operationId: getInvoice
+      summary: Retrieve an invoice
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: The invoice, with its payment attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Billing]
+      operationId: deleteInvoice
+      summary: Delete a draft invoice
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/invoices/{id}/finalize:
+    post:
+      tags: [Billing]
+      operationId: finalizeInvoice
+      summary: Finalize a draft invoice
+      description: Numbers the invoice and opens it for payment. The customer is emailed the link of its page.
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: The open invoice.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/invoices/{id}/pay:
+    post:
+      tags: [Billing]
+      operationId: payInvoice
+      summary: Charge the saved card for an invoice
+      description: "A card that is refused is an answer (paid is false, with a failure_code), not an error."
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: How it went.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayInvoiceResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/invoices/{id}/void:
+    post:
+      tags: [Billing]
+      operationId: voidInvoice
+      summary: Void an unpaid invoice
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: The void invoice.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/invoices/{id}/pdf:
+    get:
+      tags: [Billing]
+      operationId: getInvoicePdf
+      summary: Download the invoice as a PDF
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: A printable A4 invoice.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/billing_settings:
+    get:
+      tags: [Billing]
+      operationId: getBillingSettings
+      summary: Retrieve the retry rules
+      responses:
+        "200":
+          description: When unpaid invoices are retried and what happens after the last retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Billing]
+      operationId: updateBillingSettings
+      summary: Change the retry rules
+      description: |
+        `retry_days` are the days after the first failed payment on which the invoice is tried again (default 1, 3, 5, 7).
+        After the last failed retry the subscription is canceled (`cancel`) or kept as `unpaid`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingSettings"
+      responses:
+        "200":
+          description: The saved rules.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSettings"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/checkout_sessions:
     post:
       tags: [Payments]
@@ -1435,6 +2078,34 @@ components:
       schema:
         type: string
         examples: [seti_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    ProductId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [prod_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    PriceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [price_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    SubscriptionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [sub_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    InvoiceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [in_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
     LinkId:
       name: id
       in: path
@@ -1766,6 +2437,589 @@ components:
         created_at:
           type: string
           format: date-time
+    CreateProduct:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateProduct:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        image_url:
+          type: string
+        active:
+          type: boolean
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    Product:
+      type: object
+      required: [id, object, name, active]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: product
+        livemode:
+          type: boolean
+        name:
+          type: string
+        description:
+          type: [string, "null"]
+        image_url:
+          type: [string, "null"]
+        active:
+          type: boolean
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        created_at:
+          type: string
+          format: date-time
+    ProductList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        has_more:
+          type: boolean
+    CreatePrice:
+      type: object
+      required: [product, unit_amount, currency]
+      properties:
+        product:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: In the smallest currency unit.
+        currency:
+          type: string
+        interval:
+          type: string
+          enum: [day, week, month, year]
+          description: Makes the price recurring.
+        interval_count:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 1
+          description: Bills every this many intervals, for example every 3 months.
+        trial_days:
+          type: integer
+          minimum: 0
+          maximum: 730
+          description: Days of free trial when a subscription starts on this price.
+        nickname:
+          type: string
+    Price:
+      type: object
+      required: [id, object, product, unit_amount, currency, type, active]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: price
+        livemode:
+          type: boolean
+        product:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        type:
+          type: string
+          enum: [one_time, recurring]
+        interval:
+          type: [string, "null"]
+          enum: [day, week, month, year, null]
+        interval_count:
+          type: integer
+        trial_days:
+          type: integer
+        nickname:
+          type: [string, "null"]
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    PriceList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
+        has_more:
+          type: boolean
+    SubscriptionStatus:
+      type: string
+      enum: [trialing, active, past_due, canceled, unpaid, incomplete]
+    SubscriptionItemInput:
+      type: object
+      required: [price, quantity]
+      properties:
+        price:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+    CreateSubscription:
+      type: object
+      required: [customer, items]
+      properties:
+        customer:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SubscriptionItemInput"
+          description: Recurring prices with the same currency and interval.
+        trial_days:
+          type: integer
+          minimum: 0
+          maximum: 730
+          description: Overrides the trial of the prices.
+        collection_method:
+          type: string
+          enum: [charge_automatically, send_invoice]
+          default: charge_automatically
+          description: "With send_invoice nothing is charged, the customer is emailed each invoice to pay."
+        default_payment_method:
+          type: string
+          description: A saved card of the customer. Defaults to the default card of the customer.
+        tax_rate_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        merchant_name:
+          type: string
+          description: Shown on invoices.
+    UpdateSubscription:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionItemInput"
+        cancel_at_period_end:
+          type: boolean
+        default_payment_method:
+          type: string
+        proration_behavior:
+          type: string
+          enum: [create_prorations, none]
+          default: create_prorations
+        bill_immediately:
+          type: boolean
+          description: Invoice and charge the proration now instead of with the next renewal.
+    Subscription:
+      type: object
+      required: [id, object, customer, status, currency, items]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: subscription
+        livemode:
+          type: boolean
+        customer:
+          type: string
+        customer_email:
+          type: [string, "null"]
+        customer_name:
+          type: [string, "null"]
+        status:
+          $ref: "#/components/schemas/SubscriptionStatus"
+        currency:
+          type: string
+        interval:
+          type: string
+          enum: [day, week, month, year]
+        interval_count:
+          type: integer
+        collection_method:
+          type: string
+        default_payment_method:
+          type: [string, "null"]
+        current_period_start:
+          type: string
+          format: date-time
+        current_period_end:
+          type: string
+          format: date-time
+        trial_end:
+          type: [string, "null"]
+          format: date-time
+        cancel_at_period_end:
+          type: boolean
+        collection_paused:
+          type: boolean
+        canceled_at:
+          type: [string, "null"]
+          format: date-time
+        ended_at:
+          type: [string, "null"]
+          format: date-time
+        tax_rate_percent:
+          type: number
+        latest_invoice:
+          type: [string, "null"]
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              price:
+                type: string
+              product:
+                type: string
+              product_name:
+                type: string
+              nickname:
+                type: [string, "null"]
+              unit_amount:
+                type: integer
+                format: int64
+              quantity:
+                type: integer
+              amount:
+                type: integer
+                format: int64
+        created_at:
+          type: string
+          format: date-time
+    SubscriptionList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+        has_more:
+          type: boolean
+    InvoiceLine:
+      type: object
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+        amount:
+          type: integer
+          format: int64
+        price:
+          type: [string, "null"]
+        proration:
+          type: boolean
+        period_start:
+          type: [string, "null"]
+          format: date-time
+        period_end:
+          type: [string, "null"]
+          format: date-time
+    ProrationPreview:
+      type: object
+      properties:
+        currency:
+          type: string
+        period_end:
+          type: string
+          format: date-time
+        net:
+          type: integer
+          format: int64
+          description: Negative is a credit to the customer.
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              unit_amount:
+                type: integer
+                format: int64
+              quantity:
+                type: integer
+              amount:
+                type: integer
+                format: int64
+    UpcomingInvoice:
+      type: object
+      properties:
+        object:
+          type: string
+          const: upcoming_invoice
+        currency:
+          type: string
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLine"
+        subtotal:
+          type: integer
+          format: int64
+        tax:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+    SubscriptionStats:
+      type: object
+      properties:
+        object:
+          type: string
+          const: subscription_stats
+        mrr:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: Monthly recurring revenue per currency, in minor units.
+        by_status:
+          type: object
+          additionalProperties:
+            type: integer
+        ended_last_30_days:
+          type: integer
+    InvoiceStatus:
+      type: string
+      enum: [draft, open, paid, void, uncollectible]
+    CreateInvoice:
+      type: object
+      required: [customer, currency, lines]
+      properties:
+        customer:
+          type: string
+        currency:
+          type: string
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [description, unit_amount, quantity]
+            properties:
+              description:
+                type: string
+              unit_amount:
+                type: integer
+                format: int64
+                description: A negative amount is a discount.
+              quantity:
+                type: integer
+                minimum: 1
+        collection_method:
+          type: string
+          enum: [charge_automatically, send_invoice]
+          default: send_invoice
+        days_until_due:
+          type: integer
+          minimum: 0
+          default: 14
+        tax_rate_percent:
+          type: number
+        description:
+          type: string
+        merchant_name:
+          type: string
+    Invoice:
+      type: object
+      required: [id, object, status, customer, currency, total]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: invoice
+        livemode:
+          type: boolean
+        number:
+          type: [string, "null"]
+          description: Set when the invoice is finalized, for example INV-0001.
+        status:
+          $ref: "#/components/schemas/InvoiceStatus"
+        subscription:
+          type: [string, "null"]
+        customer:
+          type: string
+        customer_email:
+          type: [string, "null"]
+        customer_name:
+          type: [string, "null"]
+        billing_reason:
+          type: string
+          enum: [manual, subscription_create, subscription_cycle, subscription_update]
+        collection_method:
+          type: string
+        currency:
+          type: string
+        subtotal:
+          type: integer
+          format: int64
+        tax:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+        amount_paid:
+          type: integer
+          format: int64
+        amount_due:
+          type: integer
+          format: int64
+        description:
+          type: [string, "null"]
+        due_date:
+          type: [string, "null"]
+          format: date-time
+        period_start:
+          type: [string, "null"]
+          format: date-time
+        period_end:
+          type: [string, "null"]
+          format: date-time
+        payment_intent:
+          type: [string, "null"]
+        failure_code:
+          type: [string, "null"]
+        attempt_count:
+          type: integer
+        next_payment_attempt:
+          type: [string, "null"]
+          format: date-time
+        hosted_invoice_url:
+          type: [string, "null"]
+          description: The page where the customer can see and pay the invoice.
+        invoice_pdf:
+          type: [string, "null"]
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLine"
+        attempts:
+          type:
+            - array
+            - "null"
+          description: The scheduled and finished payment attempts. Only on a single invoice.
+          items:
+            type: object
+            properties:
+              attempt_no:
+                type: integer
+              scheduled_at:
+                type: string
+                format: date-time
+              executed_at:
+                type: [string, "null"]
+                format: date-time
+              result:
+                type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        finalized_at:
+          type: [string, "null"]
+          format: date-time
+        paid_at:
+          type: [string, "null"]
+          format: date-time
+    InvoiceList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        has_more:
+          type: boolean
+    PayInvoiceResult:
+      type: object
+      properties:
+        invoice:
+          $ref: "#/components/schemas/Invoice"
+        paid:
+          type: boolean
+        failure_code:
+          type: [string, "null"]
+        failure_message:
+          type: [string, "null"]
+    BillingSettings:
+      type: object
+      required: [retry_days]
+      properties:
+        object:
+          type: string
+          const: billing_settings
+        retry_days:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 60
+          maxItems: 10
+          description: Increasing days after the first failed payment.
+        final_action:
+          type: string
+          enum: [cancel, unpaid]
+          default: cancel
     CaptureRequest:
       type: object
       properties:
@@ -2388,6 +3642,13 @@ components:
         - payment_method.detached
         - setup_intent.succeeded
         - setup_intent.setup_failed
+        - customer.subscription.created
+        - customer.subscription.updated
+        - customer.subscription.deleted
+        - invoice.finalized
+        - invoice.paid
+        - invoice.payment_failed
+        - invoice.voided
         - webhook_endpoint.test
     Event:
       type: object

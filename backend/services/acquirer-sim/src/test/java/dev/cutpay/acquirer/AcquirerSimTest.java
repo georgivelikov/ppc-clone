@@ -202,4 +202,13 @@ class AcquirerSimTest {
         verify(tokenize("4242424242424242")).andExpect(jsonPath("$.status").value("approved"));
         verify(tokenize("4000000000009995")).andExpect(jsonPath("$.decline_code").value("insufficient_funds"));
     }
+
+    @Test
+    void aCardThatWentBadCanBeSavedButEveryChargeIsDeclined() throws Exception {
+        String token = tokenize("4000000000000341");
+        verify(token).andExpect(jsonPath("$.status").value("approved"));
+        authorize(token).andExpect(jsonPath("$.status").value("declined"))
+                .andExpect(jsonPath("$.decline_code").value("card_declined"));
+        authorizeOffSession(token).andExpect(jsonPath("$.decline_code").value("card_declined"));
+    }
 }

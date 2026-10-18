@@ -62,6 +62,37 @@ class EventMappingTest {
     }
 
     @Test
+    void subscriptionAndInvoiceEventsMapToTheirPublicTypes() {
+        var subscription = JSON.readTree("""
+                {"subscription_id":"sub_1","customer_id":"cus_1","status":"past_due","currency":"EUR",
+                 "cancel_at_period_end":false,"current_period_end":"2027-02-01T00:00:00Z","latest_invoice":"in_1"}""");
+        assertThat(EventMapper.map("SubscriptionCreated", subscription).orElseThrow().type())
+                .isEqualTo("customer.subscription.created");
+        for (String type : List.of("SubscriptionUpdated", "SubscriptionRenewed", "SubscriptionPastDue")) {
+            assertThat(EventMapper.map(type, subscription).orElseThrow().type()).isEqualTo("customer.subscription.updated");
+        }
+        Mapped canceled = EventMapper.map("SubscriptionCanceled", subscription).orElseThrow();
+        assertThat(canceled.type()).isEqualTo("customer.subscription.deleted");
+        assertThat(canceled.object()).containsEntry("id", "sub_1").containsEntry("object", "subscription")
+                .containsEntry("status", "past_due").containsEntry("customer", "cus_1");
+
+        var invoice = JSON.readTree("""
+                {"invoice_id":"in_1","number":"INV-0001","subscription_id":"sub_1","customer_id":"cus_1",
+                 "status":"paid","currency":"EUR","total":1500,"amount_paid":1500,
+                 "hosted_invoice_url":"http://localhost:5174/i/abc","failure_code":null}""");
+        assertThat(EventMapper.map("InvoiceFinalized", invoice).orElseThrow().type()).isEqualTo("invoice.finalized");
+        assertThat(EventMapper.map("InvoicePaymentFailed", invoice).orElseThrow().type()).isEqualTo("invoice.payment_failed");
+        assertThat(EventMapper.map("InvoiceVoided", invoice).orElseThrow().type()).isEqualTo("invoice.voided");
+        Mapped paid = EventMapper.map("InvoicePaid", invoice).orElseThrow();
+        assertThat(paid.type()).isEqualTo("invoice.paid");
+        assertThat(paid.object()).containsEntry("number", "INV-0001").containsEntry("total", 1500L)
+                .containsEntry("hosted_invoice_url", "http://localhost:5174/i/abc").doesNotContainKey("failure_code");
+        for (Mapped mapped : List.of(canceled, paid)) {
+            assertThat(EventTypes.ALL).contains(mapped.type());
+        }
+    }
+
+    @Test
     void internalOnlyEventsAreNotPublished() {
         assertThat(EventMapper.map("JournalEntryPosted", JSON.readTree("{}"))).isEmpty();
         assertThat(EventMapper.map("MerchantCreated", JSON.readTree("{}"))).isEmpty();

@@ -230,6 +230,391 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List products */
+        get: operations["listProducts"];
+        put?: never;
+        /**
+         * Create a product
+         * @description Something you sell. Give it one or more prices to make it buyable.
+         */
+        post: operations["createProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a product */
+        get: operations["getProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update or archive a product
+         * @description Set `active` to `false` to archive it. Fields you leave out stay as they are.
+         */
+        patch: operations["updateProduct"];
+        trace?: never;
+    };
+    "/v1/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List prices */
+        get: operations["listPrices"];
+        put?: never;
+        /**
+         * Create a price
+         * @description A price with an `interval` recurs (a subscription price), one without is a single payment. A price never
+         *     changes: to charge something else, archive it and create a new one, so existing subscriptions keep their terms.
+         */
+        post: operations["createPrice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a price */
+        get: operations["getPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Archive a price or change its label
+         * @description Only `active` and `nickname` can change. The amount and interval never do.
+         */
+        patch: operations["updatePrice"];
+        trace?: never;
+    };
+    "/v1/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List subscriptions */
+        get: operations["listSubscriptions"];
+        put?: never;
+        /**
+         * Start a subscription
+         * @description Bills a customer on a recurring price. Without a trial the first invoice is charged to the customer's saved
+         *     card at once; if that fails the subscription is `incomplete`. With a trial (`trial_days`, or the trial of the
+         *     price) the first invoice is created when the trial ends. A subscription is billed in advance: each period is
+         *     invoiced as it starts. Failed payments are retried (see `/v1/billing_settings`) and the subscription is
+         *     `past_due` meanwhile.
+         */
+        post: operations["createSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a subscription */
+        get: operations["getSubscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a subscription
+         * @description Replace its `items` to change plan or quantity. The unused part of the old plan is credited and the rest of the
+         *     period is charged at the new one, as proration lines that join the next invoice, or are invoiced and charged
+         *     now with `bill_immediately`. Use `proration_behavior: none` to skip them.
+         */
+        patch: operations["updateSubscription"];
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a subscription
+         * @description Cancels now, or with `at_period_end` when the paid period runs out. Nothing is refunded.
+         */
+        post: operations["cancelSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause collection
+         * @description No new invoices are created while it is paused.
+         */
+        post: operations["pauseSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume collection
+         * @description If the paid period is still running nothing is billed yet. Otherwise a new period starts now and is billed.
+         */
+        post: operations["resumeSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}/proration_preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview the proration of a plan change
+         * @description Shows the credit and charge lines a change would create, without changing anything.
+         */
+        post: operations["previewSubscriptionChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscriptions/{id}/upcoming_invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview the next invoice */
+        get: operations["getUpcomingInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/subscription_stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recurring revenue and subscriber counts
+         * @description MRR is the monthly value of active and past due subscriptions per currency. Trials are not revenue yet.
+         */
+        get: operations["getSubscriptionStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List invoices */
+        get: operations["listInvoices"];
+        put?: never;
+        /**
+         * Create a one-off invoice
+         * @description Creates a draft. Finalize it to number it and get a link the customer can pay at.
+         */
+        post: operations["createInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve an invoice */
+        get: operations["getInvoice"];
+        put?: never;
+        post?: never;
+        /** Delete a draft invoice */
+        delete: operations["deleteInvoice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices/{id}/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finalize a draft invoice
+         * @description Numbers the invoice and opens it for payment. The customer is emailed the link of its page.
+         */
+        post: operations["finalizeInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices/{id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Charge the saved card for an invoice
+         * @description A card that is refused is an answer (paid is false, with a failure_code), not an error.
+         */
+        post: operations["payInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void an unpaid invoice */
+        post: operations["voidInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invoices/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the invoice as a PDF */
+        get: operations["getInvoicePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/billing_settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve the retry rules */
+        get: operations["getBillingSettings"];
+        /**
+         * Change the retry rules
+         * @description `retry_days` are the days after the first failed payment on which the invoice is tried again (default 1, 3, 5, 7).
+         *     After the last failed retry the subscription is canceled (`cancel`) or kept as `unpaid`.
+         */
+        put: operations["updateBillingSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/checkout_sessions": {
         parameters: {
             query?: never;
@@ -912,6 +1297,342 @@ export interface components {
             /** Format: date-time */
             created_at?: string;
         };
+        CreateProduct: {
+            name: string;
+            description?: string;
+            /** Format: uri */
+            image_url?: string;
+            metadata?: components["schemas"]["Metadata"];
+        };
+        UpdateProduct: {
+            name?: string;
+            description?: string;
+            image_url?: string;
+            active?: boolean;
+            metadata?: components["schemas"]["Metadata"];
+        };
+        Product: {
+            id: string;
+            /** @constant */
+            object: "product";
+            livemode?: boolean;
+            name: string;
+            description?: string | null;
+            image_url?: string | null;
+            active: boolean;
+            metadata?: components["schemas"]["Metadata"];
+            /** Format: date-time */
+            created_at?: string;
+        };
+        ProductList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["Product"][];
+            has_more: boolean;
+        };
+        CreatePrice: {
+            product: string;
+            /**
+             * Format: int64
+             * @description In the smallest currency unit.
+             */
+            unit_amount: number;
+            currency: string;
+            /**
+             * @description Makes the price recurring.
+             * @enum {string}
+             */
+            interval?: "day" | "week" | "month" | "year";
+            /**
+             * @description Bills every this many intervals, for example every 3 months.
+             * @default 1
+             */
+            interval_count: number;
+            /** @description Days of free trial when a subscription starts on this price. */
+            trial_days?: number;
+            nickname?: string;
+        };
+        Price: {
+            id: string;
+            /** @constant */
+            object: "price";
+            livemode?: boolean;
+            product: string;
+            /** Format: int64 */
+            unit_amount: number;
+            currency: string;
+            /** @enum {string} */
+            type: "one_time" | "recurring";
+            /** @enum {string|null} */
+            interval?: "day" | "week" | "month" | "year" | null;
+            interval_count?: number;
+            trial_days?: number;
+            nickname?: string | null;
+            active: boolean;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        PriceList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["Price"][];
+            has_more: boolean;
+        };
+        /** @enum {string} */
+        SubscriptionStatus: "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "incomplete";
+        SubscriptionItemInput: {
+            price: string;
+            quantity: number;
+        };
+        CreateSubscription: {
+            customer: string;
+            /** @description Recurring prices with the same currency and interval. */
+            items: components["schemas"]["SubscriptionItemInput"][];
+            /** @description Overrides the trial of the prices. */
+            trial_days?: number;
+            /**
+             * @description With send_invoice nothing is charged, the customer is emailed each invoice to pay.
+             * @default charge_automatically
+             * @enum {string}
+             */
+            collection_method: "charge_automatically" | "send_invoice";
+            /** @description A saved card of the customer. Defaults to the default card of the customer. */
+            default_payment_method?: string;
+            tax_rate_percent?: number;
+            metadata?: components["schemas"]["Metadata"];
+            /** @description Shown on invoices. */
+            merchant_name?: string;
+        };
+        UpdateSubscription: {
+            items?: components["schemas"]["SubscriptionItemInput"][];
+            cancel_at_period_end?: boolean;
+            default_payment_method?: string;
+            /**
+             * @default create_prorations
+             * @enum {string}
+             */
+            proration_behavior: "create_prorations" | "none";
+            /** @description Invoice and charge the proration now instead of with the next renewal. */
+            bill_immediately?: boolean;
+        };
+        Subscription: {
+            id: string;
+            /** @constant */
+            object: "subscription";
+            livemode?: boolean;
+            customer: string;
+            customer_email?: string | null;
+            customer_name?: string | null;
+            status: components["schemas"]["SubscriptionStatus"];
+            currency: string;
+            /** @enum {string} */
+            interval?: "day" | "week" | "month" | "year";
+            interval_count?: number;
+            collection_method?: string;
+            default_payment_method?: string | null;
+            /** Format: date-time */
+            current_period_start?: string;
+            /** Format: date-time */
+            current_period_end?: string;
+            /** Format: date-time */
+            trial_end?: string | null;
+            cancel_at_period_end?: boolean;
+            collection_paused?: boolean;
+            /** Format: date-time */
+            canceled_at?: string | null;
+            /** Format: date-time */
+            ended_at?: string | null;
+            tax_rate_percent?: number;
+            latest_invoice?: string | null;
+            metadata?: components["schemas"]["Metadata"];
+            items: {
+                id?: string;
+                price?: string;
+                product?: string;
+                product_name?: string;
+                nickname?: string | null;
+                /** Format: int64 */
+                unit_amount?: number;
+                quantity?: number;
+                /** Format: int64 */
+                amount?: number;
+            }[];
+            /** Format: date-time */
+            created_at?: string;
+        };
+        SubscriptionList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["Subscription"][];
+            has_more: boolean;
+        };
+        InvoiceLine: {
+            id?: string;
+            description?: string;
+            /** Format: int64 */
+            unit_amount?: number;
+            quantity?: number;
+            /** Format: int64 */
+            amount?: number;
+            price?: string | null;
+            proration?: boolean;
+            /** Format: date-time */
+            period_start?: string | null;
+            /** Format: date-time */
+            period_end?: string | null;
+        };
+        ProrationPreview: {
+            currency?: string;
+            /** Format: date-time */
+            period_end?: string;
+            /**
+             * Format: int64
+             * @description Negative is a credit to the customer.
+             */
+            net?: number;
+            lines?: {
+                description?: string;
+                /** Format: int64 */
+                unit_amount?: number;
+                quantity?: number;
+                /** Format: int64 */
+                amount?: number;
+            }[];
+        };
+        UpcomingInvoice: {
+            /** @constant */
+            object?: "upcoming_invoice";
+            currency?: string;
+            /** Format: date-time */
+            period_start?: string;
+            /** Format: date-time */
+            period_end?: string;
+            lines?: components["schemas"]["InvoiceLine"][];
+            /** Format: int64 */
+            subtotal?: number;
+            /** Format: int64 */
+            tax?: number;
+            /** Format: int64 */
+            total?: number;
+        };
+        SubscriptionStats: {
+            /** @constant */
+            object?: "subscription_stats";
+            /** @description Monthly recurring revenue per currency, in minor units. */
+            mrr?: {
+                [key: string]: number;
+            };
+            by_status?: {
+                [key: string]: number;
+            };
+            ended_last_30_days?: number;
+        };
+        /** @enum {string} */
+        InvoiceStatus: "draft" | "open" | "paid" | "void" | "uncollectible";
+        CreateInvoice: {
+            customer: string;
+            currency: string;
+            lines: {
+                description: string;
+                /**
+                 * Format: int64
+                 * @description A negative amount is a discount.
+                 */
+                unit_amount: number;
+                quantity: number;
+            }[];
+            /**
+             * @default send_invoice
+             * @enum {string}
+             */
+            collection_method: "charge_automatically" | "send_invoice";
+            /** @default 14 */
+            days_until_due: number;
+            tax_rate_percent?: number;
+            description?: string;
+            merchant_name?: string;
+        };
+        Invoice: {
+            id: string;
+            /** @constant */
+            object: "invoice";
+            livemode?: boolean;
+            /** @description Set when the invoice is finalized, for example INV-0001. */
+            number?: string | null;
+            status: components["schemas"]["InvoiceStatus"];
+            subscription?: string | null;
+            customer: string;
+            customer_email?: string | null;
+            customer_name?: string | null;
+            /** @enum {string} */
+            billing_reason?: "manual" | "subscription_create" | "subscription_cycle" | "subscription_update";
+            collection_method?: string;
+            currency: string;
+            /** Format: int64 */
+            subtotal?: number;
+            /** Format: int64 */
+            tax?: number;
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            amount_paid?: number;
+            /** Format: int64 */
+            amount_due?: number;
+            description?: string | null;
+            /** Format: date-time */
+            due_date?: string | null;
+            /** Format: date-time */
+            period_start?: string | null;
+            /** Format: date-time */
+            period_end?: string | null;
+            payment_intent?: string | null;
+            failure_code?: string | null;
+            attempt_count?: number;
+            /** Format: date-time */
+            next_payment_attempt?: string | null;
+            /** @description The page where the customer can see and pay the invoice. */
+            hosted_invoice_url?: string | null;
+            invoice_pdf?: string | null;
+            lines?: components["schemas"]["InvoiceLine"][];
+            /** @description The scheduled and finished payment attempts. Only on a single invoice. */
+            attempts?: {
+                attempt_no?: number;
+                /** Format: date-time */
+                scheduled_at?: string;
+                /** Format: date-time */
+                executed_at?: string | null;
+                result?: string | null;
+            }[] | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            finalized_at?: string | null;
+            /** Format: date-time */
+            paid_at?: string | null;
+        };
+        InvoiceList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["Invoice"][];
+            has_more: boolean;
+        };
+        PayInvoiceResult: {
+            invoice?: components["schemas"]["Invoice"];
+            paid?: boolean;
+            failure_code?: string | null;
+            failure_message?: string | null;
+        };
+        BillingSettings: {
+            /** @constant */
+            object?: "billing_settings";
+            /** @description Increasing days after the first failed payment. */
+            retry_days: number[];
+            /**
+             * @default cancel
+             * @enum {string}
+             */
+            final_action: "cancel" | "unpaid";
+        };
         CaptureRequest: {
             /**
              * Format: int64
@@ -1269,7 +1990,7 @@ export interface components {
             weekly_anchor: string;
         };
         /** @enum {string} */
-        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.amount_capturable_updated" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "payment_link.created" | "payment_link.deactivated" | "customer.created" | "customer.updated" | "customer.deleted" | "payment_method.attached" | "payment_method.detached" | "setup_intent.succeeded" | "setup_intent.setup_failed" | "webhook_endpoint.test";
+        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.amount_capturable_updated" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "payment_link.created" | "payment_link.deactivated" | "customer.created" | "customer.updated" | "customer.deleted" | "payment_method.attached" | "payment_method.detached" | "setup_intent.succeeded" | "setup_intent.setup_failed" | "customer.subscription.created" | "customer.subscription.updated" | "customer.subscription.deleted" | "invoice.finalized" | "invoice.paid" | "invoice.payment_failed" | "invoice.voided" | "webhook_endpoint.test";
         Event: {
             /** @description Stable across retries; use it to deduplicate. */
             id: string;
@@ -1403,6 +2124,10 @@ export interface components {
         PaymentId: string;
         CustomerId: string;
         SetupIntentId: string;
+        ProductId: string;
+        PriceId: string;
+        SubscriptionId: string;
+        InvoiceId: string;
         LinkId: string;
         EndpointId: string;
         DeliveryId: string;
@@ -1830,6 +2555,750 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listProducts: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Products, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createProduct: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProduct"];
+            };
+        };
+        responses: {
+            /** @description The product. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The product. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProduct"];
+            };
+        };
+        responses: {
+            /** @description The updated product. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPrices: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                product?: string;
+                active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Prices, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createPrice: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrice"];
+            };
+        };
+        responses: {
+            /** @description The price. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Price"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PriceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The price. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Price"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updatePrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PriceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    active?: boolean;
+                    nickname?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated price. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Price"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listSubscriptions: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                status?: components["schemas"]["SubscriptionStatus"];
+                customer?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subscriptions, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createSubscription: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubscription"];
+            };
+        };
+        responses: {
+            /** @description The subscription. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSubscription"];
+            };
+        };
+        responses: {
+            /** @description The updated subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    cancelSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    at_period_end?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    pauseSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    resumeSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    previewSubscriptionChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: components["schemas"]["SubscriptionItemInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description The lines and their net amount (negative is a credit). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProrationPreview"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getUpcomingInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the next renewal will charge, including any waiting proration lines. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpcomingInvoice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getSubscriptionStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The figures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStats"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listInvoices: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                status?: components["schemas"]["InvoiceStatus"];
+                customer?: string;
+                subscription?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoices, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createInvoice: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoice"];
+            };
+        };
+        responses: {
+            /** @description The draft invoice. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice, with its payment attempts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    finalizeInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open invoice. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    payInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How it went. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayInvoiceResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    voidInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The void invoice. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getInvoicePdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["InvoiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A printable A4 invoice. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBillingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description When unpaid invoices are retried and what happens after the last retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateBillingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingSettings"];
+            };
+        };
+        responses: {
+            /** @description The saved rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettings"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
     createCheckoutSession: {

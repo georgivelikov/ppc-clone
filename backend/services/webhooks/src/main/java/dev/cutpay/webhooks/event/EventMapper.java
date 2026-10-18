@@ -32,6 +32,14 @@ public final class EventMapper {
             case "PayoutCreated" -> payout("payout.created", p);
             case "PayoutPaid" -> payout("payout.paid", p);
             case "PayoutFailed" -> payout("payout.failed", p);
+            case "SubscriptionCreated" -> subscription("customer.subscription.created", p);
+            case "SubscriptionUpdated", "SubscriptionRenewed", "SubscriptionPastDue" ->
+                    subscription("customer.subscription.updated", p);
+            case "SubscriptionCanceled" -> subscription("customer.subscription.deleted", p);
+            case "InvoiceFinalized" -> invoice("invoice.finalized", p);
+            case "InvoicePaid" -> invoice("invoice.paid", p);
+            case "InvoicePaymentFailed" -> invoice("invoice.payment_failed", p);
+            case "InvoiceVoided" -> invoice("invoice.voided", p);
             case "CustomerCreated" -> customer("customer.created", p);
             case "CustomerUpdated" -> customer("customer.updated", p);
             case "CustomerDeleted" -> customer("customer.deleted", p);
@@ -80,6 +88,35 @@ public final class EventMapper {
         object.put("currency", text(p, "currency"));
         optional(object, "arrival_date", p);
         optional(object, "kind", p);
+        optional(object, "failure_code", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> subscription(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "subscription_id"));
+        object.put("object", "subscription");
+        object.put("customer", text(p, "customer_id"));
+        object.put("status", text(p, "status"));
+        optional(object, "currency", p);
+        optional(object, "current_period_end", p);
+        optional(object, "latest_invoice", p);
+        object.put("cancel_at_period_end", p.path("cancel_at_period_end").asBoolean(false));
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> invoice(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "invoice_id"));
+        object.put("object", "invoice");
+        object.put("customer", text(p, "customer_id"));
+        object.put("status", text(p, "status"));
+        object.put("total", p.path("total").asLong());
+        object.put("amount_paid", p.path("amount_paid").asLong());
+        object.put("currency", text(p, "currency"));
+        optional(object, "number", p);
+        optional(object, "subscription_id", p);
+        optional(object, "hosted_invoice_url", p);
         optional(object, "failure_code", p);
         return Optional.of(new Mapped(type, object));
     }

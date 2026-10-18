@@ -64,11 +64,16 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("rounded-card border border-border bg-surface p-6", className)} {...props} />;
 }
 
-export function Alert({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+/** An error by default; `tone="info"` is a calm notice (pass `role="status"` with it). */
+export function Alert({ className, tone = "danger", ...props }: HTMLAttributes<HTMLDivElement> & { tone?: "danger" | "info" }) {
   return (
     <div
       role="alert"
-      className={cn("rounded-lg border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger", className)}
+      className={cn(
+        "rounded-lg border px-3 py-2 text-sm",
+        tone === "danger" ? "border-danger/30 bg-danger-bg text-danger" : "border-border bg-canvas text-ink",
+        className,
+      )}
       {...props}
     />
   );

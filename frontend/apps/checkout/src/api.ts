@@ -157,3 +157,33 @@ export function getSetupSession(secret: string): Promise<SetupSession> {
 export function confirmSetup(secret: string, token: string): Promise<SetupSession> {
   return call("POST", `/checkout/setup_intents/${encodeURIComponent(secret)}/confirm`, { token });
 }
+
+// --- invoices (public: the unguessable token in the address is the credential) ---------------
+
+export interface PublicInvoice {
+  number: string | null;
+  status: "open" | "paid" | "void" | "uncollectible";
+  merchant_name: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  currency: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  amount_paid: number;
+  description: string | null;
+  due_date: string | null;
+  paid_at: string | null;
+  lines: { id: string; description: string; quantity: number; unit_amount: number; amount: number; proration: boolean }[];
+  /** True while the invoice can still be paid. */
+  payable: boolean;
+}
+
+export function getInvoice(token: string): Promise<PublicInvoice> {
+  return call("GET", `/invoices/${encodeURIComponent(token)}`);
+}
+
+/** Starts a payment for the invoice. The answer is the address of the hosted checkout to send the customer to. */
+export function startInvoicePayment(token: string): Promise<{ url: string }> {
+  return call("POST", `/invoices/${encodeURIComponent(token)}/pay`, {});
+}

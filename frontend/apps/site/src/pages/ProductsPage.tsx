@@ -1,5 +1,5 @@
 import { Badge, Card } from "@cutpay/ui";
-import { Banknote, CreditCard, Link2, ScanLine, Store, type LucideIcon } from "lucide-react";
+import { Banknote, CreditCard, Link2, Repeat, ScanLine, Store, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { PageHeader, Section } from "../components";
 
@@ -44,6 +44,14 @@ const PRODUCTS: Product[] = [
     points: ["Key in a card, or show a QR code to scan", "Same fees and payouts as online", "A printable receipt"],
     available: true,
     link: { to: "/docs/payment-links", label: "How the terminal works" },
+  },
+  {
+    icon: Repeat,
+    name: "Subscriptions & invoices",
+    text: "Bill customers every month, with trials, plan changes and automatic retries.",
+    points: ["Saved cards charged without the customer", "Prorated upgrades and a retry schedule", "Hold now, capture later for hotels and rentals"],
+    available: true,
+    link: { to: "/docs/billing", label: "How billing works" },
   },
   {
     icon: ScanLine,

@@ -49,6 +49,25 @@ class KeyPolicyTest {
     }
 
     @Test
+    void customersAndBillingHaveTheirOwnScopes() {
+        assertThat(KeyPolicy.allows(List.of("customers:write"), HttpMethod.POST, "/v1/customers")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("customers:read"), HttpMethod.GET, "/v1/customers/cus_1/payment_methods")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("customers:write"), HttpMethod.POST, "/v1/setup_intents")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("customers:read"), HttpMethod.DELETE, "/v1/customers/cus_1")).isFalse();
+        assertThat(KeyPolicy.allows(List.of("billing:write"), HttpMethod.POST, "/v1/subscriptions/sub_1/cancel")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("billing:write"), HttpMethod.POST, "/v1/invoices/in_1/pay")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("billing:read"), HttpMethod.GET, "/v1/subscription_stats")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("billing:read"), HttpMethod.POST, "/v1/products")).isFalse();
+        assertThat(KeyPolicy.allows(List.of("payments:write"), HttpMethod.POST, "/v1/subscriptions")).isFalse();
+    }
+
+    @Test
+    void thePublicInvoicePageIsOpenToTheBrowserSafeKeyButTheInvoiceApiIsNot() {
+        assertThat(KeyPolicy.isPublishableAllowed("/invoices/abc")).isTrue();
+        assertThat(KeyPolicy.isPublishableAllowed("/v1/invoices")).isFalse();
+    }
+
+    @Test
     void restrictedKeysStayInsideTheirResource() {
         List<String> scopes = List.of("payments:write");
         assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/payouts")).isFalse();

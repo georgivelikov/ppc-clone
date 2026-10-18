@@ -24,4 +24,5 @@ include(
     "services:payouts",
     "services:webhooks",
     "services:links",
+    "services:billing",
 )

@@ -17,6 +17,11 @@ export function HomePage() {
   const firstName = user.full_name.split(" ")[0];
   const summary = useQuery({ queryKey: ["payment-summary", livemode], queryFn: () => api.paymentSummary(livemode) });
   const today = summary.data?.today.find((row) => row.currency === merchant.default_currency);
+  const subscriptions = useQuery({ queryKey: ["subscription-stats", livemode], queryFn: () => api.subscriptionStats(livemode) });
+  const mrr = subscriptions.data?.mrr[merchant.default_currency] ?? 0;
+  const subscribers = (subscriptions.data?.by_status.active ?? 0) + (subscriptions.data?.by_status.past_due ?? 0);
+  const left = subscriptions.data?.ended_last_30_days ?? 0;
+  const churn = subscribers + left > 0 ? (left / (subscribers + left)) * 100 : 0;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -46,6 +51,29 @@ export function HomePage() {
           <p className="mt-2 text-2xl font-semibold">None yet</p>
         </Card>
       </div>
+
+      {subscribers + left > 0 && (
+        <div className="grid gap-4 sm:grid-cols-3" aria-label="Recurring revenue">
+          <Card>
+            <p className="text-sm text-muted">Monthly recurring revenue</p>
+            <p className="mt-2 text-2xl font-semibold" data-testid="home-mrr">
+              {formatMoney(mrr, merchant.default_currency)}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-muted">Subscribers</p>
+            <p className="mt-2 text-2xl font-semibold" data-testid="home-subscribers">
+              {subscribers}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-muted">Churn, last 30 days</p>
+            <p className="mt-2 text-2xl font-semibold" data-testid="home-churn">
+              {churn.toFixed(1)}%
+            </p>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <h2 className="font-semibold">Getting started</h2>

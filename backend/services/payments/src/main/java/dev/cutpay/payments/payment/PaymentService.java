@@ -461,6 +461,7 @@ public class PaymentService {
         payload.put("customer_email", intent.getCustomerEmail());
         payload.put("failure_code", intent.getFailureCode());
         payload.put("channel", intent.getChannel());
+        payload.put("off_session", intent.isOffSession());
         payload.put("metadata", intent.getMetadata());
         if (attempt != null) {
             payload.put("card_brand", attempt.getCardBrand());

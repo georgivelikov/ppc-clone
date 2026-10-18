@@ -40,9 +40,9 @@ describe("marketing pages", () => {
 
   it("products separates what exists from what is coming", () => {
     renderAt("/products");
-    expect(screen.getAllByText("Available")).toHaveLength(4);
+    expect(screen.getAllByText("Available")).toHaveLength(5);
     expect(screen.getAllByText("Coming soon")).toHaveLength(1);
-    for (const name of ["Checkout", "Billing & payouts", "Links & QR", "Virtual POS", "Buy now, pay later"]) {
+    for (const name of ["Checkout", "Billing & payouts", "Links & QR", "Virtual POS", "Subscriptions & invoices", "Buy now, pay later"]) {
       expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     }
   });
@@ -125,6 +125,15 @@ describe("docs", () => {
     expect(screen.getByText(/exactly one of them gets it/)).toBeInTheDocument();
     expect(screen.getByText(/outside the European strong customer authentication/)).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Payment links" })).toBeInTheDocument();
+  });
+
+  it("billing guide explains retries, proration and holds", () => {
+    renderAt("/docs/billing");
+    expect(screen.getByRole("heading", { name: "Changing plan" })).toBeInTheDocument();
+    expect(screen.getByText(/1, 3, 5 and 7 days/)).toBeInTheDocument();
+    expect(screen.getByText(/Halfway through a 31-day month/)).toBeInTheDocument();
+    expect(screen.getByText(/seven days/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Billing" })).toBeInTheDocument();
   });
 
   it("api reference is part of the docs navigation", async () => {

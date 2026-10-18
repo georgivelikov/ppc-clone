@@ -18,6 +18,8 @@ public final class EventTypes {
             "customer.created", "customer.updated", "customer.deleted",
             "payment_method.attached", "payment_method.detached",
             "setup_intent.succeeded", "setup_intent.setup_failed",
+            "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted",
+            "invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.voided",
             TEST);
 
     private EventTypes() {

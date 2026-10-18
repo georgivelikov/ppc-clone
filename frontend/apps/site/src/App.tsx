@@ -6,6 +6,7 @@ import { BusinessTypesPage } from "./pages/BusinessTypesPage";
 import { DocsLayout } from "./pages/docs/DocsLayout";
 import { GettingStartedPage } from "./pages/docs/GettingStartedPage";
 import { TestCardsPage } from "./pages/docs/TestCardsPage";
+import { BillingPage } from "./pages/docs/BillingPage";
 import { PaymentLinksPage } from "./pages/docs/PaymentLinksPage";
 import { WebhooksGuidePage } from "./pages/docs/WebhooksGuidePage";
 import { FaqPage } from "./pages/FaqPage";
@@ -97,6 +98,7 @@ export function App() {
           <Route index element={<GettingStartedPage />} />
           <Route path="test-cards" element={<TestCardsPage />} />
           <Route path="payment-links" element={<PaymentLinksPage />} />
+          <Route path="billing" element={<BillingPage />} />
           <Route path="webhooks" element={<WebhooksGuidePage />} />
           <Route
             path="api/*"

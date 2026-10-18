@@ -130,7 +130,7 @@ class AcquirerController {
     @PostMapping("/authorize")
     AuthorizeResponse authorize(@Valid @RequestBody AuthorizeRequest request) throws InterruptedException {
         return decide(request.token(), request.amount(), request.currency(), request.channel(),
-                Boolean.TRUE.equals(request.offSession()));
+                Boolean.TRUE.equals(request.offSession()), false);
     }
 
     /**
@@ -139,10 +139,11 @@ class AcquirerController {
      */
     @PostMapping("/verify")
     AuthorizeResponse verify(@Valid @RequestBody VerifyRequest request) throws InterruptedException {
-        return decide(request.token(), 0, "EUR", request.channel(), false);
+        return decide(request.token(), 0, "EUR", request.channel(), false, true);
     }
 
-    private AuthorizeResponse decide(String token, long amount, String currency, String channel, boolean offSession)
+    private AuthorizeResponse decide(String token, long amount, String currency, String channel, boolean offSession,
+                                     boolean verifyOnly)
             throws InterruptedException {
         StoredCard card = tokens.get(token);
         if (card == null) {
@@ -164,6 +165,9 @@ class AcquirerController {
         }
         if (YearMonth.of(card.expYear(), card.expMonth()).isBefore(YearMonth.now())) {
             return declined("expired_card", "Your card has expired.");
+        }
+        if (outcome.behaviour() == TestCards.Behaviour.DECLINE_ON_CHARGE && !verifyOnly) {
+            return declined("card_declined", "Your card was declined.");
         }
         if (outcome.behaviour() == TestCards.Behaviour.DECLINE) {
             return declined(outcome.declineCode(), outcome.message());

@@ -22,7 +22,7 @@ public class GatewayConfig {
                         // Login, signup, refresh and the public key set are reachable without a token.
                         .pathMatchers("/auth/**", "/.well-known/**").permitAll()
                         // The hosted checkout, payment links and the card vault are used by anonymous customers.
-                        .pathMatchers("/checkout/**", "/vault/**", "/links/**").permitAll()
+                        .pathMatchers("/checkout/**", "/vault/**", "/links/**", "/invoices/**").permitAll()
                         .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }))
