@@ -43,6 +43,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/payment_intents/{id}/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Capture an authorised payment
+         * @description Takes money from a payment created with `capture_method: manual` once it is `requires_capture`. A smaller
+         *     `amount_to_capture` takes only that part and releases the rest; the payment is then for the captured amount.
+         *     A capture can be made once.
+         */
+        post: operations["capturePaymentIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/payment_intents/{id}/cancel": {
         parameters: {
             query?: never;
@@ -54,9 +76,154 @@ export interface paths {
         put?: never;
         /**
          * Cancel a payment
-         * @description Only a payment that has not been paid yet can be canceled.
+         * @description Cancels a payment that has not been paid yet, or releases the hold of an authorised one (`requires_capture`).
          */
         post: operations["cancelPaymentIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List customers */
+        get: operations["listCustomers"];
+        put?: never;
+        /**
+         * Create a customer
+         * @description A customer groups the saved cards, payments, subscriptions and invoices of one person or company.
+         */
+        post: operations["createCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a customer */
+        get: operations["getCustomer"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a customer
+         * @description Hides the customer and removes their saved cards. Their payments and invoices stay on record.
+         */
+        delete: operations["deleteCustomer"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a customer
+         * @description Fields you leave out stay as they are. `default_payment_method` picks the saved card used when none is named.
+         */
+        patch: operations["updateCustomer"];
+        trace?: never;
+    };
+    "/v1/customers/{id}/payment_methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the saved cards of a customer
+         * @description Only brand, last four digits and expiry are returned. The card number is never stored here.
+         */
+        get: operations["listCustomerPaymentMethods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/{id}/payment_methods/{payment_method_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a saved card
+         * @description If it was the default, another saved card takes over. Subscriptions are not changed, so one that used only this card fails its next payment.
+         */
+        delete: operations["detachPaymentMethod"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/setup_intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save a card without charging it
+         * @description Creates a setup intent and the address of a hosted page where the customer enters their card. The bank may
+         *     ask them to authenticate once (3-D Secure); after that the card can be charged without them, for example
+         *     by a subscription. The result arrives as `setup_intent.succeeded` or `setup_intent.setup_failed`.
+         */
+        post: operations["createSetupIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/setup_intents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve a setup intent */
+        get: operations["getSetupIntent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/setup_intents/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a setup intent
+         * @description The hosted page stops accepting a card.
+         */
+        post: operations["cancelSetupIntent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -601,7 +768,7 @@ export interface components {
             [key: string]: string;
         };
         /** @enum {string} */
-        PaymentStatus: "requires_payment_method" | "processing" | "requires_action" | "succeeded" | "failed" | "canceled" | "partially_refunded" | "refunded";
+        PaymentStatus: "requires_payment_method" | "processing" | "requires_action" | "requires_capture" | "succeeded" | "failed" | "canceled" | "partially_refunded" | "refunded";
         CreatePaymentIntent: {
             /**
              * Format: int64
@@ -624,6 +791,133 @@ export interface components {
             return_url?: string;
             /** @description Shown to the customer on the checkout. */
             merchant_name?: string;
+            /**
+             * @description `manual` only holds the amount on the card (status `requires_capture`). Take it with
+             *     `POST /v1/payment_intents/{id}/capture`, or release it by cancelling. A hold that is not captured within
+             *     seven days is released automatically.
+             * @default automatic
+             * @enum {string}
+             */
+            capture_method: "automatic" | "manual";
+            /** @description A customer id. Needed for `payment_method`, `off_session` and `setup_future_usage`. */
+            customer?: string;
+            /** @description A saved card of the customer. With `off_session` and none given, the default card is used. */
+            payment_method?: string;
+            /**
+             * @description Charge the saved card right away without the customer being present (subscriptions, repeat orders). The
+             *     bank cannot ask for 3-D Secure then: a card that needs it fails with `authentication_required` and the
+             *     customer has to pay on a hosted page.
+             */
+            off_session?: boolean;
+            /**
+             * @description Save the card the customer pays with to the customer, for future off-session payments.
+             * @enum {string}
+             */
+            setup_future_usage?: "off_session";
+        };
+        Address: {
+            line1?: string | null;
+            line2?: string | null;
+            city?: string | null;
+            postal_code?: string | null;
+            country?: string | null;
+        };
+        CreateCustomer: {
+            /** Format: email */
+            email?: string;
+            name?: string;
+            phone?: string;
+            description?: string;
+            address?: components["schemas"]["Address"];
+            metadata?: components["schemas"]["Metadata"];
+        };
+        UpdateCustomer: components["schemas"]["CreateCustomer"] & {
+            default_payment_method?: string;
+        };
+        Customer: {
+            id: string;
+            /** @constant */
+            object: "customer";
+            livemode: boolean;
+            email?: string | null;
+            name?: string | null;
+            phone?: string | null;
+            description?: string | null;
+            address?: components["schemas"]["Address"] | null;
+            metadata?: components["schemas"]["Metadata"];
+            default_payment_method?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CustomerList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["Customer"][];
+            has_more: boolean;
+        };
+        PaymentMethod: {
+            id: string;
+            /** @constant */
+            object: "payment_method";
+            /** @constant */
+            type: "card";
+            customer: string;
+            livemode?: boolean;
+            card?: {
+                brand?: string | null;
+                last4?: string | null;
+                exp_month?: number | null;
+                exp_year?: number | null;
+                fingerprint?: string | null;
+            };
+            is_default?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        PaymentMethodList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["PaymentMethod"][];
+        };
+        CreateSetupIntent: {
+            customer: string;
+            description?: string;
+            /**
+             * Format: uri
+             * @description Where the hosted page sends the customer afterwards.
+             */
+            return_url?: string;
+            /** @description Shown to the customer on the hosted page. */
+            merchant_name?: string;
+        };
+        SetupIntent: {
+            id: string;
+            /** @constant */
+            object: "setup_intent";
+            livemode?: boolean;
+            customer: string;
+            /** @enum {string} */
+            status: "requires_payment_method" | "requires_action" | "succeeded" | "failed" | "canceled";
+            client_secret: string;
+            /**
+             * Format: uri
+             * @description The hosted page where the customer enters their card.
+             */
+            url: string;
+            payment_method?: string | null;
+            description?: string | null;
+            return_url?: string | null;
+            failure_code?: string | null;
+            failure_message?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CaptureRequest: {
+            /**
+             * Format: int64
+             * @description Up to the authorised amount. Omit it to take everything; the rest of a smaller capture is released.
+             */
+            amount_to_capture?: number;
         };
         PaymentAttempt: {
             id?: string;
@@ -664,6 +958,22 @@ export interface components {
             return_url?: string | null;
             /** Format: int64 */
             amount_refunded?: number;
+            /** @description The customer the payment belongs to. */
+            customer?: string | null;
+            /** @description The saved card the payment was charged to. */
+            payment_method?: string | null;
+            /** @description Charged to a saved card without the customer present. */
+            off_session?: boolean;
+            /**
+             * Format: int64
+             * @description What was held on the card for a `manual` capture payment. `amount` is what was taken once captured.
+             */
+            amount_authorized?: number | null;
+            /**
+             * Format: date-time
+             * @description While `requires_capture`, the moment after which the hold is released automatically.
+             */
+            capture_before?: string | null;
             failure_code?: string | null;
             failure_message?: string | null;
             /** Format: date-time */
@@ -959,7 +1269,7 @@ export interface components {
             weekly_anchor: string;
         };
         /** @enum {string} */
-        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "payment_link.created" | "payment_link.deactivated" | "webhook_endpoint.test";
+        EventType: "payment_intent.created" | "payment_intent.requires_action" | "payment_intent.amount_capturable_updated" | "payment_intent.succeeded" | "payment_intent.payment_failed" | "payment_intent.canceled" | "charge.refunded" | "refund.created" | "refund.failed" | "payout.created" | "payout.paid" | "payout.failed" | "payment_link.created" | "payment_link.deactivated" | "customer.created" | "customer.updated" | "customer.deleted" | "payment_method.attached" | "payment_method.detached" | "setup_intent.succeeded" | "setup_intent.setup_failed" | "webhook_endpoint.test";
         Event: {
             /** @description Stable across retries; use it to deduplicate. */
             id: string;
@@ -1091,6 +1401,8 @@ export interface components {
         /** @description Fields to replace with the full object. */
         ExpandPayment: "latest_attempt"[];
         PaymentId: string;
+        CustomerId: string;
+        SetupIntentId: string;
         LinkId: string;
         EndpointId: string;
         DeliveryId: string;
@@ -1200,6 +1512,39 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    capturePaymentIntent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["PaymentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CaptureRequest"];
+            };
+        };
+        responses: {
+            /** @description The captured payment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntent"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     cancelPaymentIntent: {
         parameters: {
             query?: never;
@@ -1221,6 +1566,265 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentIntent"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listCustomers: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+                /** @description Matches part of the name, email or id. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Customers, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createCustomer: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomer"];
+            };
+        };
+        responses: {
+            /** @description The customer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The customer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomer"];
+            };
+        };
+        responses: {
+            /** @description The updated customer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listCustomerPaymentMethods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved cards, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    detachPaymentMethod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CustomerId"];
+                payment_method_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createSetupIntent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSetupIntent"];
+            };
+        };
+        responses: {
+            /** @description The setup intent. Send the customer to `url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupIntent"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getSetupIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SetupIntentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setup intent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupIntent"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelSetupIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["SetupIntentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The canceled setup intent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupIntent"];
                 };
             };
             401: components["responses"]["Unauthorized"];

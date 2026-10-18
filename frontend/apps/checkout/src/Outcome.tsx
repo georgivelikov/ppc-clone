@@ -4,12 +4,16 @@ import type { Session } from "./api";
 
 /** The end states of a payment: paid, failed, canceled. */
 export function Outcome({ session }: { session: Session }) {
-  const paid = ["succeeded", "partially_refunded", "refunded"].includes(session.status);
+  const held = session.status === "requires_capture";
+  const paid = held || ["succeeded", "partially_refunded", "refunded"].includes(session.status);
   const processing = session.status === "processing";
 
   let title = "Payment failed";
   let message = session.failure_message ?? "Your payment could not be completed.";
-  if (paid) {
+  if (held) {
+    title = "Payment authorised";
+    message = `${formatMoney(session.amount, session.currency)} is reserved on your card. ${session.merchant_name ?? "The merchant"} will take the payment later; you may see it as pending.`;
+  } else if (paid) {
     title = "Payment successful";
     message = `${formatMoney(session.amount, session.currency)} was paid to ${session.merchant_name ?? "the merchant"}.`;
   } else if (processing) {

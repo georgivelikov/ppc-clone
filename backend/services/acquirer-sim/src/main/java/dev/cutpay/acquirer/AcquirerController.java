@@ -51,8 +51,11 @@ class AcquirerController {
                             String cardType, String cardRegion) {
     }
 
+    record VerifyRequest(@NotBlank String token, String channel) {
+    }
+
     record AuthorizeRequest(@NotBlank String token, @Min(1) long amount, @NotBlank String currency, String reference,
-                            String channel) {
+                            String channel, Boolean offSession) {
     }
 
     record AuthorizeResponse(String status, String acquirerRef, String declineCode, String message) {
@@ -70,6 +73,9 @@ class AcquirerController {
     record RefundResponse(String status, String refundRef) {
     }
 
+    record VoidRequest(@NotBlank String acquirerRef) {
+    }
+
     record ConfigRequest(Long latencyMs, Double failureRate) {
     }
 
@@ -77,6 +83,9 @@ class AcquirerController {
     private final Map<String, PendingChallenge> challenges = new ConcurrentHashMap<>();
     private final Map<String, Long> authorizations = new ConcurrentHashMap<>();
     private final Map<String, Long> refunded = new ConcurrentHashMap<>();
+    /** Amount taken from an authorisation; guards the "capture once" rule. */
+    private final Map<String, Long> captured = new java.util.HashMap<>();
+    private final java.util.Set<String> voided = ConcurrentHashMap.newKeySet();
     private final AtomicReference<Runtime> runtime;
     private final AcquirerProperties properties;
     private final RestClient payments;
@@ -120,7 +129,22 @@ class AcquirerController {
 
     @PostMapping("/authorize")
     AuthorizeResponse authorize(@Valid @RequestBody AuthorizeRequest request) throws InterruptedException {
-        StoredCard card = tokens.get(request.token());
+        return decide(request.token(), request.amount(), request.currency(), request.channel(),
+                Boolean.TRUE.equals(request.offSession()));
+    }
+
+    /**
+     * Checks that a card can be used later without charging it (saving a card). The same rules as a payment apply, so
+     * a card that needs 3-D Secure asks for it here, once, and the saved card can then be charged without the customer.
+     */
+    @PostMapping("/verify")
+    AuthorizeResponse verify(@Valid @RequestBody VerifyRequest request) throws InterruptedException {
+        return decide(request.token(), 0, "EUR", request.channel(), false);
+    }
+
+    private AuthorizeResponse decide(String token, long amount, String currency, String channel, boolean offSession)
+            throws InterruptedException {
+        StoredCard card = tokens.get(token);
         if (card == null) {
             throw ApiException.invalidRequest("invalid_token", "Unknown or expired card token", "token");
         }
@@ -148,12 +172,20 @@ class AcquirerController {
         String ref = "auth_" + UUID.randomUUID().toString().replace("-", "");
         // Mail/telephone orders are outside strong customer authentication: the merchant keys the card in, so
         // there is no cardholder present to answer a challenge and the issuer is not allowed to ask for one.
-        boolean moto = "moto".equals(request.channel());
-        if (outcome.behaviour() == TestCards.Behaviour.THREE_DS && !moto) {
-            challenges.put(ref, new PendingChallenge(ref, request.amount(), request.currency()));
+        boolean moto = "moto".equals(channel);
+        if (offSession && outcome.behaviour() == TestCards.Behaviour.THREE_DS_ALWAYS) {
+            // Nobody is there to answer a challenge, so this card cannot be charged until the customer returns.
+            return declined("authentication_required", "Your bank requires authentication for this payment.");
+        }
+        // The plain 3-D Secure card is challenged while the customer is present; once they authenticated, saved
+        // copies of the card can be charged off-session.
+        boolean asksForChallenge = outcome.behaviour() == TestCards.Behaviour.THREE_DS
+                || outcome.behaviour() == TestCards.Behaviour.THREE_DS_ALWAYS;
+        if (asksForChallenge && !moto && !offSession) {
+            challenges.put(ref, new PendingChallenge(ref, amount, currency));
             return new AuthorizeResponse("requires_action", ref, null, "3-D Secure authentication required");
         }
-        authorizations.put(ref, request.amount());
+        authorizations.put(ref, amount);
         return new AuthorizeResponse("approved", ref, null, null);
     }
 
@@ -179,12 +211,50 @@ class AcquirerController {
         return result;
     }
 
+    /**
+     * Takes money from a held authorisation, in full or in part; the rest is released. Asking again for the
+     * same amount succeeds again (a retry after a lost answer), a different amount is refused.
+     */
     @PostMapping("/capture")
     AuthorizeResponse capture(@Valid @RequestBody RefundRequest request) {
-        if (!authorizations.containsKey(request.acquirerRef())) {
-            throw ApiException.notFound("authorization_not_found", "Unknown authorization");
+        String ref = request.acquirerRef();
+        synchronized (captured) {
+            Long held = authorizations.get(ref);
+            if (held == null || voided.contains(ref)) {
+                throw ApiException.notFound("authorization_not_found", "Unknown or released authorization");
+            }
+            Long already = captured.get(ref);
+            if (already != null) {
+                if (already == request.amount()) {
+                    return new AuthorizeResponse("approved", ref, null, null);
+                }
+                throw ApiException.conflict("already_captured", "This authorization was already captured", null);
+            }
+            if (request.amount() > held) {
+                throw ApiException.invalidRequest("capture_exceeds_authorization",
+                        "Capture is larger than the authorised amount", "amount");
+            }
+            captured.put(ref, request.amount());
+            // From now on only what was captured can be refunded.
+            authorizations.put(ref, request.amount());
         }
-        return new AuthorizeResponse("approved", request.acquirerRef(), null, null);
+        return new AuthorizeResponse("approved", ref, null, null);
+    }
+
+    /** Releases a held authorisation so the cardholder's available balance is restored. Repeating it is harmless. */
+    @PostMapping("/void")
+    AuthorizeResponse voidAuthorization(@Valid @RequestBody VoidRequest request) {
+        String ref = request.acquirerRef();
+        synchronized (captured) {
+            if (!authorizations.containsKey(ref)) {
+                throw ApiException.notFound("authorization_not_found", "Unknown authorization");
+            }
+            if (captured.containsKey(ref)) {
+                throw ApiException.conflict("already_captured", "A captured authorization cannot be released", null);
+            }
+            voided.add(ref);
+        }
+        return new AuthorizeResponse("approved", ref, null, null);
     }
 
     @PostMapping("/refund")

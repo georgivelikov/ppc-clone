@@ -53,7 +53,10 @@ function CardStep({ payment, onStartOver }: { payment: Payment; onStartOver: () 
       setPaying(false);
       return;
     }
-    if (result.session.status === "succeeded") {
+    if (result.session.status === "requires_capture") {
+      // Held, not taken: capturing or releasing it happens on the payment page.
+      navigate(`/payments/${payment.id}`);
+    } else if (result.session.status === "succeeded") {
       navigate(`/terminal/receipt/${payment.id}`);
     } else {
       // A declined payment is over; a new charge is needed to try another card.
@@ -101,6 +104,7 @@ export function TerminalPage() {
   const [currency, setCurrency] = useState(merchant.default_currency);
   const [description, setDescription] = useState("");
   const [email, setEmail] = useState("");
+  const [holdOnly, setHoldOnly] = useState(false);
   const [problems, setProblems] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -125,6 +129,7 @@ export function TerminalPage() {
             description: description.trim() || undefined,
             customer_email: email.trim() || undefined,
             merchant_name: merchant.display_name,
+            capture_method: holdOnly ? "manual" : undefined,
           },
           !testMode,
         ),
@@ -182,6 +187,15 @@ export function TerminalPage() {
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={Boolean(problems.email)} />
               <FieldError>{problems.email}</FieldError>
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={holdOnly} onChange={(e) => setHoldOnly(e.target.checked)} />
+              <span>
+                <span className="font-medium">Pre-authorise only (capture later)</span>
+                <span className="block text-muted">
+                  Reserve it on the card now and capture it later, up to seven days, for a hotel stay or a rental.
+                </span>
+              </span>
+            </label>
             {formError && <Alert>{formError}</Alert>}
             <Button type="submit" loading={saving}>
               Continue

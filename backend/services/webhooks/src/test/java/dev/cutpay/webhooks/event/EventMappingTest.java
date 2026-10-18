@@ -49,7 +49,7 @@ class EventMappingTest {
         var payment = JSON.readTree("{\"payment_id\":\"p\",\"status\":\"s\",\"currency\":\"EUR\"}");
         var refund = JSON.readTree("{\"refund_id\":\"r\",\"payment_id\":\"p\",\"status\":\"s\",\"currency\":\"EUR\"}");
         var payout = JSON.readTree("{\"payout_id\":\"o\",\"status\":\"s\",\"currency\":\"EUR\"}");
-        for (String type : List.of("PaymentIntentCreated", "PaymentRequiresAction", "PaymentSucceeded",
+        for (String type : List.of("PaymentIntentCreated", "PaymentRequiresAction", "PaymentAuthorized", "PaymentSucceeded",
                 "PaymentFailed", "PaymentCanceled")) {
             assertThat(EventTypes.ALL).contains(EventMapper.map(type, payment).orElseThrow().type());
         }

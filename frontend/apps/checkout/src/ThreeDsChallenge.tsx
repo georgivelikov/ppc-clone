@@ -7,7 +7,7 @@ import { CheckoutApiError, completeThreeDs, type Session } from "./api";
  * The fake bank's 3-D Secure page. A real one is hosted by the card issuer; here the code is always 1234
  * and "Fail authentication" simulates a customer who cannot prove who they are.
  */
-export function ThreeDsChallenge({ session, onDone }: { session: Session; onDone: () => void }) {
+export function ThreeDsChallenge({ session, onDone }: { session: Pick<Session, "next_action">; onDone: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

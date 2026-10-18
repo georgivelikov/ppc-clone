@@ -24,7 +24,7 @@ public class PaymentStreams {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentStreams.class);
     private static final long TIMEOUT_MS = 10 * 60_000L;
-    private static final Set<String> FINAL = Set.of("succeeded", "failed", "canceled", "refunded");
+    private static final Set<String> FINAL = Set.of("succeeded", "failed", "canceled", "refunded", "requires_capture");
 
     private final Map<String, Set<SseEmitter>> subscribers = new ConcurrentHashMap<>();
 

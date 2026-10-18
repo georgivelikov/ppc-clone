@@ -104,7 +104,8 @@ describe("the OpenAPI description", () => {
   it("documents the payment statuses the payments service uses", () => {
     const source = read("backend/services/payments/src/main/java/dev/cutpay/payments/domain/PaymentStatus.java");
     const start = source.indexOf("public enum PaymentStatus {") + "public enum PaymentStatus {".length;
-    const constants = source.slice(start, source.indexOf(";", start));
+    // Doc comments on the constants are not constants.
+    const constants = source.slice(start, source.indexOf(";", start)).replace(/\/\*[\s\S]*?\*\//g, "");
     const wire = constants.split(",").map((name) => name.trim().toLowerCase()).filter(Boolean);
     expect(wire.length).toBeGreaterThan(5);
     expect([...wire].sort()).toEqual([...(spec.components.schemas.PaymentStatus.enum as string[])].sort());
@@ -115,7 +116,7 @@ describe("the docs agree with the platform", () => {
   it("lists every special test card of the simulated card network", () => {
     const source = read("backend/services/acquirer-sim/src/main/java/dev/cutpay/acquirer/TestCards.java");
     const numbers = [...source.matchAll(/"(4\d{15})", Outcome/g)].map((m) => m[1]);
-    expect(numbers.length).toBe(6);
+    expect(numbers.length).toBe(7);
     const documented = TEST_CARDS.map((card) => card.number.replaceAll(" ", ""));
     for (const number of numbers) expect(documented, number).toContain(number);
   });

@@ -18,6 +18,8 @@ final class KeyPolicy {
             Map.entry("/v1/checkout_sessions", "payments"),
             Map.entry("/v1/payment_stats", "payments"),
             Map.entry("/v1/payment_links", "payment_links"),
+            Map.entry("/v1/customers", "customers"),
+            Map.entry("/v1/setup_intents", "customers"),
             Map.entry("/v1/refunds", "refunds"),
             Map.entry("/v1/balance", "balance"),
             Map.entry("/v1/balance_transactions", "balance"),

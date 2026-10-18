@@ -25,6 +25,8 @@ public class SecurityConfig {
                         .requestMatchers("/checkout/**").permitAll()
                         // Service-to-service; the gateway does not route here.
                         .requestMatchers("/internal/**").permitAll()
+                        // Operator tools (the simulated clock). The gateway does not route /admin/**.
+                        .requestMatchers("/admin/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())

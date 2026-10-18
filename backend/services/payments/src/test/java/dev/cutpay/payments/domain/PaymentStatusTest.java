@@ -6,6 +6,7 @@ import static dev.cutpay.payments.domain.PaymentStatus.PARTIALLY_REFUNDED;
 import static dev.cutpay.payments.domain.PaymentStatus.PROCESSING;
 import static dev.cutpay.payments.domain.PaymentStatus.REFUNDED;
 import static dev.cutpay.payments.domain.PaymentStatus.REQUIRES_ACTION;
+import static dev.cutpay.payments.domain.PaymentStatus.REQUIRES_CAPTURE;
 import static dev.cutpay.payments.domain.PaymentStatus.REQUIRES_PAYMENT_METHOD;
 import static dev.cutpay.payments.domain.PaymentStatus.SUCCEEDED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +22,8 @@ class PaymentStatusTest {
 
     private static final Map<PaymentStatus, Set<PaymentStatus>> ALLOWED = Map.of(
             REQUIRES_PAYMENT_METHOD, EnumSet.of(PROCESSING, CANCELED),
-            PROCESSING, EnumSet.of(SUCCEEDED, REQUIRES_ACTION, FAILED),
+            PROCESSING, EnumSet.of(SUCCEEDED, REQUIRES_ACTION, REQUIRES_CAPTURE, FAILED),
+            REQUIRES_CAPTURE, EnumSet.of(SUCCEEDED, CANCELED),
             REQUIRES_ACTION, EnumSet.of(PROCESSING, FAILED, CANCELED),
             SUCCEEDED, EnumSet.of(PARTIALLY_REFUNDED, REFUNDED),
             PARTIALLY_REFUNDED, EnumSet.of(PARTIALLY_REFUNDED, REFUNDED),
@@ -79,6 +81,49 @@ class PaymentStatusTest {
         intent.applyRefundedTotal(1000);
         assertThat(intent.getStatus()).isEqualTo(REFUNDED);
         assertThat(intent.refundable()).isZero();
+    }
+
+    private static PaymentIntent manualIntent(long amount) {
+        return new PaymentIntent("pay_1", "secret", "mer_1", "Hotel", false, Money.ofMinor(amount, "EUR"), null,
+                null, null, null, PaymentIntent.CHANNEL_ONLINE, PaymentIntent.CAPTURE_MANUAL);
+    }
+
+    @Test
+    void aPartialCaptureShrinksThePaymentToWhatWasTakenAndTheRestIsReleased() {
+        var intent = manualIntent(20_000);
+        intent.startProcessing("guest@example.com");
+        intent.authorize(java.time.Instant.parse("2026-11-01T00:00:00Z"));
+        assertThat(intent.getStatus()).isEqualTo(REQUIRES_CAPTURE);
+        assertThat(intent.getAmountAuthorized()).isEqualTo(20_000);
+
+        intent.capture(15_000);
+
+        assertThat(intent.getStatus()).isEqualTo(SUCCEEDED);
+        assertThat(intent.getAmount()).isEqualTo(15_000);
+        assertThat(intent.getAmountAuthorized()).isEqualTo(20_000);
+        assertThat(intent.refundable()).isEqualTo(15_000);
+        assertThat(intent.getCaptureBefore()).isNull();
+    }
+
+    @Test
+    void youCannotCaptureMoreThanWasHeldOrNothing() {
+        var intent = manualIntent(20_000);
+        intent.startProcessing(null);
+        intent.authorize(java.time.Instant.parse("2026-11-01T00:00:00Z"));
+        assertThatThrownBy(() -> intent.capture(20_001)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> intent.capture(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(intent.getStatus()).isEqualTo(REQUIRES_CAPTURE);
+    }
+
+    @Test
+    void anExpiredAuthorisationIsCanceledWithAReasonAndCannotBeCapturedAfterwards() {
+        var intent = manualIntent(20_000);
+        intent.startProcessing(null);
+        intent.authorize(java.time.Instant.parse("2026-11-01T00:00:00Z"));
+        intent.expire();
+        assertThat(intent.getStatus()).isEqualTo(CANCELED);
+        assertThat(intent.getFailureCode()).isEqualTo("authorization_expired");
+        assertThatThrownBy(() -> intent.capture(100)).isInstanceOf(IllegalTransitionException.class);
     }
 
     @Test

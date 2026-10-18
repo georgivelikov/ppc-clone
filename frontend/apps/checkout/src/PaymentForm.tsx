@@ -134,6 +134,11 @@ export function PaymentForm({ secret, session, onUpdate }: Props) {
       <Button type="submit" className="w-full" loading={isSubmitting}>
         Pay {formatMoney(session.amount, session.currency)}
       </Button>
+      {session.save_card && (
+        <p className="text-center text-xs text-muted" data-testid="save-card-notice">
+          Your card will be saved for future payments with {session.merchant_name ?? "this merchant"}.
+        </p>
+      )}
       <p className="text-center text-xs text-muted">
         Test card: 4242 4242 4242 4242, any future date, any CVC.
       </p>

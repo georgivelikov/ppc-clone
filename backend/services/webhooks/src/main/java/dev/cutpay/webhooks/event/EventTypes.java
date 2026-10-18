@@ -9,11 +9,15 @@ public final class EventTypes {
     public static final String TEST = "webhook_endpoint.test";
 
     public static final Set<String> ALL = Set.of(
-            "payment_intent.created", "payment_intent.requires_action", "payment_intent.succeeded",
+            "payment_intent.created", "payment_intent.requires_action", "payment_intent.amount_capturable_updated",
+            "payment_intent.succeeded",
             "payment_intent.payment_failed", "payment_intent.canceled",
             "refund.created", "charge.refunded", "refund.failed",
             "payout.created", "payout.paid", "payout.failed",
             "payment_link.created", "payment_link.deactivated",
+            "customer.created", "customer.updated", "customer.deleted",
+            "payment_method.attached", "payment_method.detached",
+            "setup_intent.succeeded", "setup_intent.setup_failed",
             TEST);
 
     private EventTypes() {

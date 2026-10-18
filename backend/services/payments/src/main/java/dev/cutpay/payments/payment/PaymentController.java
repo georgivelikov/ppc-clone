@@ -2,6 +2,7 @@ package dev.cutpay.payments.payment;
 
 import dev.cutpay.payments.domain.PaymentIntent;
 import dev.cutpay.web.RequestMode;
+import dev.cutpay.payments.payment.PaymentDtos.CaptureRequest;
 import dev.cutpay.payments.payment.PaymentDtos.CheckoutSessionCreated;
 import dev.cutpay.payments.payment.PaymentDtos.ConfirmRequest;
 import dev.cutpay.payments.payment.PaymentDtos.CreatePaymentRequest;
@@ -45,7 +46,7 @@ class PaymentController {
     @ResponseStatus(HttpStatus.CREATED)
     PaymentView create(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                        @Valid @RequestBody CreatePaymentRequest request) {
-        PaymentIntent intent = payments.create(merchant(jwt), livemode(jwt, requestedLivemode), request);
+        PaymentIntent intent = payments.createAndCharge(merchant(jwt), livemode(jwt, requestedLivemode), request);
         return payments.get(merchant(jwt), claim(jwt), intent.getId(), Set.of());
     }
 
@@ -71,9 +72,10 @@ class PaymentController {
                      @RequestParam(name = "max_amount", required = false) Long maxAmount,
                      @RequestParam(name = "starting_after", required = false) String startingAfter,
                      @RequestParam(name = "expand[]", required = false) List<String> expand,
+                     @RequestParam(required = false) String customer,
                      @RequestParam(defaultValue = "20") int limit) {
         return payments.list(merchant(jwt), livemode(jwt, requestedLivemode), new PaymentService.Filter(status, query, from, to, minAmount, maxAmount,
-                startingAfter, limit, expansions(expand)));
+                startingAfter, limit, expansions(expand), customer));
     }
 
     @GetMapping("/v1/payment_intents/{id}")
@@ -90,6 +92,13 @@ class PaymentController {
     SseEmitter stream(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
         PaymentView payment = payments.get(merchant(jwt), claim(jwt), id, Set.of());
         return streams.subscribe(id, payment.status(), payment.failureCode());
+    }
+
+    /** Takes money from an authorised payment (capture_method = manual). No body, or no amount: take it all. */
+    @PostMapping("/v1/payment_intents/{id}/capture")
+    PaymentView capture(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
+                        @Valid @RequestBody(required = false) CaptureRequest request) {
+        return payments.capture(merchant(jwt), claim(jwt), id, request == null ? null : request.amountToCapture());
     }
 
     @PostMapping("/v1/payment_intents/{id}/cancel")

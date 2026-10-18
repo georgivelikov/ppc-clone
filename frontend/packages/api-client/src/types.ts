@@ -63,6 +63,7 @@ export type PaymentStatus =
   | "requires_payment_method"
   | "processing"
   | "requires_action"
+  | "requires_capture"
   | "succeeded"
   | "failed"
   | "canceled"
@@ -109,6 +110,15 @@ export interface Payment {
   client_secret: string;
   return_url: string | null;
   amount_refunded: number;
+  /** What was held on the card for a manual-capture payment; `amount` is what was taken once captured. */
+  amount_authorized: number | null;
+  /** While `requires_capture`: when the hold is released automatically. */
+  capture_before: string | null;
+  /** The customer this payment belongs to, when it was made for a saved customer. */
+  customer: string | null;
+  payment_method: string | null;
+  /** Charged without the customer present, using a saved card. */
+  off_session: boolean;
   failure_code: string | null;
   failure_message: string | null;
   created_at: string;
@@ -126,6 +136,8 @@ export interface PaymentListParams {
   status?: PaymentStatus | "";
   q?: string;
   livemode?: boolean;
+  /** Only the payments of this customer. */
+  customer?: string;
   starting_after?: string;
   limit?: number;
 }
@@ -137,6 +149,15 @@ export interface CreatePaymentInput {
   customer_email?: string;
   return_url?: string;
   merchant_name?: string;
+  /** `manual` only holds the amount; capture it later with `capturePayment`. */
+  capture_method?: "automatic" | "manual";
+  customer?: string;
+  /** A saved card of the customer. */
+  payment_method?: string;
+  /** Charge the saved card right away without the customer present (subscriptions, repeat orders). */
+  off_session?: boolean;
+  /** `off_session` saves the card used at checkout to the customer for future payments. */
+  setup_future_usage?: "off_session";
 }
 
 export interface CheckoutSessionCreated {

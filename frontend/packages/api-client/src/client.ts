@@ -39,6 +39,16 @@ import type {
   UpdatePaymentLinkInput,
 } from "./links";
 import type {
+  CreateCustomerInput,
+  CreateSetupIntentInput,
+  Customer,
+  CustomerList,
+  CustomerListParams,
+  PaymentMethodList,
+  SetupIntent,
+  UpdateCustomerInput,
+} from "./customers";
+import type {
   ApiKey,
   ApiKeyList,
   CreateApiKeyInput,
@@ -154,6 +164,11 @@ export class ApiClient {
     return this.request("POST", `/v1/checkout_sessions${toQuery({ livemode })}`, input, { idempotent: true });
   }
 
+  /** Creates a payment. With `off_session` and a customer it charges the saved card right away. */
+  createPayment(input: CreatePaymentInput, livemode = false): Promise<Payment> {
+    return this.request("POST", `/v1/payment_intents${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
   listPayments(params: PaymentListParams = {}): Promise<PaymentList> {
     return this.request("GET", `/v1/payment_intents${toQuery(params)}`);
   }
@@ -164,6 +179,13 @@ export class ApiClient {
 
   cancelPayment(id: string): Promise<Payment> {
     return this.request("POST", `/v1/payment_intents/${encodeURIComponent(id)}/cancel`, undefined, {
+      idempotent: true,
+    });
+  }
+
+  /** Takes money from an authorised payment; omit the amount to take everything that was held. */
+  capturePayment(id: string, amountToCapture?: number): Promise<Payment> {
+    return this.request("POST", `/v1/payment_intents/${encodeURIComponent(id)}/capture`, amountToCapture === undefined ? undefined : { amount_to_capture: amountToCapture }, {
       idempotent: true,
     });
   }
@@ -253,6 +275,49 @@ export class ApiClient {
     } finally {
       reader.cancel().catch(() => undefined);
     }
+  }
+
+  // --- customers, saved cards and setup intents ---------------------------
+
+  createCustomer(input: CreateCustomerInput, livemode = false): Promise<Customer> {
+    return this.request("POST", `/v1/customers${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listCustomers(params: CustomerListParams = {}): Promise<CustomerList> {
+    return this.request("GET", `/v1/customers${toQuery(params)}`);
+  }
+
+  getCustomer(id: string): Promise<Customer> {
+    return this.request("GET", `/v1/customers/${encodeURIComponent(id)}`);
+  }
+
+  updateCustomer(id: string, input: UpdateCustomerInput): Promise<Customer> {
+    return this.request("PATCH", `/v1/customers/${encodeURIComponent(id)}`, input);
+  }
+
+  deleteCustomer(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/customers/${encodeURIComponent(id)}`);
+  }
+
+  listPaymentMethods(customerId: string): Promise<PaymentMethodList> {
+    return this.request("GET", `/v1/customers/${encodeURIComponent(customerId)}/payment_methods`);
+  }
+
+  /** Removes a saved card. Subscriptions that relied on it will fail their next payment. */
+  detachPaymentMethod(customerId: string, paymentMethodId: string): Promise<void> {
+    return this.request(
+      "DELETE",
+      `/v1/customers/${encodeURIComponent(customerId)}/payment_methods/${encodeURIComponent(paymentMethodId)}`,
+    );
+  }
+
+  /** Starts saving a card without charging it. Send the customer to the returned `url`. */
+  createSetupIntent(input: CreateSetupIntentInput, livemode = false): Promise<SetupIntent> {
+    return this.request("POST", `/v1/setup_intents${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  getSetupIntent(id: string): Promise<SetupIntent> {
+    return this.request("GET", `/v1/setup_intents/${encodeURIComponent(id)}`);
   }
 
   // --- balances (ledger) --------------------------------------------------

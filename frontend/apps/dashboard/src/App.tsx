@@ -10,6 +10,8 @@ import { EventsPage } from "./pages/developers/EventsPage";
 import { LogsPage } from "./pages/developers/LogsPage";
 import { WebhookDetailPage } from "./pages/developers/WebhookDetailPage";
 import { WebhooksPage } from "./pages/developers/WebhooksPage";
+import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
+import { CustomersPage } from "./pages/customers/CustomersPage";
 import { CreateLinkPage } from "./pages/links/CreateLinkPage";
 import { LinkDetailPage } from "./pages/links/LinkDetailPage";
 import { LinksPage } from "./pages/links/LinksPage";
@@ -39,6 +41,8 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="payments/:id" element={<PaymentDetailPage />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="customers/:id" element={<CustomerDetailPage />} />
             <Route path="links" element={<LinksPage />} />
             <Route path="links/new" element={<CreateLinkPage />} />
             <Route path="links/:id" element={<LinkDetailPage />} />

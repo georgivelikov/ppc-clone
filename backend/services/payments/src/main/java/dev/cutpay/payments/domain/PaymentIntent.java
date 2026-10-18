@@ -19,6 +19,8 @@ public class PaymentIntent {
 
     public static final String CHANNEL_ONLINE = "online";
     public static final String CHANNEL_MOTO = "moto";
+    public static final String CAPTURE_AUTOMATIC = "automatic";
+    public static final String CAPTURE_MANUAL = "manual";
 
     @Id
     private String id;
@@ -73,6 +75,30 @@ public class PaymentIntent {
     @Column(nullable = false)
     private String channel;
 
+    /** What was held on the card for a manual-capture payment; {@code amount} is what was taken once captured. */
+    @Column(name = "amount_authorized")
+    private Long amountAuthorized;
+
+    /** After this moment an uncaptured authorisation is released by a job. */
+    @Column(name = "capture_before")
+    private Instant captureBefore;
+
+    /** Set when the payment was made for a saved customer. */
+    @Column(name = "customer_id")
+    private String customerId;
+
+    /** The saved card this payment is charged to, if any. */
+    @Column(name = "payment_method_id")
+    private String paymentMethodId;
+
+    /** Charged without the customer present: no 3-D Secure challenge is possible. */
+    @Column(name = "off_session", nullable = false)
+    private boolean offSession;
+
+    /** {@code off_session}: save the card used here to the customer once the payment goes through. */
+    @Column(name = "setup_future_usage")
+    private String setupFutureUsage;
+
     @Version
     private long version;
 
@@ -95,6 +121,13 @@ public class PaymentIntent {
     public PaymentIntent(String id, String clientSecret, String merchantId, String merchantName, boolean livemode,
                          Money money, String description, String customerEmail, Map<String, String> metadata,
                          String returnUrl, String channel) {
+        this(id, clientSecret, merchantId, merchantName, livemode, money, description, customerEmail, metadata,
+                returnUrl, channel, CAPTURE_AUTOMATIC);
+    }
+
+    public PaymentIntent(String id, String clientSecret, String merchantId, String merchantName, boolean livemode,
+                         Money money, String description, String customerEmail, Map<String, String> metadata,
+                         String returnUrl, String channel, String captureMethod) {
         this.id = id;
         this.channel = channel;
         this.clientSecret = clientSecret;
@@ -104,7 +137,7 @@ public class PaymentIntent {
         this.amount = money.minor();
         this.currency = money.currency().getCurrencyCode();
         this.status = PaymentStatus.REQUIRES_PAYMENT_METHOD;
-        this.captureMethod = "automatic";
+        this.captureMethod = captureMethod;
         this.description = description;
         this.customerEmail = customerEmail;
         this.metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
@@ -151,6 +184,40 @@ public class PaymentIntent {
 
     public void cancel() {
         moveTo(PaymentStatus.CANCELED);
+    }
+
+    public boolean isManualCapture() {
+        return CAPTURE_MANUAL.equals(captureMethod);
+    }
+
+    /** The card issuer approved the amount and it is now held; it must be captured before {@code until}. */
+    public void authorize(Instant until) {
+        moveTo(PaymentStatus.REQUIRES_CAPTURE);
+        amountAuthorized = amount;
+        captureBefore = until;
+        failureCode = null;
+        failureMessage = null;
+    }
+
+    /**
+     * Takes {@code captured} of the held amount. The rest is released, so from now on the payment is for the
+     * captured amount only: that is what refunds, fees and the ledger see.
+     */
+    public void capture(long captured) {
+        if (captured < 1 || captured > amount) {
+            throw new IllegalArgumentException("Capture must be between 1 and " + amount);
+        }
+        moveTo(PaymentStatus.SUCCEEDED);
+        amount = captured;
+        captureBefore = null;
+    }
+
+    /** The merchant never captured in time, so the hold is given back. */
+    public void expire() {
+        moveTo(PaymentStatus.CANCELED);
+        captureBefore = null;
+        failureCode = "authorization_expired";
+        failureMessage = "The authorisation was not captured in time and has been released.";
     }
 
     // --- refunds -------------------------------------------------------------------------------
@@ -224,6 +291,43 @@ public class PaymentIntent {
 
     public String getChannel() {
         return channel;
+    }
+
+    /** Ties the payment to a customer, optionally charged to one of their saved cards. */
+    public void forCustomer(String customerId, String paymentMethodId, boolean offSession, String setupFutureUsage) {
+        this.customerId = customerId;
+        this.paymentMethodId = paymentMethodId;
+        this.offSession = offSession;
+        this.setupFutureUsage = setupFutureUsage;
+    }
+
+    /** The saved card now tied to the payment, e.g. after it was saved at checkout. */
+    public void usePaymentMethod(String paymentMethodId) {
+        this.paymentMethodId = paymentMethodId;
+    }
+
+    public String getCustomerId() {
+        return customerId;
+    }
+
+    public String getPaymentMethodId() {
+        return paymentMethodId;
+    }
+
+    public boolean isOffSession() {
+        return offSession;
+    }
+
+    public String getSetupFutureUsage() {
+        return setupFutureUsage;
+    }
+
+    public Long getAmountAuthorized() {
+        return amountAuthorized;
+    }
+
+    public Instant getCaptureBefore() {
+        return captureBefore;
     }
 
     public String getClientSecret() {

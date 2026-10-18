@@ -31,7 +31,8 @@ public class ApiKeyService {
 
     /** Resources a restricted key can be limited to; each takes {@code :read} or {@code :write}. */
     static final Set<String> RESOURCES =
-            Set.of("payments", "refunds", "balance", "payouts", "bank_accounts", "webhooks", "payment_links");
+            Set.of("payments", "refunds", "balance", "payouts", "bank_accounts", "webhooks", "payment_links", "customers",
+                    "billing", "connected_accounts");
 
     private final ApiKeyRepository keys;
 

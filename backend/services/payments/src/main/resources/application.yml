@@ -45,3 +45,10 @@ cutpay:
     url: http://localhost:8083
     connect-timeout: PT2S
     read-timeout: PT5S
+  payments:
+    # How long a held (pre-authorised) amount waits for the merchant to capture it before it is released.
+    authorization-validity: P7D
+    job-poll-interval: PT10S
+  clock:
+    # Lets e2e tests push time forward via POST /admin/clock/advance (authorisation expiry, billing runs).
+    simulated: true

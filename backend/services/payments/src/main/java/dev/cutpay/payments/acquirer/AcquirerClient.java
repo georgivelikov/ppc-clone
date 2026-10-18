@@ -52,7 +52,11 @@ public class AcquirerClient {
         }
     }
 
-    record AuthorizeRequest(String token, long amount, String currency, String reference, String channel) {
+    record AuthorizeRequest(String token, long amount, String currency, String reference, String channel,
+                            boolean offSession) {
+    }
+
+    record VerifyRequest(String token, String channel) {
     }
 
     record AuthorizeResponse(String status, String acquirerRef, String declineCode, String message) {
@@ -103,10 +107,27 @@ public class AcquirerClient {
     }
 
     public AuthResult authorize(String token, long amount, String currency, String reference, String channel) {
+        return authorize(token, amount, currency, reference, channel, false);
+    }
+
+    /** {@code offSession}: the customer is not there, so the bank cannot ask them to authenticate. */
+    public AuthResult authorize(String token, long amount, String currency, String reference, String channel,
+                                boolean offSession) {
+        return call("authorize", () -> http.post().uri("/authorize")
+                .body(new AuthorizeRequest(token, amount, currency, reference, channel, offSession))
+                .retrieve().body(AuthorizeResponse.class));
+    }
+
+    /** Checks a card without charging it, for saving it. May ask the customer to authenticate (once). */
+    public AuthResult verify(String token) {
+        return call("verify", () -> http.post().uri("/verify")
+                .body(new VerifyRequest(token, "online"))
+                .retrieve().body(AuthorizeResponse.class));
+    }
+
+    private AuthResult call(String what, java.util.function.Supplier<AuthorizeResponse> request) {
         try {
-            AuthorizeResponse response = breaker.executeSupplier(() -> http.post().uri("/authorize")
-                    .body(new AuthorizeRequest(token, amount, currency, reference, channel))
-                    .retrieve().body(AuthorizeResponse.class));
+            AuthorizeResponse response = breaker.executeSupplier(request);
             if (response == null) {
                 return new AuthResult.Unavailable("empty response");
             }
@@ -119,7 +140,7 @@ public class AcquirerClient {
             log.warn("Acquirer circuit is open, failing fast");
             return new AuthResult.Unavailable("circuit open");
         } catch (RuntimeException e) {
-            log.warn("Acquirer authorize call failed: {}", e.toString());
+            log.warn("Acquirer {} call failed: {}", what, e.toString());
             return new AuthResult.Unavailable(e.getClass().getSimpleName());
         }
     }
@@ -139,6 +160,46 @@ public class AcquirerClient {
         } catch (RuntimeException e) {
             log.warn("Acquirer refund call failed: {}", e.toString());
             return new RefundResult.Failed("acquirer_unavailable");
+        }
+    }
+
+    /** Outcome of capturing or releasing a held authorisation. */
+    public sealed interface HoldResult {
+        record Done() implements HoldResult {
+        }
+
+        /** The acquirer refused (unknown, already captured, too large): retrying will not help. */
+        record Rejected(String code) implements HoldResult {
+        }
+
+        record Unavailable() implements HoldResult {
+        }
+    }
+
+    record HoldRequest(String acquirerRef, Long amount) {
+    }
+
+    /** Takes {@code amount} from a held authorisation; the remainder is released. Safe to repeat. */
+    public HoldResult capture(String acquirerRef, long amount) {
+        return hold("/capture", new HoldRequest(acquirerRef, amount));
+    }
+
+    /** Releases a held authorisation without taking anything. Safe to repeat. */
+    public HoldResult release(String acquirerRef) {
+        return hold("/void", new HoldRequest(acquirerRef, null));
+    }
+
+    private HoldResult hold(String path, HoldRequest request) {
+        try {
+            breaker.executeSupplier(() -> http.post().uri(path).body(request).retrieve().toBodilessEntity());
+            return new HoldResult.Done();
+        } catch (CallNotPermittedException e) {
+            return new HoldResult.Unavailable();
+        } catch (HttpClientErrorException e) {
+            return new HoldResult.Rejected(e.getStatusCode().value() == 409 ? "already_captured" : "rejected");
+        } catch (RuntimeException e) {
+            log.warn("Acquirer {} call failed: {}", path, e.toString());
+            return new HoldResult.Unavailable();
         }
     }
 }

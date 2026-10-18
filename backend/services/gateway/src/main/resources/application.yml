@@ -47,7 +47,7 @@ spring:
             - id: payments-api
               uri: ${cutpay.upstreams.payments}
               predicates:
-                - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats,/v1/terminal/**
+                - Path=/v1/payment_intents/**,/v1/payment_intents,/v1/refunds/**,/v1/refunds,/v1/checkout_sessions,/v1/payment_stats,/v1/terminal/**,/v1/customers,/v1/customers/**,/v1/setup_intents,/v1/setup_intents/**
             - id: links-api
               uri: ${cutpay.upstreams.links}
               predicates:

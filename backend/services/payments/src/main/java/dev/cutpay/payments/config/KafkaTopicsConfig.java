@@ -11,6 +11,7 @@ public class KafkaTopicsConfig {
 
     public static final String PAYMENT_TOPIC = "payment.events";
     public static final String REFUND_TOPIC = "refund.events";
+    public static final String CUSTOMER_TOPIC = "customer.events";
 
     @Bean
     NewTopic paymentEvents() {
@@ -20,5 +21,10 @@ public class KafkaTopicsConfig {
     @Bean
     NewTopic refundEvents() {
         return TopicBuilder.name(REFUND_TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic customerEvents() {
+        return TopicBuilder.name(CUSTOMER_TOPIC).partitions(3).replicas(1).build();
     }
 }

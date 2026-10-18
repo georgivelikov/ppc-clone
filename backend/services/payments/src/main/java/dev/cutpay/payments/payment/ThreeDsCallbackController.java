@@ -1,5 +1,6 @@
 package dev.cutpay.payments.payment;
 
+import dev.cutpay.payments.customer.SetupIntentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
@@ -19,15 +20,20 @@ class ThreeDsCallbackController {
     }
 
     private final PaymentService payments;
+    private final SetupIntentService setups;
 
-    ThreeDsCallbackController(PaymentService payments) {
+    ThreeDsCallbackController(PaymentService payments, SetupIntentService setups) {
         this.payments = payments;
+        this.setups = setups;
     }
 
+    /** The reference belongs either to a payment or to a card being saved. */
     @PostMapping("/internal/3ds/callback")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void callback(@Valid @RequestBody Callback callback) {
-        payments.completeThreeDs(callback.acquirerRef(), "approved".equals(callback.status()),
-                callback.declineCode(), callback.message());
+        boolean approved = "approved".equals(callback.status());
+        if (!setups.completeThreeDs(callback.acquirerRef(), approved, callback.declineCode(), callback.message())) {
+            payments.completeThreeDs(callback.acquirerRef(), approved, callback.declineCode(), callback.message());
+        }
     }
 }

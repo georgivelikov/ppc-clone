@@ -54,6 +54,8 @@ security:
 tags:
   - name: Payments
     description: Create and track card payments.
+  - name: Customers
+    description: People and companies you sell to, and the cards they saved for later.
   - name: Payment links
     description: Get paid without a website, with a shareable link or a QR code.
   - name: Refunds
@@ -170,12 +172,45 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/payment_intents/{id}/capture:
+    post:
+      tags: [Payments]
+      operationId: capturePaymentIntent
+      summary: Capture an authorised payment
+      description: |
+        Takes money from a payment created with `capture_method: manual` once it is `requires_capture`. A smaller
+        `amount_to_capture` takes only that part and releases the rest; the payment is then for the captured amount.
+        A capture can be made once.
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaptureRequest"
+      responses:
+        "200":
+          description: The captured payment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntent"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /v1/payment_intents/{id}/cancel:
     post:
       tags: [Payments]
       operationId: cancelPaymentIntent
       summary: Cancel a payment
-      description: Only a payment that has not been paid yet can be canceled.
+      description: Cancels a payment that has not been paid yet, or releases the hold of an authorised one (`requires_capture`).
       parameters:
         - $ref: "#/components/parameters/PaymentId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -186,6 +221,220 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaymentIntent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/customers:
+    post:
+      tags: [Customers]
+      operationId: createCustomer
+      summary: Create a customer
+      description: A customer groups the saved cards, payments, subscriptions and invoices of one person or company.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomer"
+      responses:
+        "201":
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [Customers]
+      operationId: listCustomers
+      summary: List customers
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+        - name: q
+          in: query
+          description: Matches part of the name, email or id.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customers, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/customers/{id}:
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: Retrieve a customer
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      responses:
+        "200":
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Customers]
+      operationId: updateCustomer
+      summary: Update a customer
+      description: Fields you leave out stay as they are. `default_payment_method` picks the saved card used when none is named.
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomer"
+      responses:
+        "200":
+          description: The updated customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Customers]
+      operationId: deleteCustomer
+      summary: Delete a customer
+      description: Hides the customer and removes their saved cards. Their payments and invoices stay on record.
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/customers/{id}/payment_methods:
+    get:
+      tags: [Customers]
+      operationId: listCustomerPaymentMethods
+      summary: List the saved cards of a customer
+      description: Only brand, last four digits and expiry are returned. The card number is never stored here.
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      responses:
+        "200":
+          description: Saved cards, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethodList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/customers/{id}/payment_methods/{payment_method_id}:
+    delete:
+      tags: [Customers]
+      operationId: detachPaymentMethod
+      summary: Remove a saved card
+      description: If it was the default, another saved card takes over. Subscriptions are not changed, so one that used only this card fails its next payment.
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+        - name: payment_method_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/setup_intents:
+    post:
+      tags: [Customers]
+      operationId: createSetupIntent
+      summary: Save a card without charging it
+      description: |
+        Creates a setup intent and the address of a hosted page where the customer enters their card. The bank may
+        ask them to authenticate once (3-D Secure); after that the card can be charged without them, for example
+        by a subscription. The result arrives as `setup_intent.succeeded` or `setup_intent.setup_failed`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSetupIntent"
+      responses:
+        "201":
+          description: The setup intent. Send the customer to `url`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupIntent"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/setup_intents/{id}:
+    get:
+      tags: [Customers]
+      operationId: getSetupIntent
+      summary: Retrieve a setup intent
+      parameters:
+        - $ref: "#/components/parameters/SetupIntentId"
+      responses:
+        "200":
+          description: The setup intent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupIntent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/setup_intents/{id}/cancel:
+    post:
+      tags: [Customers]
+      operationId: cancelSetupIntent
+      summary: Cancel a setup intent
+      description: The hosted page stops accepting a card.
+      parameters:
+        - $ref: "#/components/parameters/SetupIntentId"
+      responses:
+        "200":
+          description: The canceled setup intent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupIntent"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1172,6 +1421,20 @@ components:
       schema:
         type: string
         examples: [pay_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    CustomerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [cus_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    SetupIntentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [seti_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
     LinkId:
       name: id
       in: path
@@ -1267,6 +1530,7 @@ components:
         - requires_payment_method
         - processing
         - requires_action
+        - requires_capture
         - succeeded
         - failed
         - canceled
@@ -1302,6 +1566,214 @@ components:
           type: string
           maxLength: 160
           description: Shown to the customer on the checkout.
+        capture_method:
+          type: string
+          enum: [automatic, manual]
+          default: automatic
+          description: |
+            `manual` only holds the amount on the card (status `requires_capture`). Take it with
+            `POST /v1/payment_intents/{id}/capture`, or release it by cancelling. A hold that is not captured within
+            seven days is released automatically.
+        customer:
+          type: string
+          description: A customer id. Needed for `payment_method`, `off_session` and `setup_future_usage`.
+        payment_method:
+          type: string
+          description: A saved card of the customer. With `off_session` and none given, the default card is used.
+        off_session:
+          type: boolean
+          description: |
+            Charge the saved card right away without the customer being present (subscriptions, repeat orders). The
+            bank cannot ask for 3-D Secure then: a card that needs it fails with `authentication_required` and the
+            customer has to pay on a hosted page.
+        setup_future_usage:
+          type: string
+          enum: [off_session]
+          description: Save the card the customer pays with to the customer, for future off-session payments.
+    Address:
+      type: object
+      properties:
+        line1:
+          type: [string, "null"]
+        line2:
+          type: [string, "null"]
+        city:
+          type: [string, "null"]
+        postal_code:
+          type: [string, "null"]
+        country:
+          type: [string, "null"]
+    CreateCustomer:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        phone:
+          type: string
+        description:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    UpdateCustomer:
+      allOf:
+        - $ref: "#/components/schemas/CreateCustomer"
+        - type: object
+          properties:
+            default_payment_method:
+              type: string
+    Customer:
+      type: object
+      required: [id, object, livemode, created_at]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: customer
+        livemode:
+          type: boolean
+        email:
+          type: [string, "null"]
+        name:
+          type: [string, "null"]
+        phone:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        address:
+          oneOf:
+            - $ref: "#/components/schemas/Address"
+            - type: "null"
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        default_payment_method:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+    CustomerList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        has_more:
+          type: boolean
+    PaymentMethod:
+      type: object
+      required: [id, object, type, customer]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: payment_method
+        type:
+          type: string
+          const: card
+        customer:
+          type: string
+        livemode:
+          type: boolean
+        card:
+          type: object
+          properties:
+            brand:
+              type: [string, "null"]
+            last4:
+              type: [string, "null"]
+            exp_month:
+              type: [integer, "null"]
+            exp_year:
+              type: [integer, "null"]
+            fingerprint:
+              type: [string, "null"]
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    PaymentMethodList:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMethod"
+    CreateSetupIntent:
+      type: object
+      required: [customer]
+      properties:
+        customer:
+          type: string
+        description:
+          type: string
+          maxLength: 500
+        return_url:
+          type: string
+          format: uri
+          description: Where the hosted page sends the customer afterwards.
+        merchant_name:
+          type: string
+          maxLength: 160
+          description: Shown to the customer on the hosted page.
+    SetupIntent:
+      type: object
+      required: [id, object, customer, status, client_secret, url]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: setup_intent
+        livemode:
+          type: boolean
+        customer:
+          type: string
+        status:
+          type: string
+          enum: [requires_payment_method, requires_action, succeeded, failed, canceled]
+        client_secret:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: The hosted page where the customer enters their card.
+        payment_method:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        return_url:
+          type: [string, "null"]
+        failure_code:
+          type: [string, "null"]
+        failure_message:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+    CaptureRequest:
+      type: object
+      properties:
+        amount_to_capture:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Up to the authorised amount. Omit it to take everything; the rest of a smaller capture is released.
     PaymentAttempt:
       type: object
       properties:
@@ -1368,6 +1840,23 @@ components:
         amount_refunded:
           type: integer
           format: int64
+        customer:
+          type: [string, "null"]
+          description: The customer the payment belongs to.
+        payment_method:
+          type: [string, "null"]
+          description: The saved card the payment was charged to.
+        off_session:
+          type: boolean
+          description: Charged to a saved card without the customer present.
+        amount_authorized:
+          type: [integer, "null"]
+          format: int64
+          description: What was held on the card for a `manual` capture payment. `amount` is what was taken once captured.
+        capture_before:
+          type: [string, "null"]
+          format: date-time
+          description: While `requires_capture`, the moment after which the hold is released automatically.
         failure_code:
           type: [string, "null"]
         failure_message:
@@ -1880,6 +2369,7 @@ components:
       enum:
         - payment_intent.created
         - payment_intent.requires_action
+        - payment_intent.amount_capturable_updated
         - payment_intent.succeeded
         - payment_intent.payment_failed
         - payment_intent.canceled
@@ -1891,6 +2381,13 @@ components:
         - payout.failed
         - payment_link.created
         - payment_link.deactivated
+        - customer.created
+        - customer.updated
+        - customer.deleted
+        - payment_method.attached
+        - payment_method.detached
+        - setup_intent.succeeded
+        - setup_intent.setup_failed
         - webhook_endpoint.test
     Event:
       type: object

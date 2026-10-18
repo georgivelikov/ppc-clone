@@ -22,6 +22,7 @@ public final class EventMapper {
         return switch (sourceType) {
             case "PaymentIntentCreated" -> payment("payment_intent.created", p);
             case "PaymentRequiresAction" -> payment("payment_intent.requires_action", p);
+            case "PaymentAuthorized" -> payment("payment_intent.amount_capturable_updated", p);
             case "PaymentSucceeded" -> payment("payment_intent.succeeded", p);
             case "PaymentFailed" -> payment("payment_intent.payment_failed", p);
             case "PaymentCanceled" -> payment("payment_intent.canceled", p);
@@ -31,6 +32,13 @@ public final class EventMapper {
             case "PayoutCreated" -> payout("payout.created", p);
             case "PayoutPaid" -> payout("payout.paid", p);
             case "PayoutFailed" -> payout("payout.failed", p);
+            case "CustomerCreated" -> customer("customer.created", p);
+            case "CustomerUpdated" -> customer("customer.updated", p);
+            case "CustomerDeleted" -> customer("customer.deleted", p);
+            case "PaymentMethodAttached" -> paymentMethod("payment_method.attached", p);
+            case "PaymentMethodDetached" -> paymentMethod("payment_method.detached", p);
+            case "SetupIntentSucceeded" -> setupIntent("setup_intent.succeeded", p);
+            case "SetupIntentFailed" -> setupIntent("setup_intent.setup_failed", p);
             case "PaymentLinkCreated" -> link("payment_link.created", p);
             case "PaymentLinkDeactivated" -> link("payment_link.deactivated", p);
             default -> Optional.empty();
@@ -72,6 +80,38 @@ public final class EventMapper {
         object.put("currency", text(p, "currency"));
         optional(object, "arrival_date", p);
         optional(object, "kind", p);
+        optional(object, "failure_code", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> customer(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "customer_id"));
+        object.put("object", "customer");
+        optional(object, "email", p);
+        optional(object, "name", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> paymentMethod(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "payment_method_id"));
+        object.put("object", "payment_method");
+        object.put("customer", text(p, "customer_id"));
+        optional(object, "brand", p);
+        optional(object, "last4", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> setupIntent(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "setup_intent_id"));
+        object.put("object", "setup_intent");
+        object.put("customer", text(p, "customer_id"));
+        object.put("status", text(p, "status"));
+        if (!p.path("payment_method_id").isMissingNode() && !p.path("payment_method_id").isNull()) {
+            object.put("payment_method", p.path("payment_method_id").asString());
+        }
         optional(object, "failure_code", p);
         return Optional.of(new Mapped(type, object));
     }

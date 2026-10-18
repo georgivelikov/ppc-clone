@@ -12,6 +12,7 @@ export interface Session {
     | "requires_payment_method"
     | "processing"
     | "requires_action"
+    | "requires_capture"
     | "succeeded"
     | "failed"
     | "canceled"
@@ -25,6 +26,8 @@ export interface Session {
   failure_code: string | null;
   failure_message: string | null;
   next_action: NextAction | null;
+  /** The merchant will keep the card for future payments (subscriptions, repeat orders). */
+  save_card?: boolean;
 }
 
 export interface CardInput {
@@ -131,4 +134,26 @@ export function createLinkSession(
   input: LinkSessionInput,
 ): Promise<{ payment_id: string; client_secret: string; url: string }> {
   return call("POST", `/links/${encodeURIComponent(slug)}/sessions`, input);
+}
+
+// --- saving a card (public: the unguessable client secret in the URL is the credential) --------
+
+export interface SetupSession {
+  id: string;
+  status: "requires_payment_method" | "requires_action" | "succeeded" | "failed" | "canceled";
+  merchant_name: string | null;
+  description: string | null;
+  return_url: string | null;
+  failure_code: string | null;
+  failure_message: string | null;
+  next_action: NextAction | null;
+}
+
+export function getSetupSession(secret: string): Promise<SetupSession> {
+  return call("GET", `/checkout/setup_intents/${encodeURIComponent(secret)}`);
+}
+
+/** Verifies the card at the bank without charging it. The card is saved when the bank approves it. */
+export function confirmSetup(secret: string, token: string): Promise<SetupSession> {
+  return call("POST", `/checkout/setup_intents/${encodeURIComponent(secret)}/confirm`, { token });
 }

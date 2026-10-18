@@ -115,4 +115,91 @@ class AcquirerSimTest {
                                 {"token":"%s","amount":1000,"currency":"EUR","channel":"moto"}""".formatted(token)))
                 .andExpect(jsonPath("$.status").value("approved"));
     }
+
+    private String authorizeRef(String pan) throws Exception {
+        String body = authorize(tokenize(pan)).andReturn().getResponse().getContentAsString();
+        return json.readTree(body).get("acquirer_ref").asString();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions capture(String ref, long amount) throws Exception {
+        return mvc.perform(post("/capture").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"acquirer_ref\":\"%s\",\"amount\":%d}".formatted(ref, amount)));
+    }
+
+    @Test
+    void aHeldAuthorisationCanBeCapturedPartiallyAndOnlyThatPartCanBeRefunded() throws Exception {
+        String ref = authorizeRef("4242424242424242");
+        capture(ref, 600).andExpect(jsonPath("$.status").value("approved"));
+
+        mvc.perform(post("/refund").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"acquirer_ref\":\"%s\",\"amount\":601}".formatted(ref)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/refund").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"acquirer_ref\":\"%s\",\"amount\":600}".formatted(ref)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void capturingMoreThanWasHeldIsRefused() throws Exception {
+        String ref = authorizeRef("4242424242424242");
+        capture(ref, 1001).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("capture_exceeds_authorization"));
+    }
+
+    @Test
+    void capturingTwiceWithTheSameAmountIsARetryAndWithAnotherAmountIsRefused() throws Exception {
+        String ref = authorizeRef("4242424242424242");
+        capture(ref, 400).andExpect(status().isOk());
+        capture(ref, 400).andExpect(status().isOk());
+        capture(ref, 500).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("already_captured"));
+    }
+
+    @Test
+    void aReleasedAuthorisationCannotBeCapturedAndACapturedOneCannotBeReleased() throws Exception {
+        String released = authorizeRef("4242424242424242");
+        mvc.perform(post("/void").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"acquirer_ref\":\"%s\"}".formatted(released))).andExpect(status().isOk());
+        mvc.perform(post("/void").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"acquirer_ref\":\"%s\"}".formatted(released))).andExpect(status().isOk());
+        capture(released, 1000).andExpect(status().isNotFound());
+
+        String taken = authorizeRef("4242424242424242");
+        capture(taken, 1000).andExpect(status().isOk());
+        mvc.perform(post("/void").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"acquirer_ref\":\"%s\"}".formatted(taken)))
+                .andExpect(status().isConflict());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions authorizeOffSession(String token) throws Exception {
+        return mvc.perform(post("/authorize").contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"token":"%s","amount":1000,"currency":"EUR","off_session":true}""".formatted(token)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions verify(String token) throws Exception {
+        return mvc.perform(post("/verify").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"%s\"}".formatted(token)));
+    }
+
+    @Test
+    void theOrdinary3dsCardIsChallengedOnceButASavedCopyCanBeChargedOffSession() throws Exception {
+        String token = tokenize("4000000000003220");
+        verify(token).andExpect(jsonPath("$.status").value("requires_action"));
+        authorizeOffSession(token).andExpect(jsonPath("$.status").value("approved"));
+    }
+
+    @Test
+    void theAlwaysAuthenticateCardNeedsTheCustomerForEveryChargeSoOffSessionIsDeclined() throws Exception {
+        String token = tokenize("4000002760003184");
+        authorize(token).andExpect(jsonPath("$.status").value("requires_action"));
+        authorizeOffSession(token).andExpect(jsonPath("$.status").value("declined"))
+                .andExpect(jsonPath("$.decline_code").value("authentication_required"));
+    }
+
+    @Test
+    void verifyingAGoodCardApprovesAndABadOneDeclinesWithoutAnyAmount() throws Exception {
+        verify(tokenize("4242424242424242")).andExpect(jsonPath("$.status").value("approved"));
+        verify(tokenize("4000000000009995")).andExpect(jsonPath("$.decline_code").value("insufficient_funds"));
+    }
 }

@@ -41,6 +41,9 @@ public class PaymentAttempt {
     @Column(name = "card_region")
     private String cardRegion;
 
+    @Column(name = "acquirer_token")
+    private String acquirerToken;
+
     @Column(name = "acquirer_ref")
     private String acquirerRef;
 
@@ -91,6 +94,26 @@ public class PaymentAttempt {
         }
     }
 
+    /** The issuer approved and the amount is held, but nothing has been taken yet. */
+    public void authorized(String acquirerRef) {
+        if (acquirerRef != null) {
+            this.acquirerRef = acquirerRef;
+        }
+        this.status = "authorized";
+        if (threeDsStatus != null) {
+            this.threeDsStatus = "authenticated";
+        }
+    }
+
+    /** The held amount was captured (or released: {@code released}). */
+    public void captured() {
+        this.status = "succeeded";
+    }
+
+    public void released() {
+        this.status = "canceled";
+    }
+
     public void failed(String declineCode) {
         this.status = "failed";
         this.declineCode = declineCode;
@@ -137,6 +160,15 @@ public class PaymentAttempt {
 
     public String getCardRegion() {
         return cardRegion;
+    }
+
+    public PaymentAttempt withToken(String token) {
+        this.acquirerToken = token;
+        return this;
+    }
+
+    public String getAcquirerToken() {
+        return acquirerToken;
     }
 
     public String getAcquirerRef() {

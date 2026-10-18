@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
+import { CaptureDialog } from "./CaptureDialog";
 import { RefundDialog } from "./RefundDialog";
 
 /** Statuses that mean the customer's money was captured and the ledger has (or will have) a fee for it. */
@@ -35,9 +36,25 @@ export function buildTimeline(payment: Payment): TimelineEvent[] {
       detail: payment.failure_message ?? payment.failure_code ?? undefined,
     });
   } else if (payment.status === "canceled") {
-    events.push({ at: payment.updated_at, title: "Payment canceled" });
+    events.push({
+      at: payment.updated_at,
+      title: payment.failure_code === "authorization_expired" ? "Hold released: not captured in time" : "Payment canceled",
+    });
+  } else if (payment.status === "requires_capture") {
+    events.push({
+      at: payment.updated_at,
+      title: `${formatMoney(payment.amount, payment.currency)} held on the card`,
+      detail: "Waiting to be captured",
+    });
   } else if (final?.status === "succeeded") {
-    events.push({ at: payment.updated_at, title: "Payment succeeded" });
+    events.push({
+      at: payment.updated_at,
+      title: "Payment succeeded",
+      detail:
+        payment.amount_authorized !== null && payment.amount_authorized > payment.amount
+          ? `Captured ${formatMoney(payment.amount, payment.currency)} of ${formatMoney(payment.amount_authorized, payment.currency)} held; the rest was released`
+          : undefined,
+    });
   }
   for (const refund of payment.refunds) {
     events.push({
@@ -62,6 +79,7 @@ export function PaymentDetailPage() {
   const { id = "" } = useParams();
   const queryClient = useQueryClient();
   const [refunding, setRefunding] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const { data: payment, error, isPending } = useQuery({ queryKey: ["payment", id], queryFn: () => api.getPayment(id) });
 
   // The ledger prices a payment shortly after it succeeds, so the fee can lag behind the status.
@@ -100,6 +118,7 @@ export function PaymentDetailPage() {
     (payment.status === "succeeded" || payment.status === "partially_refunded") &&
     payment.amount > payment.amount_refunded;
   const canCancel = payment.status === "requires_payment_method" || payment.status === "requires_action";
+  const canCapture = payment.status === "requires_capture";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -119,11 +138,12 @@ export function PaymentDetailPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          {canCancel && (
+          {(canCancel || canCapture) && (
             <Button variant="secondary" loading={cancel.isPending} onClick={() => cancel.mutate()}>
-              Cancel payment
+              {canCapture ? "Release hold" : "Cancel payment"}
             </Button>
           )}
+          {canCapture && <Button onClick={() => setCapturing(true)}>Capture</Button>}
           {canRefund && <Button onClick={() => setRefunding(true)}>Refund</Button>}
         </div>
       </div>
@@ -140,6 +160,16 @@ export function PaymentDetailPage() {
                 {payment.channel === "moto" ? "Card not present (MOTO)" : "Online"}
               </span>
             </Row>
+            {payment.amount_authorized !== null && (
+              <Row label={canCapture ? "Held on card" : "Authorised"}>
+                <span data-testid="payment-authorized">{formatMoney(payment.amount_authorized, payment.currency)}</span>
+              </Row>
+            )}
+            {canCapture && payment.capture_before && (
+              <Row label="Released automatically">
+                <span data-testid="payment-capture-before">{new Date(payment.capture_before).toLocaleString()}</span>
+              </Row>
+            )}
             <Row label="Created">{new Date(payment.created_at).toLocaleString()}</Row>
             {payment.amount_refunded > 0 && (
               <Row label="Refunded">{formatMoney(payment.amount_refunded, payment.currency)}</Row>
@@ -227,6 +257,7 @@ export function PaymentDetailPage() {
       </Card>
 
       {refunding && <RefundDialog payment={payment} onClose={() => setRefunding(false)} />}
+      {capturing && <CaptureDialog payment={payment} onClose={() => setCapturing(false)} />}
     </div>
   );
 }

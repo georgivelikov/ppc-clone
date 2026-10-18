@@ -6,6 +6,7 @@ import dev.cutpay.payments.domain.Refund;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -23,7 +24,28 @@ public final class PaymentDtos {
             @Size(max = 254) String customerEmail,
             Map<String, String> metadata,
             @Size(max = 2000) String returnUrl,
-            @Size(max = 160) String merchantName) {
+            @Size(max = 160) String merchantName,
+            @Pattern(regexp = "automatic|manual", message = "Capture method must be automatic or manual")
+            String captureMethod,
+            @Size(max = 64) String customer,
+            @Size(max = 64) String paymentMethod,
+            Boolean offSession,
+            @Pattern(regexp = "off_session", message = "Setup future usage can only be off_session")
+            String setupFutureUsage) {
+
+        /** A payment for a saved customer, charged straight away to a saved card. */
+        public boolean chargesSavedCard() {
+            return Boolean.TRUE.equals(offSession);
+        }
+
+        public CreatePaymentRequest withMerchantName(String name) {
+            return new CreatePaymentRequest(amount, currency, description, customerEmail, metadata, returnUrl, name,
+                    captureMethod, customer, paymentMethod, offSession, setupFutureUsage);
+        }
+    }
+
+    /** Omit the amount to take everything that was authorised. */
+    public record CaptureRequest(@Min(value = 1, message = "Amount must be positive") Long amountToCapture) {
     }
 
     public record ConfirmRequest(@NotBlank String token, @Size(max = 254) String email) {
@@ -53,9 +75,10 @@ public final class PaymentDtos {
     public record PaymentView(String id, String object, boolean livemode, long amount, String currency,
                               String status, String captureMethod, String channel, String description, String customerEmail,
                               Map<String, String> metadata, String clientSecret, String returnUrl,
-                              long amountRefunded, String failureCode, String failureMessage, Instant createdAt,
-                              Instant updatedAt, List<AttemptView> attempts, List<RefundView> refunds,
-                              Object latestAttempt) {
+                              long amountRefunded, Long amountAuthorized, Instant captureBefore, String customer,
+                              String paymentMethod, boolean offSession, String failureCode,
+                              String failureMessage, Instant createdAt, Instant updatedAt,
+                              List<AttemptView> attempts, List<RefundView> refunds, Object latestAttempt) {
 
         static PaymentView of(PaymentIntent p, List<PaymentAttempt> attempts, List<Refund> refunds) {
             return of(p, attempts, refunds, false);
@@ -73,7 +96,9 @@ public final class PaymentDtos {
             return new PaymentView(p.getId(), "payment_intent", p.isLivemode(), p.getAmount(), p.getCurrency(),
                     p.getStatus().wire(), p.getCaptureMethod(), p.getChannel(), p.getDescription(), p.getCustomerEmail(),
                     p.getMetadata(), p.getClientSecret(), p.getReturnUrl(), p.getAmountRefunded(),
-                    p.getFailureCode(), p.getFailureMessage(), p.getCreatedAt(), p.getUpdatedAt(),
+                    p.getAmountAuthorized(), p.getCaptureBefore(), p.getCustomerId(), p.getPaymentMethodId(),
+                    p.isOffSession(), p.getFailureCode(), p.getFailureMessage(),
+                    p.getCreatedAt(), p.getUpdatedAt(),
                     attempts.stream().map(AttemptView::of).toList(),
                     refunds.stream().map(RefundView::of).toList(), latest);
         }
@@ -88,7 +113,7 @@ public final class PaymentDtos {
     /** What the hosted checkout is allowed to see. */
     public record SessionView(String id, String status, long amount, String currency, String description,
                               String merchantName, String returnUrl, String failureCode, String failureMessage,
-                              NextAction nextAction) {
+                              NextAction nextAction, boolean saveCard) {
     }
 
     public record VolumeView(String currency, long count, long volume) {

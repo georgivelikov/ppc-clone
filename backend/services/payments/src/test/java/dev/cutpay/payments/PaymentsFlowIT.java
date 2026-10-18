@@ -589,4 +589,157 @@ class PaymentsFlowIT {
                         .with(jwt().jwt(j -> j.claim("mid", other))))
                 .andExpect(status().isNotFound());
     }
+
+    // --- phase 5: pre-authorisation and capture ---------------------------------------------------------
+
+    @Autowired
+    java.time.Clock clock;
+
+    @Autowired
+    dev.cutpay.payments.payment.PaymentService paymentService;
+
+    private void stubHold(String path, int status) {
+        ACQUIRER.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(status)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"approved\",\"acquirer_ref\":\"auth_hold\"}")));
+    }
+
+    /** Creates and confirms a payment with capture_method = manual, so it ends up authorised and held. */
+    private String authorisedPayment(long amount) throws Exception {
+        stubAuthorize("""
+                {"status":"approved","acquirer_ref":"auth_hold"}""");
+        String body = mvc.perform(post("/v1/payment_intents").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":%d,\"currency\":\"EUR\",\"capture_method\":\"manual\"}".formatted(amount)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.capture_method").value("manual"))
+                .andReturn().getResponse().getContentAsString();
+        confirm(field(body, "client_secret"));
+        return field(body, "id");
+    }
+
+    private long outboxCount(String id, String eventType) {
+        return jdbc.sql("SELECT count(*) FROM outbox WHERE event_key = :id AND event_type = :type")
+                .param("id", id).param("type", eventType).query(Long.class).single();
+    }
+
+    @Test
+    void aManualPaymentIsHeldNotTakenUntilTheMerchantCaptures() throws Exception {
+        String id = authorisedPayment(20_000);
+
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.status").value("requires_capture"))
+                .andExpect(jsonPath("$.amount").value(20_000))
+                .andExpect(jsonPath("$.amount_authorized").value(20_000))
+                .andExpect(jsonPath("$.capture_before").isNotEmpty())
+                .andExpect(jsonPath("$.attempts[0].status").value("authorized"));
+        // The ledger only learns of a payment when money is taken, so nothing says "succeeded" yet.
+        assertThat(outboxCount(id, "PaymentAuthorized")).isEqualTo(1);
+        assertThat(outboxCount(id, "PaymentSucceeded")).isZero();
+    }
+
+    @Test
+    void capturingLessThanWasHeldTakesOnlyThatAndTheRefundLimitFollows() throws Exception {
+        String id = authorisedPayment(20_000);
+        stubHold("/capture", 200);
+
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"amount_to_capture\":15000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("succeeded"))
+                .andExpect(jsonPath("$.amount").value(15_000))
+                .andExpect(jsonPath("$.amount_authorized").value(20_000))
+                .andExpect(jsonPath("$.attempts[0].status").value("succeeded"));
+        ACQUIRER.verify(WireMock.postRequestedFor(urlEqualTo("/capture"))
+                .withRequestBody(WireMock.matchingJsonPath("$.amount", WireMock.equalTo("15000")))
+                .withRequestBody(WireMock.matchingJsonPath("$.acquirer_ref", WireMock.equalTo("auth_hold"))));
+
+        // The event the ledger books carries the captured amount, not the held one.
+        String payload = jdbc.sql("SELECT payload FROM outbox WHERE event_key = :id AND event_type = 'PaymentSucceeded'")
+                .param("id", id).query(String.class).single();
+        assertThat(json.readTree(payload).path("payload").path("amount").asLong()).isEqualTo(15_000);
+
+        // Capturing again is refused, and a refund can only go up to what was taken.
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant()))
+                .andExpect(status().isConflict());
+        refund(id, 15_001).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void capturingWithoutAnAmountTakesEverythingThatWasHeld() throws Exception {
+        String id = authorisedPayment(8_000);
+        stubHold("/capture", 200);
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("succeeded"))
+                .andExpect(jsonPath("$.amount").value(8_000));
+    }
+
+    @Test
+    void capturingMoreThanWasHeldIsRejectedAndNothingChanges() throws Exception {
+        String id = authorisedPayment(20_000);
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"amount_to_capture\":20001}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_capture_amount"));
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.status").value("requires_capture"));
+        ACQUIRER.verify(0, WireMock.postRequestedFor(urlEqualTo("/capture")));
+    }
+
+    @Test
+    void aPaymentThatWasNotAuthorisedCannotBeCaptured() throws Exception {
+        String id = field(createPayment(), "id");
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant()))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void releasingAHeldPaymentTellsTheAcquirerAndCancelsIt() throws Exception {
+        String id = authorisedPayment(20_000);
+        stubHold("/void", 200);
+        mvc.perform(post("/v1/payment_intents/%s/cancel".formatted(id)).with(merchant()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("canceled"))
+                .andExpect(jsonPath("$.attempts[0].status").value("canceled"));
+        ACQUIRER.verify(WireMock.postRequestedFor(urlEqualTo("/void"))
+                .withRequestBody(WireMock.matchingJsonPath("$.acquirer_ref", WireMock.equalTo("auth_hold"))));
+    }
+
+    @Test
+    void whenTheAcquirerCannotBeReachedACaptureFailsAndTheHoldStaysCapturable() throws Exception {
+        String id = authorisedPayment(20_000);
+        stubHold("/capture", 503);
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("acquirer_unavailable"));
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant()))
+                .andExpect(jsonPath("$.status").value("requires_capture"));
+
+        stubHold("/capture", 200);
+        mvc.perform(post("/v1/payment_intents/%s/capture".formatted(id)).with(merchant()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("succeeded"));
+    }
+
+    @Test
+    void anAuthorisationNobodyCapturedIsReleasedAfterSevenDays() throws Exception {
+        String stale = authorisedPayment(12_000);
+        stubHold("/void", 200);
+
+        // Six days later it is still held; after eight it is released by the job.
+        ((dev.cutpay.web.SimulatedClock) clock).advance(java.time.Duration.ofDays(6));
+        paymentService.expireUncaptured(100);
+        mvc.perform(get("/v1/payment_intents/" + stale).with(merchant()))
+                .andExpect(jsonPath("$.status").value("requires_capture"));
+
+        ((dev.cutpay.web.SimulatedClock) clock).advance(java.time.Duration.ofDays(2));
+        paymentService.expireUncaptured(100);
+        mvc.perform(get("/v1/payment_intents/" + stale).with(merchant()))
+                .andExpect(jsonPath("$.status").value("canceled"))
+                .andExpect(jsonPath("$.failure_code").value("authorization_expired"));
+        assertThat(outboxCount(stale, "PaymentCanceled")).isEqualTo(1);
+
+        // Running the job again does nothing more.
+        paymentService.expireUncaptured(100);
+        assertThat(outboxCount(stale, "PaymentCanceled")).isEqualTo(1);
+    }
 }

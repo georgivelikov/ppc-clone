@@ -13,6 +13,7 @@ vi.mock("../api", () => ({
     getPayment: vi.fn(),
     createRefund: vi.fn(),
     cancelPayment: vi.fn(),
+    capturePayment: vi.fn(),
     listBalanceTransactions: vi.fn(),
   },
 }));
@@ -40,6 +41,11 @@ const payment: Payment = {
   client_secret: "pay_1_secret_x",
   return_url: null,
   amount_refunded: 0,
+  amount_authorized: null,
+  capture_before: null,
+  customer: null,
+  payment_method: null,
+  off_session: false,
   failure_code: null,
   failure_message: null,
   created_at: "2026-10-17T10:00:00Z",
@@ -146,6 +152,45 @@ describe("payments pages", () => {
     await waitFor(() =>
       expect(api.createRefund).toHaveBeenCalledWith({ payment_intent: "pay_1", amount: 1000, reason: undefined }),
     );
+  });
+
+  it("captures part of a held payment, says how much is released and refuses more than was held", async () => {
+    const held: Payment = {
+      ...payment,
+      amount: 20000,
+      status: "requires_capture",
+      capture_method: "manual",
+      amount_authorized: 20000,
+      capture_before: "2026-10-25T10:00:00Z",
+    };
+    vi.mocked(api.getPayment).mockResolvedValue(held);
+    vi.mocked(api.capturePayment).mockResolvedValue({ ...held, status: "succeeded", amount: 15000 });
+    renderAt("/payments/pay_1");
+
+    expect(await screen.findByText("Uncaptured")).toBeInTheDocument();
+    expect(screen.getByTestId("payment-authorized")).toHaveTextContent("€200.00");
+    expect(screen.getByRole("button", { name: "Release hold" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Capture" }));
+    const dialog = await screen.findByRole("dialog");
+    const amount = screen.getByLabelText(/Amount to capture/);
+    expect(amount).toHaveValue("200.00");
+
+    await userEvent.clear(amount);
+    await userEvent.type(amount, "250");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Capture" }));
+    expect(await screen.findByText("You can capture at most €200.00")).toBeInTheDocument();
+    expect(api.capturePayment).not.toHaveBeenCalled();
+
+    await userEvent.clear(amount);
+    await userEvent.type(amount, "150");
+    expect(screen.getByTestId("capture-release-note")).toHaveTextContent("€50.00 will be released");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Capture" }));
+    await waitFor(() => expect(api.capturePayment).toHaveBeenCalledWith("pay_1", 15000));
+  });
+
+  it("explains in the timeline when an unclaimed hold was released", () => {
+    const events = buildTimeline({ ...payment, status: "canceled", failure_code: "authorization_expired" });
+    expect(events.at(-1)?.title).toBe("Hold released: not captured in time");
   });
 
   it("shows card details without the full number", async () => {

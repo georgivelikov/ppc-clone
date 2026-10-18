@@ -12,6 +12,8 @@ public enum PaymentStatus {
     REQUIRES_PAYMENT_METHOD,
     PROCESSING,
     REQUIRES_ACTION,
+    /** Authorised and held on the card, waiting for the merchant to capture or release it. */
+    REQUIRES_CAPTURE,
     SUCCEEDED,
     FAILED,
     CANCELED,
@@ -21,7 +23,8 @@ public enum PaymentStatus {
     private Set<PaymentStatus> allowedNext() {
         return switch (this) {
             case REQUIRES_PAYMENT_METHOD -> EnumSet.of(PROCESSING, CANCELED);
-            case PROCESSING -> EnumSet.of(SUCCEEDED, REQUIRES_ACTION, FAILED);
+            case PROCESSING -> EnumSet.of(SUCCEEDED, REQUIRES_ACTION, REQUIRES_CAPTURE, FAILED);
+            case REQUIRES_CAPTURE -> EnumSet.of(SUCCEEDED, CANCELED);
             case REQUIRES_ACTION -> EnumSet.of(PROCESSING, FAILED, CANCELED);
             case SUCCEEDED -> EnumSet.of(PARTIALLY_REFUNDED, REFUNDED);
             case PARTIALLY_REFUNDED -> EnumSet.of(PARTIALLY_REFUNDED, REFUNDED);

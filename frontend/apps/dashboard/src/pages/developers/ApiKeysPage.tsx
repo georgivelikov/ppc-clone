@@ -12,6 +12,9 @@ import { useTestMode } from "../../layout/testMode";
 const SCOPE_RESOURCES = [
   ["payments", "Payments"],
   ["payment_links", "Payment links"],
+  ["customers", "Customers and saved cards"],
+  ["billing", "Subscriptions and invoices"],
+  ["connected_accounts", "Connected accounts"],
   ["refunds", "Refunds"],
   ["balance", "Balance"],
   ["payouts", "Payouts"],

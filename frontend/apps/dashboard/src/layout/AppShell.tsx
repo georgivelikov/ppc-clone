@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { label: "Payouts", to: "/payouts", icon: Banknote },
   { label: "Links", to: "/links", icon: Link2 },
   { label: "Terminal", to: "/terminal", icon: Keyboard },
-  { label: "Customers", to: "/customers", icon: Users, phase: 5 },
+  { label: "Customers", to: "/customers", icon: Users },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat, phase: 5 },
   { label: "Developers", to: "/developers", icon: Code2 },
   { label: "Settings", to: "/settings", icon: Settings },

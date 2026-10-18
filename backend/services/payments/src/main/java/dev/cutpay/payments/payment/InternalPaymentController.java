@@ -37,9 +37,7 @@ class InternalPaymentController {
     @ResponseStatus(HttpStatus.CREATED)
     Created create(@Valid @RequestBody CreateForMerchant request) {
         var payment = request.payment();
-        PaymentIntent intent = payments.create(request.merchantId(), request.livemode(), new CreatePaymentRequest(
-                payment.amount(), payment.currency(), payment.description(), payment.customerEmail(),
-                payment.metadata(), payment.returnUrl(), request.merchantName()));
+        PaymentIntent intent = payments.create(request.merchantId(), request.livemode(), payment.withMerchantName(request.merchantName()));
         return new Created(intent.getId(), intent.getClientSecret(), checkoutUrl + "/c/" + intent.getClientSecret());
     }
 }
