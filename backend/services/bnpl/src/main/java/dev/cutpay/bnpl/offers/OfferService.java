@@ -1,5 +1,6 @@
 package dev.cutpay.bnpl.offers;
 
+import dev.cutpay.bnpl.adapter.Adapters;
 import dev.cutpay.bnpl.config.BnplProperties;
 import dev.cutpay.bnpl.model.QuoteRequest;
 import dev.cutpay.bnpl.offers.DecisionRepository.Stored;
@@ -17,7 +18,6 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -34,6 +34,7 @@ public class OfferService {
 
     private final PaymentsClient payments;
     private final SettingsService settings;
+    private final Adapters adapters;
     private final Quoter quoter;
     private final StatsSource stats;
     private final DecisionRepository decisions;
@@ -41,10 +42,11 @@ public class OfferService {
     private final JsonMapper json;
     private final Clock clock;
 
-    public OfferService(PaymentsClient payments, SettingsService settings, Quoter quoter, StatsSource stats,
+    public OfferService(PaymentsClient payments, SettingsService settings, Adapters adapters, Quoter quoter, StatsSource stats,
                         DecisionRepository decisions, BnplProperties properties, JsonMapper json, Clock clock) {
         this.payments = payments;
         this.settings = settings;
+        this.adapters = adapters;
         this.quoter = quoter;
         this.stats = stats;
         this.decisions = decisions;
@@ -60,7 +62,7 @@ public class OfferService {
                 : requestedCountry.trim().toUpperCase(Locale.ROOT);
         MerchantRouting routing = settings.get(payment.merchantId(), payment.livemode());
 
-        Eligibility eligibility = RoutingEngine.eligible(payment.amount(), payment.currency(), country, routing, Set.of());
+        Eligibility eligibility = RoutingEngine.eligible(payment.amount(), payment.currency(), country, routing, adapters.unavailable());
         Quotes quotes = eligibility.eligible().isEmpty() ? new Quotes(Map.of(), Map.of())
                 : quoter.quote(eligibility.eligible(), new QuoteRequest(payment.amount(), payment.currency(), country));
         Decision decision = RoutingEngine.decide(routing, payment.amount(), payment.currency(), eligibility, quotes.offers(),

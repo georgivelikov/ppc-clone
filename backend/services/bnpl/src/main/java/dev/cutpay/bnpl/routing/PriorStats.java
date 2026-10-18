@@ -2,13 +2,11 @@ package dev.cutpay.bnpl.routing;
 
 import dev.cutpay.bnpl.model.ProviderCatalog;
 import java.util.Map;
-import org.springframework.stereotype.Component;
 
 /**
  * What a provider is assumed to do before there is any history: roughly what its published behaviour suggests.
- * Measured figures replace these as applications come in.
+ * {@link RollingStats} leans on these until real decisions have been seen.
  */
-@Component
 public class PriorStats implements StatsSource {
 
     private static final Map<String, Stats> PRIORS = Map.of(

@@ -119,6 +119,35 @@ public class ApplicationRepository {
                 .param("decided", ts(decidedAt), Types.TIMESTAMP_WITH_TIMEZONE).param("now", ts(now)).update();
     }
 
+    /** How one provider has done for a merchant over a period. Rates are left to the caller. */
+    public record ProviderFigures(String provider, long applications, long approved, long declined, long failed, long pending,
+                                  long abandoned, double avgDecisionMs, double p50DecisionMs, long volume, long fees) {
+    }
+
+    public List<ProviderFigures> figures(String merchantId, boolean livemode, Instant since) {
+        return jdbc.sql("""
+                        SELECT provider,
+                               count(*) AS applications,
+                               count(*) FILTER (WHERE status IN ('approved', 'settled')) AS approved,
+                               count(*) FILTER (WHERE status = 'declined') AS declined,
+                               count(*) FILTER (WHERE status = 'failed') AS failed,
+                               count(*) FILTER (WHERE status IN ('created', 'pending_review')) AS pending,
+                               count(*) FILTER (WHERE status IN ('expired', 'canceled')) AS abandoned,
+                               COALESCE(avg(decision_ms), 0) AS avg_ms,
+                               COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY decision_ms), 0) AS p50_ms,
+                               COALESCE(sum(amount) FILTER (WHERE status IN ('approved', 'settled')), 0) AS volume,
+                               COALESCE(sum(merchant_fee) FILTER (WHERE status IN ('approved', 'settled')), 0) AS fees
+                          FROM bnpl_applications
+                         WHERE merchant_id = :merchant AND livemode = :livemode AND created_at >= :since
+                         GROUP BY provider
+                        """)
+                .param("merchant", merchantId).param("livemode", livemode).param("since", ts(since))
+                .query((rs, n) -> new ProviderFigures(rs.getString("provider"), rs.getLong("applications"), rs.getLong("approved"),
+                        rs.getLong("declined"), rs.getLong("failed"), rs.getLong("pending"), rs.getLong("abandoned"),
+                        rs.getDouble("avg_ms"), rs.getDouble("p50_ms"), rs.getLong("volume"), rs.getLong("fees")))
+                .list();
+    }
+
     /** Approved applications whose provider is due to have paid by now, oldest first. */
     public List<Application> dueForSettlement(Instant approvedBefore, int limit) {
         return jdbc.sql("SELECT " + COLUMNS + """

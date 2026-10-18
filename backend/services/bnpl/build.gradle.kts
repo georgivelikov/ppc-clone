@@ -15,6 +15,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.3.0")
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation(project(":libs:common-test"))

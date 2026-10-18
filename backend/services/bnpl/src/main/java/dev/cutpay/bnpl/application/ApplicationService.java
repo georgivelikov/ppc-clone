@@ -14,8 +14,10 @@ import dev.cutpay.bnpl.model.ProviderException.Kind;
 import dev.cutpay.bnpl.model.ProviderResult;
 import dev.cutpay.bnpl.model.ProviderResult.Outcome;
 import dev.cutpay.bnpl.model.QuoteRequest;
+import dev.cutpay.bnpl.offers.OfferService;
 import dev.cutpay.bnpl.payments.PaymentsClient;
 import dev.cutpay.bnpl.payments.PaymentsClient.CheckoutFacts;
+import dev.cutpay.bnpl.routing.Decision.Ranked;
 import dev.cutpay.bnpl.routing.RoutingEngine;
 import dev.cutpay.bnpl.settings.SettingsService;
 import dev.cutpay.web.ApiException;
@@ -23,11 +25,11 @@ import dev.cutpay.web.Ids;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -46,11 +48,36 @@ public class ApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(ApplicationService.class);
 
+    /** The provider could not take an application that was stored: the application is kept, as failed. */
+    public static final class ApplicationFailed extends ApiException {
+        private final transient String applicationId;
+
+        ApplicationFailed(String applicationId, String message) {
+            super(HttpStatus.BAD_GATEWAY, "api_error", "provider_unavailable", message, null);
+            this.applicationId = applicationId;
+        }
+
+        public String applicationId() {
+            return applicationId;
+        }
+    }
+
+    /** What happened when the customer asked for the best provider: every try in order, the last one being the outcome. */
+    public record BestResult(List<Application> attempts) {
+        public Application last() {
+            return attempts.get(attempts.size() - 1);
+        }
+    }
+
+    /** After a decline or a failure the next provider is tried, at most this many times (with the customer's consent). */
+    static final int MAX_HOPS = 2;
+
     /** What the customer sends to apply. */
     public record Apply(String provider, String plan, Applicant applicant, String country) {
     }
 
     private final Adapters adapters;
+    private final OfferService offers;
     private final ApplicationRepository applications;
     private final BnplEvents events;
     private final PaymentsClient payments;
@@ -59,10 +86,11 @@ public class ApplicationService {
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public ApplicationService(Adapters adapters, ApplicationRepository applications, BnplEvents events,
+    public ApplicationService(Adapters adapters, OfferService offers, ApplicationRepository applications, BnplEvents events,
                               PaymentsClient payments, SettingsService settings, BnplProperties properties,
                               TransactionTemplate tx, Clock clock) {
         this.adapters = adapters;
+        this.offers = offers;
         this.applications = applications;
         this.events = events;
         this.payments = payments;
@@ -82,7 +110,7 @@ public class ApplicationService {
                 : request.country().trim().toUpperCase(Locale.ROOT);
 
         var eligibility = RoutingEngine.eligible(payment.amount(), payment.currency(), country,
-                settings.get(payment.merchantId(), payment.livemode()), Set.of());
+                settings.get(payment.merchantId(), payment.livemode()), adapters.unavailable());
         if (eligibility.eligible().stream().noneMatch(p -> p.code().equals(request.provider()))) {
             throw ApiException.conflict("provider_not_available", "This provider cannot finance this payment", "provider");
         }
@@ -118,11 +146,55 @@ public class ApplicationService {
         } catch (ProviderException e) {
             log.warn("Application {} could not be sent: {}", stored.id(), e.getMessage());
             fail(stored.id(), e);
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "api_error", "provider_unavailable",
-                    ProviderCatalog.find(stored.provider()).orElseThrow().name()
-                            + " could not take the application. You can try another option.", null);
+            throw new ApplicationFailed(stored.id(), ProviderCatalog.find(stored.provider()).orElseThrow().name()
+                    + " could not take the application. You can try another option.");
         }
         return settle(stored.id(), result, (System.nanoTime() - started) / 1_000_000);
+    }
+
+    /**
+     * Applies with the provider the routing picks, and, if the customer agreed, with the next best one when a provider
+     * declines or cannot be reached: at most {@value #MAX_HOPS} more. A provider that asks for details the customer has
+     * not given is skipped. Every try is an application of its own, kept with its outcome, and none of them is open once
+     * the next one starts, so the customer is never financed twice.
+     */
+    public BestResult applyBest(String clientSecret, Applicant applicant, String country, boolean fallback) {
+        Applicant who = applicant == null ? new Applicant(null, null, null, null, null) : applicant;
+        List<Ranked> ranked = offers.offers(clientSecret, country).decision().ranked();
+        if (ranked.isEmpty()) {
+            throw ApiException.conflict("provider_not_available", "No provider can finance this payment right now", null);
+        }
+        List<Ranked> candidates = ranked.stream()
+                .filter(r -> who.missing(adapters.require(r.provider()).requiredFields()).isEmpty()).toList();
+        if (candidates.isEmpty()) {
+            List<String> missing = who.missing(adapters.require(ranked.get(0).provider()).requiredFields());
+            throw ApiException.invalidRequest("applicant_incomplete", "Missing: " + String.join(", ", missing), missing.get(0));
+        }
+        List<Application> attempts = new ArrayList<>();
+        ApiException lastError = null;
+        for (Ranked next : candidates.subList(0, Math.min(fallback ? 1 + MAX_HOPS : 1, candidates.size()))) {
+            try {
+                Application application = apply(clientSecret, new Apply(next.provider(), next.best().plan(), who, country));
+                attempts.add(application);
+                lastError = null;
+                if (application.status() != ApplicationStatus.DECLINED && application.status() != ApplicationStatus.FAILED) {
+                    break;
+                }
+            } catch (ApplicationFailed e) {
+                attempts.add(applications.find(e.applicationId()).orElseThrow());
+                lastError = e;
+            } catch (ApiException e) {
+                // The offer went away or the provider just became unavailable: nothing was stored, try the next.
+                if (!List.of("offer_not_available", "provider_not_available", "provider_unavailable").contains(e.code())) {
+                    throw e;
+                }
+                lastError = e;
+            }
+        }
+        if (attempts.isEmpty()) {
+            throw lastError;
+        }
+        return new BestResult(attempts);
     }
 
     private Offer quoteAgain(BnplProviderAdapter adapter, QuoteRequest quote, String plan) {
@@ -136,6 +208,31 @@ public class ApplicationService {
         }
         return offers.stream().filter(o -> o.plan().equals(plan)).findFirst().orElseThrow(() -> ApiException.conflict(
                 "offer_not_available", "This offer is no longer available. Reload the offers and choose again.", "plan"));
+    }
+
+    // --- how it is going ---------------------------------------------------------------------------------------
+
+    /** One provider's record for a merchant. {@code approvalRate} is the share of decided applications it approved. */
+    public record ProviderAnalytics(String provider, String name, long applications, long approved, long declined, long failed,
+                                    long pending, long abandoned, Double approvalRate, long avgDecisionMs, long p50DecisionMs,
+                                    long volume, long fees, String circuit) {
+    }
+
+    public List<ProviderAnalytics> analytics(String merchantId, boolean livemode, int days) {
+        var since = clock.instant().minus(Duration.ofDays(Math.max(1, Math.min(days, 365))));
+        Map<String, ApplicationRepository.ProviderFigures> found = new java.util.HashMap<>();
+        applications.figures(merchantId, livemode, since).forEach(f -> found.put(f.provider(), f));
+        List<ProviderAnalytics> rows = new ArrayList<>();
+        for (var info : ProviderCatalog.ALL) {
+            var f = found.get(info.code());
+            long decided = f == null ? 0 : f.approved() + f.declined();
+            rows.add(new ProviderAnalytics(info.code(), info.name(), f == null ? 0 : f.applications(), f == null ? 0 : f.approved(),
+                    f == null ? 0 : f.declined(), f == null ? 0 : f.failed(), f == null ? 0 : f.pending(),
+                    f == null ? 0 : f.abandoned(), decided == 0 ? null : (double) f.approved() / decided,
+                    f == null ? 0 : Math.round(f.avgDecisionMs()), f == null ? 0 : Math.round(f.p50DecisionMs()),
+                    f == null ? 0 : f.volume(), f == null ? 0 : f.fees(), adapters.circuit(info.code())));
+        }
+        return rows;
     }
 
     // --- reading -----------------------------------------------------------------------------------------------

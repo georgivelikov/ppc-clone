@@ -33,6 +33,10 @@ class MerchantApplicationController {
     record ApplicationList(String object, List<ApplicationView> data, boolean hasMore) {
     }
 
+    record AnalyticsView(String object, int days, List<ApplicationService.ProviderAnalytics> providers, long applications,
+                         long approved, long volume, long fees) {
+    }
+
     private final ApplicationService service;
 
     MerchantApplicationController(ApplicationService service) {
@@ -51,6 +55,19 @@ class MerchantApplicationController {
                 RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode), status, provider, payment,
                 startingAfter, size);
         return new ApplicationList("list", found.stream().limit(size).map(ApplicationView::of).toList(), found.size() > size);
+    }
+
+    /** How each provider has done for the merchant over the last {@code days} days, and the state of its circuit now. */
+    @GetMapping("/v1/bnpl/analytics")
+    AnalyticsView analytics(@AuthenticationPrincipal Jwt jwt,
+                            @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
+                            @RequestParam(defaultValue = "30") int days) {
+        int period = Math.max(1, Math.min(days, 365));
+        var rows = service.analytics(jwt.getClaimAsString("mid"),
+                RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode), period);
+        return new AnalyticsView("bnpl_analytics", period, rows, rows.stream().mapToLong(r -> r.applications()).sum(),
+                rows.stream().mapToLong(r -> r.approved()).sum(), rows.stream().mapToLong(r -> r.volume()).sum(),
+                rows.stream().mapToLong(r -> r.fees()).sum());
     }
 
     @GetMapping("/v1/bnpl/applications/{id}")

@@ -64,6 +64,9 @@ abstract class BnplIntegrationTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    dev.cutpay.bnpl.adapter.ProviderHealth health;
+
     String merchantId;
     String secret;
 
@@ -71,6 +74,10 @@ abstract class BnplIntegrationTest {
     void freshMerchantAndAnswers() {
         merchantId = "mer_" + UUID.randomUUID().toString().replace("-", "");
         secret = "pay_" + UUID.randomUUID().toString().replace("-", "") + "_secret_x";
+        // Provider statistics and circuit breakers remember: every test starts from a clean slate.
+        jdbc.sql("DELETE FROM bnpl_refunds").update();
+        jdbc.sql("DELETE FROM bnpl_applications").update();
+        health.resetAll();
         WORLD.resetAll();
         payment(secret, 30_000, "requires_payment_method", "automatic");
         providersAnswer();

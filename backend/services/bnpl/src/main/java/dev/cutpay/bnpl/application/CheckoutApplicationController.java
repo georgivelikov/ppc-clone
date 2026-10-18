@@ -43,6 +43,17 @@ class CheckoutApplicationController {
         }
     }
 
+    /** Ask for the best provider; with `fallback` the next best ones may be tried after a decline or a failure. */
+    record BestRequest(String country, Applicant applicant, boolean fallback) {
+    }
+
+    record Attempt(String id, String provider, String providerName, String status) {
+    }
+
+    /** The last try is the outcome; the tries before it were declined or failed. */
+    record BestView(String object, CustomerView application, List<Attempt> attempts) {
+    }
+
     private final ApplicationService service;
 
     CheckoutApplicationController(ApplicationService service) {
@@ -54,6 +65,15 @@ class CheckoutApplicationController {
     CustomerView apply(@PathVariable String clientSecret, @RequestBody @jakarta.validation.Valid ApplyRequest request) {
         return CustomerView.of(service.apply(clientSecret,
                 new Apply(request.provider(), request.plan(), request.applicant(), request.country())));
+    }
+
+    @PostMapping("/checkout/{clientSecret}/bnpl/apply_best")
+    @ResponseStatus(HttpStatus.CREATED)
+    BestView applyBest(@PathVariable String clientSecret, @RequestBody BestRequest request) {
+        var result = service.applyBest(clientSecret, request.applicant(), request.country(), request.fallback());
+        return new BestView("bnpl_best", CustomerView.of(result.last()), result.attempts().stream()
+                .map(a -> new Attempt(a.id(), a.provider(), ProviderCatalog.find(a.provider()).map(p -> p.name()).orElse(a.provider()),
+                        a.status().wire())).toList());
     }
 
     @GetMapping("/checkout/{clientSecret}/bnpl/applications/{id}")

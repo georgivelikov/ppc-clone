@@ -282,6 +282,14 @@ class BnplSimTest {
                 .andExpect(jsonPath("$.ok").value(false)).andExpect(jsonPath("$.code").value("DECLINED"));
     }
 
+    @Test
+    void theDemoPageIsTheWelcomePage() throws Exception {
+        mvc.perform(get("/")).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl("index.html"));
+        mvc.perform(get("/index.html")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
+                        org.hamcrest.Matchers.containsString("BNPL simulator")));
+    }
+
     // --- the demo controls -------------------------------------------------------------------------------------
 
     @Test
