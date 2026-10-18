@@ -1,5 +1,6 @@
 // Mirrors the identity service's JSON (snake_case, see backend/services/identity).
 // Phase 3 replaces these hand-written types with ones generated from the OpenAPI spec.
+import type { TransferData } from "./connected";
 
 export type Role = "owner" | "admin" | "developer" | "viewer";
 
@@ -119,6 +120,10 @@ export interface Payment {
   payment_method: string | null;
   /** Charged without the customer present, using a saved card. */
   off_session: boolean;
+  /** What the platform keeps of a split payment, when it said so. */
+  application_fee_amount?: number | null;
+  /** How the payment is shared with connected accounts. Only on a single payment. */
+  transfer_data?: { destination: string; amount: number }[] | null;
   failure_code: string | null;
   failure_message: string | null;
   created_at: string;
@@ -158,6 +163,10 @@ export interface CreatePaymentInput {
   off_session?: boolean;
   /** `off_session` saves the card used at checkout to the customer for future payments. */
   setup_future_usage?: "off_session";
+  /** Share the payment with connected accounts once it succeeds. */
+  transfer_data?: TransferData[];
+  /** What the platform keeps, for a single destination without an amount. */
+  application_fee_amount?: number;
 }
 
 export interface CheckoutSessionCreated {
@@ -194,7 +203,7 @@ export interface Balance {
   reserved: MoneyAmount[];
 }
 
-export type BalanceTransactionType = "payment" | "refund" | "payout" | "payout_failure";
+export type BalanceTransactionType = "payment" | "refund" | "payout" | "payout_failure" | "transfer" | "transfer_reversal";
 
 export interface BalanceTransaction {
   id: string;
@@ -223,6 +232,8 @@ export interface BalanceTransactionList {
 }
 
 export interface BalanceTransactionListParams {
+  /** Read the transactions of one of your connected accounts. */
+  connected_account?: string;
   type?: BalanceTransactionType | "";
   /** A payment id also matches the refunds made against it. */
   source?: string;

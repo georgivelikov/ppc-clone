@@ -74,6 +74,12 @@ import type {
   UpdateSubscriptionInput,
 } from "./billing";
 import type {
+  ConnectedAccount,
+  ConnectedAccountList,
+  CreateConnectedAccountInput,
+  UpdateConnectedAccountInput,
+} from "./connected";
+import type {
   ApiKey,
   ApiKeyList,
   CreateApiKeyInput,
@@ -458,10 +464,33 @@ export class ApiClient {
     return this.request("GET", `/v1/billing_notifications${toQuery({ related_id: relatedId, livemode })}`);
   }
 
+  // --- connected accounts (split payments) --------------------------------
+
+  createConnectedAccount(input: CreateConnectedAccountInput, livemode = false): Promise<ConnectedAccount> {
+    return this.request("POST", `/v1/connected_accounts${toQuery({ livemode })}`, input, { idempotent: true });
+  }
+
+  listConnectedAccounts(params: { livemode?: boolean; starting_after?: string; limit?: number } = {}): Promise<ConnectedAccountList> {
+    return this.request("GET", `/v1/connected_accounts${toQuery(params)}`);
+  }
+
+  getConnectedAccount(id: string): Promise<ConnectedAccount> {
+    return this.request("GET", `/v1/connected_accounts/${encodeURIComponent(id)}`);
+  }
+
+  updateConnectedAccount(id: string, input: UpdateConnectedAccountInput): Promise<ConnectedAccount> {
+    return this.request("PATCH", `/v1/connected_accounts/${encodeURIComponent(id)}`, input);
+  }
+
+  /** Stops sending money to the account. What it already earned is still paid out. */
+  disableConnectedAccount(id: string): Promise<ConnectedAccount> {
+    return this.request("POST", `/v1/connected_accounts/${encodeURIComponent(id)}/disable`, undefined);
+  }
+
   // --- balances (ledger) --------------------------------------------------
 
-  getBalance(livemode = false): Promise<Balance> {
-    return this.request("GET", `/v1/balance${toQuery({ livemode })}`);
+  getBalance(livemode = false, connectedAccount?: string): Promise<Balance> {
+    return this.request("GET", `/v1/balance${toQuery({ livemode, connected_account: connectedAccount })}`);
   }
 
   listBalanceTransactions(params: BalanceTransactionListParams = {}): Promise<BalanceTransactionList> {

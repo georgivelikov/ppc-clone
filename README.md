@@ -41,7 +41,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 2 | [Ledger & payouts](docs/plans/phase-02-ledger-payouts.md) — double-entry ledger, fees, balances, settlement | ✅ Built |
 | 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ✅ Built |
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) — payment links, QR codes, charge-with-QR, virtual terminal | ✅ Built |
-| 5 | [Billing](docs/plans/phase-05-billing.md) — subscriptions, invoices, pre-auth, split payments | ⏳ Planned |
+| 5 | [Billing](docs/plans/phase-05-billing.md) — saved cards, pre-auth, subscriptions, invoices, split payments | ✅ Built |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ⏳ Planned |
 | 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ⏳ Planned |
@@ -74,6 +74,7 @@ cd backend
 ./gradlew :services:payouts:bootRun       # http://localhost:8085  (bank accounts, payouts, fake bank)
 ./gradlew :services:webhooks:bootRun      # http://localhost:8086  (webhook endpoints, events, deliveries)
 ./gradlew :services:links:bootRun         # http://localhost:8087  (payment links, QR codes)
+./gradlew :services:billing:bootRun       # http://localhost:8088  (products, subscriptions, invoices)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard
@@ -110,7 +111,9 @@ cd e2e && npm install && npx playwright install chromium && npx playwright test 
 | Card number | Result |
 |---|---|
 | 4242 4242 4242 4242 | Success |
-| 4000 0000 0000 3220 | 3DS challenge |
+| 4000 0000 0000 3220 | 3DS challenge (once when saved: then it can be charged off-session) |
+| 4000 0027 6000 3184 | 3DS challenge on **every** charge: an off-session charge fails with `authentication_required` |
+| 4000 0000 0000 0341 | Can be saved, but every charge is declined (a subscription card that went bad) |
 | 4000 0000 0000 0002 | Declined |
 | 4000 0000 0000 9995 | Insufficient funds |
 | 4000 0000 0000 0069 | Expired card |
@@ -144,6 +147,22 @@ No website needed. In the dashboard:
 - **Terminal → Virtual POS** keys in a card for a phone or mail order. The payment has `channel: "moto"` and the simulated bank skips 3-D Secure, as card-not-present orders are outside strong customer authentication. Try the 3-D Secure test card `4000 0000 0000 3220` here and at a normal checkout to see the difference.
 
 To scan a code with a phone on the same network, serve the checkout on your computer's address and tell the services where it is: run `npx pnpm@10.34.7 --filter @cutpay/checkout dev --host`, and start the links and payments services with `CUTPAY_LINKS_CHECKOUT_URL` and `CUTPAY_CHECKOUT_URL` set to `http://<your-ip>:5174` (the codes encode that address).
+
+## Billing, subscriptions and split payments
+
+- **Customers** keep saved cards. "Add a card" gives you a link to a hosted page where the customer enters it without being charged; "Charge saved card" then takes a payment without them ([ADR 0015](docs/adr/0015-billing-saved-cards-and-preauthorisation.md)).
+- **Terminal → Pre-authorise only** holds an amount on a card; the payment then shows **Capture** (all or part, the rest is released) and **Release hold**. A hold nobody captures is released after seven days.
+- **Products** hold prices; **Subscriptions** bills them every period, with trials, plan changes that credit the unused part of the old plan and charge the rest at the new one (the preview shows the lines first), pause and cancel. When a payment fails the subscription goes past due and the invoice is tried again on days 1, 3, 5 and 7, then the subscription is canceled (or kept unpaid, as you choose). The customer is emailed at every step; the emails are recorded under the subscription until real delivery arrives in phase 8.
+- **Invoices** also covers one-off invoices: draft, finalize (numbered INV-0001…), email a link to the page at `/i/{token}` where the customer pays or downloads the PDF.
+- **Connected accounts** are the sellers on your platform. Create a payment with `transfer_data` (or pick an account in "Create test payment") and each account is credited its part, with its own balance and its own payouts; refunds are taken back in proportion ([ADR 0016](docs/adr/0016-split-payments.md)).
+
+Billing, ledger and payouts run on simulated clocks. To watch a trial end and the next month renew:
+
+```bash
+curl -X POST 'http://localhost:8088/admin/clock/advance?days=8'    # billing: the trial ends, the first invoice is charged
+curl -X POST 'http://localhost:8088/admin/clock/advance?days=32'   # billing: the next period is invoiced
+curl -X POST 'http://localhost:8082/admin/clock/advance?days=8'    # payments: an uncaptured hold is released after 7 days
+```
 
 ## Payouts and time travel
 

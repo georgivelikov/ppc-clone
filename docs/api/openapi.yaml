@@ -56,6 +56,8 @@ tags:
     description: Create and track card payments.
   - name: Customers
     description: People and companies you sell to, and the cards they saved for later.
+  - name: Connected accounts
+    description: Sub-merchants of a platform, who receive part of its payments.
   - name: Billing
     description: Products and prices, subscriptions and invoices.
   - name: Payment links
@@ -443,6 +445,117 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /v1/connected_accounts:
+    post:
+      tags: [Connected accounts]
+      operationId: createConnectedAccount
+      summary: Create a connected account
+      description: |
+        A sub-merchant of your platform, for example a restaurant on a delivery app. Send it part of a payment with
+        `transfer_data`; what it earns is paid out to its IBAN on its own schedule.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConnectedAccount"
+      responses:
+        "201":
+          description: The account. Only the last four digits of the IBAN are returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccount"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    get:
+      tags: [Connected accounts]
+      operationId: listConnectedAccounts
+      summary: List connected accounts
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+      responses:
+        "200":
+          description: Accounts, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccountList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/connected_accounts/{id}:
+    get:
+      tags: [Connected accounts]
+      operationId: getConnectedAccount
+      summary: Retrieve a connected account
+      description: Its balance is `GET /v1/balance?connected_account={id}`.
+      parameters:
+        - $ref: "#/components/parameters/ConnectedAccountId"
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Connected accounts]
+      operationId: updateConnectedAccount
+      summary: Update a connected account
+      description: Changing the IBAN moves future payouts to it. It has to stay in the same country.
+      parameters:
+        - $ref: "#/components/parameters/ConnectedAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConnectedAccount"
+      responses:
+        "200":
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccount"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /v1/connected_accounts/{id}/disable:
+    post:
+      tags: [Connected accounts]
+      operationId: disableConnectedAccount
+      summary: Stop sending money to a connected account
+      description: What it already earned is still paid out. New payments cannot name it as a destination.
+      parameters:
+        - $ref: "#/components/parameters/ConnectedAccountId"
+      responses:
+        "200":
+          description: The disabled account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/products:
     post:
       tags: [Billing]
@@ -1392,6 +1505,8 @@ paths:
       description: |
         `pending` funds are not yet available, `available` funds can be paid out. A negative amount means you
         owe money, for example after a refund that followed a payout.
+      parameters:
+        - $ref: "#/components/parameters/ConnectedAccountQuery"
       responses:
         "200":
           description: Your balance, per currency.
@@ -1410,13 +1525,14 @@ paths:
       summary: List balance transactions
       description: Every payment, refund and payout that moved your balance, with fees and net amounts.
       parameters:
+        - $ref: "#/components/parameters/ConnectedAccountQuery"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/StartingAfter"
         - name: type
           in: query
           schema:
             type: string
-            enum: [payment, refund, payout]
+            enum: [payment, refund, payout, transfer, transfer_reversal]
         - name: source
           in: query
           description: A payment id (also matches its refunds), refund id or payout id.
@@ -2078,6 +2194,20 @@ components:
       schema:
         type: string
         examples: [seti_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    ConnectedAccountId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [acct_01J9ZK3Q8V2M6X4N7B5C1D0E9F]
+    ConnectedAccountQuery:
+      name: connected_account
+      in: query
+      required: false
+      description: Read the balance of one of your connected accounts instead of your own.
+      schema:
+        type: string
     ProductId:
       name: id
       in: path
@@ -2261,6 +2391,20 @@ components:
           type: string
           enum: [off_session]
           description: Save the card the customer pays with to the customer, for future off-session payments.
+        transfer_data:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/TransferData"
+          description: |
+            Share the payment with connected accounts once it succeeds. Give each destination an amount and the platform
+            keeps the rest, or name one destination without an amount and set `application_fee_amount`. The processing
+            fee is paid by the platform from its own part. A payment captured later cannot be split.
+        application_fee_amount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: What the platform keeps of the payment. The single destination receives everything else.
     Address:
       type: object
       properties:
@@ -2437,6 +2581,81 @@ components:
         created_at:
           type: string
           format: date-time
+    CreateConnectedAccount:
+      type: object
+      required: [name, iban]
+      properties:
+        name:
+          type: string
+          maxLength: 160
+        email:
+          type: string
+          format: email
+        iban:
+          type: string
+          description: Where the account is paid out. Spaces are ignored; the checksum is verified.
+    UpdateConnectedAccount:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        iban:
+          type: string
+    ConnectedAccount:
+      type: object
+      required: [id, object, name, status, currency]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: connected_account
+        livemode:
+          type: boolean
+        name:
+          type: string
+        email:
+          type: [string, "null"]
+        country:
+          type: string
+        currency:
+          type: string
+          description: The currency it receives and is paid out in, the default currency of the platform.
+        iban_last4:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+    ConnectedAccountList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConnectedAccount"
+        has_more:
+          type: boolean
+    TransferData:
+      type: object
+      required: [destination]
+      properties:
+        destination:
+          type: string
+          description: A connected account id.
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: What the account receives. Omit it only for a single destination together with `application_fee_amount`.
     CreateProduct:
       type: object
       required: [name]
@@ -3103,6 +3322,22 @@ components:
         off_session:
           type: boolean
           description: Charged to a saved card without the customer present.
+        application_fee_amount:
+          type: [integer, "null"]
+          format: int64
+        transfer_data:
+          type:
+            - array
+            - "null"
+          description: How the payment is shared with connected accounts. Only on a single payment.
+          items:
+            type: object
+            properties:
+              destination:
+                type: string
+              amount:
+                type: integer
+                format: int64
         amount_authorized:
           type: [integer, "null"]
           format: int64
@@ -3486,7 +3721,7 @@ components:
           const: balance_transaction
         type:
           type: string
-          enum: [payment, refund, payout]
+          enum: [payment, refund, payout, transfer, transfer_reversal]
         source_id:
           type: string
         parent_id:

@@ -83,6 +83,10 @@ public class PaymentIntent {
     @Column(name = "capture_before")
     private Instant captureBefore;
 
+    /** What the platform keeps of a split payment on top of the processing fee, if it said so. */
+    @Column(name = "application_fee_amount")
+    private Long applicationFeeAmount;
+
     /** Set when the payment was made for a saved customer. */
     @Column(name = "customer_id")
     private String customerId;
@@ -304,6 +308,14 @@ public class PaymentIntent {
     /** The saved card now tied to the payment, e.g. after it was saved at checkout. */
     public void usePaymentMethod(String paymentMethodId) {
         this.paymentMethodId = paymentMethodId;
+    }
+
+    public void setApplicationFeeAmount(Long applicationFeeAmount) {
+        this.applicationFeeAmount = applicationFeeAmount;
+    }
+
+    public Long getApplicationFeeAmount() {
+        return applicationFeeAmount;
     }
 
     public String getCustomerId() {

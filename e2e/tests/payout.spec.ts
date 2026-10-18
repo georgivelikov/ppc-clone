@@ -51,7 +51,13 @@ test.describe("balances and payouts", () => {
     await payHundredEuros(page, context);
 
     await nav(page, "Balances");
-    await expect(page.getByTestId("balance-pending")).toHaveText("€98.61", { timeout: 20_000 });
+    // The ledger books the payment when the event reaches it, which can take a while on a busy machine. The page
+    // does not refresh by itself, so look again until the payment is there.
+    await expect(async () => {
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByTestId("balance-pending")).toHaveText("€98.61", { timeout: 2_000 });
+    }).toPass({ timeout: 45_000, intervals: [1_000, 2_000, 3_000] });
     await expect(page.getByTestId("balance-available")).toHaveText("€0.00");
 
     await advanceClocks(request, 2);

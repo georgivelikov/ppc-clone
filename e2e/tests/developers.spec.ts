@@ -31,6 +31,8 @@ async function createKey(page: Page, name: string, type: "Secret" | "Publishable
 
 test.describe("developers", () => {
   test("creates, uses, rolls and revokes API keys, and sees the calls in the log", async ({ page, request }) => {
+    // The request log travels through Kafka and is allowed 45 seconds below, so the test needs more than the default 30.
+    test.setTimeout(90_000);
     await signUp(page);
     await page.getByRole("link", { name: "Developers" }).click();
     await expect(page).toHaveURL(/\/developers\/api-keys/);

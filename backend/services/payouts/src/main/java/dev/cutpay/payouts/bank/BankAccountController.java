@@ -1,6 +1,6 @@
 package dev.cutpay.payouts.bank;
 
-import dev.cutpay.payouts.iban.Iban;
+import dev.cutpay.money.Iban;
 import dev.cutpay.payouts.payout.Sql;
 import dev.cutpay.web.ApiException;
 import dev.cutpay.web.RequestMode;

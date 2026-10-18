@@ -8,6 +8,7 @@ import {
   Keyboard,
   Link2,
   LogOut,
+  Network,
   Package,
   Repeat,
   Settings,
@@ -38,6 +39,7 @@ const NAV: NavItem[] = [
   { label: "Products", to: "/products", icon: Package },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat },
   { label: "Invoices", to: "/invoices", icon: FileText },
+  { label: "Connected accounts", to: "/connected-accounts", icon: Network },
   { label: "Developers", to: "/developers", icon: Code2 },
   { label: "Settings", to: "/settings", icon: Settings },
 ];

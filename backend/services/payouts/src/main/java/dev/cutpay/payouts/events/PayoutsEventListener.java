@@ -26,8 +26,14 @@ class PayoutsEventListener {
     @KafkaListener(topics = Topics.MERCHANT)
     void onMerchantEvent(String message) {
         JsonNode event = mapper.readTree(message);
-        if ("MerchantCreated".equals(text(event, "event_type"))) {
+        String type = text(event, "event_type");
+        if ("MerchantCreated".equals(type)) {
             payouts.onMerchantCreated(text(event, "event_id"), text(event, "merchant_id"));
+        } else if ("ConnectedAccountCreated".equals(type) || "ConnectedAccountUpdated".equals(type)) {
+            JsonNode payload = event.path("payload");
+            payouts.onConnectedAccount(text(event, "event_id"), text(payload, "account_id"),
+                    event.path("livemode").asBoolean(false), text(payload, "iban"), text(payload, "name"),
+                    text(payload, "currency"), "ConnectedAccountUpdated".equals(type));
         }
     }
 

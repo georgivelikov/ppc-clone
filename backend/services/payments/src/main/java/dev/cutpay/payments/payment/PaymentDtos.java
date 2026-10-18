@@ -3,6 +3,7 @@ package dev.cutpay.payments.payment;
 import dev.cutpay.payments.domain.PaymentAttempt;
 import dev.cutpay.payments.domain.PaymentIntent;
 import dev.cutpay.payments.domain.Refund;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -31,7 +32,9 @@ public final class PaymentDtos {
             @Size(max = 64) String paymentMethod,
             Boolean offSession,
             @Pattern(regexp = "off_session", message = "Setup future usage can only be off_session")
-            String setupFutureUsage) {
+            String setupFutureUsage,
+            @Valid List<TransferInput> transferData,
+            @Min(value = 0, message = "Application fee cannot be negative") Long applicationFeeAmount) {
 
         /** A payment for a saved customer, charged straight away to a saved card. */
         public boolean chargesSavedCard() {
@@ -40,8 +43,16 @@ public final class PaymentDtos {
 
         public CreatePaymentRequest withMerchantName(String name) {
             return new CreatePaymentRequest(amount, currency, description, customerEmail, metadata, returnUrl, name,
-                    captureMethod, customer, paymentMethod, offSession, setupFutureUsage);
+                    captureMethod, customer, paymentMethod, offSession, setupFutureUsage, transferData,
+                    applicationFeeAmount);
         }
+    }
+
+    /** Part of a payment sent to a connected account. Omit the amount to send everything the platform does not keep. */
+    public record TransferInput(@NotBlank String destination, @Min(value = 1, message = "Amount must be positive") Long amount) {
+    }
+
+    public record TransferView(String destination, long amount) {
     }
 
     /** Omit the amount to take everything that was authorised. */
@@ -78,7 +89,16 @@ public final class PaymentDtos {
                               long amountRefunded, Long amountAuthorized, Instant captureBefore, String customer,
                               String paymentMethod, boolean offSession, String failureCode,
                               String failureMessage, Instant createdAt, Instant updatedAt,
-                              List<AttemptView> attempts, List<RefundView> refunds, Object latestAttempt) {
+                              List<AttemptView> attempts, List<RefundView> refunds, Object latestAttempt,
+                              Long applicationFeeAmount, List<TransferView> transferData) {
+
+        /** The same payment with the parts of it sent to connected accounts, which only a single payment shows. */
+        PaymentView withTransfers(List<TransferView> transfers) {
+            return new PaymentView(id, object, livemode, amount, currency, status, captureMethod, channel, description,
+                    customerEmail, metadata, clientSecret, returnUrl, amountRefunded, amountAuthorized, captureBefore,
+                    customer, paymentMethod, offSession, failureCode, failureMessage, createdAt, updatedAt, attempts,
+                    refunds, latestAttempt, applicationFeeAmount, transfers);
+        }
 
         static PaymentView of(PaymentIntent p, List<PaymentAttempt> attempts, List<Refund> refunds) {
             return of(p, attempts, refunds, false);
@@ -100,7 +120,7 @@ public final class PaymentDtos {
                     p.isOffSession(), p.getFailureCode(), p.getFailureMessage(),
                     p.getCreatedAt(), p.getUpdatedAt(),
                     attempts.stream().map(AttemptView::of).toList(),
-                    refunds.stream().map(RefundView::of).toList(), latest);
+                    refunds.stream().map(RefundView::of).toList(), latest, p.getApplicationFeeAmount(), null);
         }
     }
 

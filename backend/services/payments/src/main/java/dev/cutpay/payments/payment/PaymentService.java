@@ -10,6 +10,11 @@ import dev.cutpay.payments.config.KafkaTopicsConfig;
 import dev.cutpay.payments.customer.CustomerService;
 import dev.cutpay.payments.domain.PaymentAttempt;
 import dev.cutpay.payments.domain.PaymentMethod;
+import dev.cutpay.payments.domain.PaymentTransfer;
+import dev.cutpay.payments.domain.Repositories.PaymentTransferRepository;
+import dev.cutpay.payments.identity.IdentityClient;
+import dev.cutpay.payments.payment.PaymentDtos.TransferInput;
+import dev.cutpay.payments.payment.PaymentDtos.TransferView;
 import dev.cutpay.payments.domain.PaymentIntent;
 import dev.cutpay.payments.domain.PaymentStatus;
 import dev.cutpay.payments.domain.Repositories.PaymentAttemptRepository;
@@ -35,6 +40,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -65,15 +71,20 @@ public class PaymentService {
     private final PaymentStreams streams;
     private final Clock clock;
     private final CustomerService customers;
+    private final PaymentTransferRepository transfers;
+    private final IdentityClient identity;
     private final Duration authorizationValidity;
 
     public PaymentService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
                           AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx,
                           PaymentStreams streams, Clock clock, CustomerService customers,
+                          PaymentTransferRepository transfers, IdentityClient identity,
                           @Value("${cutpay.payments.authorization-validity:P7D}") Duration authorizationValidity) {
         this.streams = streams;
         this.clock = clock;
         this.customers = customers;
+        this.transfers = transfers;
+        this.identity = identity;
         this.authorizationValidity = authorizationValidity;
         this.intents = intents;
         this.attempts = attempts;
@@ -115,9 +126,84 @@ public class PaymentService {
                 money, request.description(), email, request.metadata(), request.returnUrl(), channel,
                 request.captureMethod() == null ? PaymentIntent.CAPTURE_AUTOMATIC : request.captureMethod());
         intent.forCustomer(customerId, methodId, request.chargesSavedCard(), request.setupFutureUsage());
+        List<PaymentTransfer> planned = planTransfers(merchantId, livemode, id, money.minor(), money.currency().getCurrencyCode(),
+                request);
+        if (!planned.isEmpty() && request.applicationFeeAmount() != null) {
+            intent.setApplicationFeeAmount(request.applicationFeeAmount());
+        }
         intents.save(intent);
+        transfers.saveAll(planned);
         publish("PaymentIntentCreated", intent);
         return intent;
+    }
+
+    private static final int MAX_TRANSFERS = 10;
+
+    /**
+     * Works out how a split payment is shared. Either each destination is given an amount and the platform keeps the
+     * rest, or one destination is given no amount and {@code application_fee_amount} says what the platform keeps:
+     * the destination then gets everything else. The platform pays the processing fee out of its own part.
+     */
+    private List<PaymentTransfer> planTransfers(String merchantId, boolean livemode, String paymentId, long amount,
+                                                String currency, CreatePaymentRequest request) {
+        List<TransferInput> inputs = request.transferData() == null ? List.of() : request.transferData();
+        if (inputs.isEmpty()) {
+            if (request.applicationFeeAmount() != null) {
+                throw ApiException.invalidRequest("destination_required",
+                        "An application fee needs a destination in transfer_data", "application_fee_amount");
+            }
+            return List.of();
+        }
+        if (inputs.size() > MAX_TRANSFERS) {
+            throw ApiException.invalidRequest("too_many_transfers", "A payment can be split between 10 accounts at most",
+                    "transfer_data");
+        }
+        if (PaymentIntent.CAPTURE_MANUAL.equals(request.captureMethod())) {
+            throw ApiException.invalidRequest("transfers_need_automatic_capture",
+                    "A payment that is captured later cannot be split", "capture_method");
+        }
+        boolean byFee = request.applicationFeeAmount() != null;
+        if (byFee && (inputs.size() != 1 || inputs.get(0).amount() != null)) {
+            throw ApiException.invalidRequest("ambiguous_split",
+                    "Give either an amount for each destination, or one destination without an amount and an application fee",
+                    "application_fee_amount");
+        }
+        if (!byFee && inputs.stream().anyMatch(t -> t.amount() == null)) {
+            throw ApiException.invalidRequest("amount_required", "Every destination needs an amount", "transfer_data");
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<PaymentTransfer> planned = new ArrayList<>();
+        long sent = 0;
+        for (TransferInput input : inputs) {
+            if (!seen.add(input.destination())) {
+                throw ApiException.invalidRequest("duplicate_destination", "Each account can appear once", "transfer_data");
+            }
+            var account = identity.connectedAccount(merchantId, input.destination());
+            if (!account.active()) {
+                throw ApiException.invalidRequest("connected_account_disabled", "That account is disabled", "transfer_data");
+            }
+            if (account.livemode() != livemode) {
+                throw ApiException.invalidRequest("connected_account_not_found",
+                        "No connected account %s on this platform".formatted(input.destination()), "transfer_data");
+            }
+            if (!account.currency().equals(currency)) {
+                throw ApiException.invalidRequest("currency_mismatch",
+                        "That account is paid out in %s, the payment is in %s".formatted(account.currency(), currency),
+                        "transfer_data");
+            }
+            long share = byFee ? amount - request.applicationFeeAmount() : input.amount();
+            if (share < 1) {
+                throw ApiException.invalidRequest("fee_too_large", "The application fee leaves nothing for the account",
+                        "application_fee_amount");
+            }
+            sent += share;
+            planned.add(new PaymentTransfer(Ids.generate("tr"), paymentId, input.destination(), share));
+        }
+        if (sent > amount) {
+            throw ApiException.invalidRequest("transfers_exceed_payment", "The transfers add up to more than the payment",
+                    "transfer_data");
+        }
+        return planned;
     }
 
     /**
@@ -146,7 +232,9 @@ public class PaymentService {
         PaymentIntent intent = find(merchantId, claimedMode, id)
                 .orElseThrow(() -> ApiException.notFound("payment_not_found", "No such payment"));
         return PaymentView.of(intent, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(id),
-                refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id), expand.contains(EXPAND_LATEST_ATTEMPT));
+                        refunds.findByPaymentIntentIdOrderByCreatedAtAsc(id), expand.contains(EXPAND_LATEST_ATTEMPT))
+                .withTransfers(transfers.findByPaymentIntentIdOrderByIdAsc(id).stream()
+                        .map(t -> new TransferView(t.getDestination(), t.getAmount())).toList());
     }
 
     private java.util.Optional<PaymentIntent> find(String merchantId, Boolean claimedMode, String id) {
@@ -463,6 +551,11 @@ public class PaymentService {
         payload.put("channel", intent.getChannel());
         payload.put("off_session", intent.isOffSession());
         payload.put("metadata", intent.getMetadata());
+        var shares = transfers.findByPaymentIntentIdOrderByIdAsc(intent.getId());
+        if (!shares.isEmpty()) {
+            payload.put("transfers", shares.stream()
+                    .map(t -> Map.of("destination", t.getDestination(), "amount", t.getAmount())).toList());
+        }
         if (attempt != null) {
             payload.put("card_brand", attempt.getCardBrand());
             payload.put("card_type", attempt.getCardType());

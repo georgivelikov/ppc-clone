@@ -50,10 +50,24 @@ curl http://localhost:8080/v1/subscriptions \\
   -H "Content-Type: application/json" \\
   -d '{ "customer": "cus_...", "items": [{ "price": "price_...", "quantity": 1 }] }'`;
 
+
+const SPLIT = `# A €100 order: €60 for the restaurant, the platform keeps the rest
+curl http://localhost:8080/v1/payment_intents \
+  -H "Authorization: Bearer sk_test_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 10000,
+    "currency": "EUR",
+    "transfer_data": [{ "destination": "acct_01J9...", "amount": 6000 }]
+  }'
+
+# Or name the fee: the single destination receives everything else (8500 here)
+  -d '{ "amount": 10000, "currency": "EUR", "transfer_data": [{ "destination": "acct_01J9..." }], "application_fee_amount": 1500 }'`;
+
 export function BillingPage() {
   return (
     <>
-      <h1 className="text-3xl font-semibold tracking-tight">Saved cards, pre-authorisation, subscriptions and invoices</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Saved cards, subscriptions, invoices and split payments</h1>
       <p className="mt-3 text-muted">
         Charge the same customer again without asking for their card, hold money and take it later, and bill every month.
       </p>
@@ -157,6 +171,26 @@ export function BillingPage() {
         customer a link. The link opens a page where they see the invoice, download the PDF and pay it with a card. Or charge the saved card
         yourself with <code>POST /v1/invoices/&#123;id&#125;/pay</code>.
       </p>
+
+      <h2 className="mt-10 text-xl font-semibold">Split payments for marketplaces</h2>
+      <p className="mt-2 text-sm">
+        If you run a marketplace or a delivery app, create a <strong>connected account</strong> for each seller (a name and an IBAN) and
+        share a payment between them. When the payment succeeds, each destination is credited its part and you keep the rest, minus the
+        card fee, which you pay from your own share. Every account has its own balance and is paid out to its own IBAN.
+      </p>
+      <CodeBlock language="Shell" label="Share a payment" code={SPLIT} />
+      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+        <li>
+          Either give each destination an amount, or name one destination without an amount and an <code>application_fee_amount</code>. Not both.
+        </li>
+        <li>
+          The payment and the account use the same currency, and a payment you capture later cannot be split.
+        </li>
+        <li>
+          A refund is taken back in proportion: refunding half of the order takes half of each account&apos;s share back, and you cover the
+          rest. Read an account&apos;s balance with <code>GET /v1/balance?connected_account=acct_...</code>.
+        </li>
+      </ul>
 
       <h2 className="mt-10 text-xl font-semibold">Events</h2>
       <p className="mt-2 text-sm">

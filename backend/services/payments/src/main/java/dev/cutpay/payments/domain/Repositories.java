@@ -136,4 +136,9 @@ public final class Repositories {
         @Query("select s from SetupIntent s where s.id = :id")
         Optional<SetupIntent> lockById(@Param("id") String id);
     }
+
+    public interface PaymentTransferRepository extends JpaRepository<PaymentTransfer, String> {
+
+        List<PaymentTransfer> findByPaymentIntentIdOrderByIdAsc(String paymentIntentId);
+    }
 }

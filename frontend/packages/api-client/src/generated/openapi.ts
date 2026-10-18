@@ -230,6 +230,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/connected_accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List connected accounts */
+        get: operations["listConnectedAccounts"];
+        put?: never;
+        /**
+         * Create a connected account
+         * @description A sub-merchant of your platform, for example a restaurant on a delivery app. Send it part of a payment with
+         *     `transfer_data`; what it earns is paid out to its IBAN on its own schedule.
+         */
+        post: operations["createConnectedAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/connected_accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve a connected account
+         * @description Its balance is `GET /v1/balance?connected_account={id}`.
+         */
+        get: operations["getConnectedAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update a connected account
+         * @description Changing the IBAN moves future payouts to it. It has to stay in the same country.
+         */
+        patch: operations["updateConnectedAccount"];
+        trace?: never;
+    };
+    "/v1/connected_accounts/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop sending money to a connected account
+         * @description What it already earned is still paid out. New payments cannot name it as a destination.
+         */
+        post: operations["disableConnectedAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products": {
         parameters: {
             query?: never;
@@ -1199,6 +1265,17 @@ export interface components {
              * @enum {string}
              */
             setup_future_usage?: "off_session";
+            /**
+             * @description Share the payment with connected accounts once it succeeds. Give each destination an amount and the platform
+             *     keeps the rest, or name one destination without an amount and set `application_fee_amount`. The processing
+             *     fee is paid by the platform from its own part. A payment captured later cannot be split.
+             */
+            transfer_data?: components["schemas"]["TransferData"][];
+            /**
+             * Format: int64
+             * @description What the platform keeps of the payment. The single destination receives everything else.
+             */
+            application_fee_amount?: number;
         };
         Address: {
             line1?: string | null;
@@ -1296,6 +1373,49 @@ export interface components {
             failure_message?: string | null;
             /** Format: date-time */
             created_at?: string;
+        };
+        CreateConnectedAccount: {
+            name: string;
+            /** Format: email */
+            email?: string;
+            /** @description Where the account is paid out. Spaces are ignored; the checksum is verified. */
+            iban: string;
+        };
+        UpdateConnectedAccount: {
+            name?: string;
+            email?: string;
+            iban?: string;
+        };
+        ConnectedAccount: {
+            id: string;
+            /** @constant */
+            object: "connected_account";
+            livemode?: boolean;
+            name: string;
+            email?: string | null;
+            country?: string;
+            /** @description The currency it receives and is paid out in, the default currency of the platform. */
+            currency: string;
+            iban_last4?: string;
+            /** @enum {string} */
+            status: "active" | "disabled";
+            /** Format: date-time */
+            created_at?: string;
+        };
+        ConnectedAccountList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["ConnectedAccount"][];
+            has_more: boolean;
+        };
+        TransferData: {
+            /** @description A connected account id. */
+            destination: string;
+            /**
+             * Format: int64
+             * @description What the account receives. Omit it only for a single destination together with `application_fee_amount`.
+             */
+            amount?: number;
         };
         CreateProduct: {
             name: string;
@@ -1685,6 +1805,14 @@ export interface components {
             payment_method?: string | null;
             /** @description Charged to a saved card without the customer present. */
             off_session?: boolean;
+            /** Format: int64 */
+            application_fee_amount?: number | null;
+            /** @description How the payment is shared with connected accounts. Only on a single payment. */
+            transfer_data?: {
+                destination?: string;
+                /** Format: int64 */
+                amount?: number;
+            }[] | null;
             /**
              * Format: int64
              * @description What was held on the card for a `manual` capture payment. `amount` is what was taken once captured.
@@ -1904,7 +2032,7 @@ export interface components {
             /** @constant */
             object: "balance_transaction";
             /** @enum {string} */
-            type: "payment" | "refund" | "payout";
+            type: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal";
             source_id?: string;
             parent_id?: string | null;
             currency: string;
@@ -2124,6 +2252,9 @@ export interface components {
         PaymentId: string;
         CustomerId: string;
         SetupIntentId: string;
+        ConnectedAccountId: string;
+        /** @description Read the balance of one of your connected accounts instead of your own. */
+        ConnectedAccountQuery: string;
         ProductId: string;
         PriceId: string;
         SubscriptionId: string;
@@ -2555,6 +2686,140 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listConnectedAccounts: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accounts, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccountList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createConnectedAccount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Up to 255 characters; kept for 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConnectedAccount"];
+            };
+        };
+        responses: {
+            /** @description The account. Only the last four digits of the IBAN are returned. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccount"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getConnectedAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ConnectedAccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateConnectedAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ConnectedAccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateConnectedAccount"];
+            };
+        };
+        responses: {
+            /** @description The updated account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccount"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    disableConnectedAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ConnectedAccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The disabled account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listProducts: {
@@ -3616,7 +3881,10 @@ export interface operations {
     };
     getBalance: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Read the balance of one of your connected accounts instead of your own. */
+                connected_account?: components["parameters"]["ConnectedAccountQuery"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3639,11 +3907,13 @@ export interface operations {
     listBalanceTransactions: {
         parameters: {
             query?: {
+                /** @description Read the balance of one of your connected accounts instead of your own. */
+                connected_account?: components["parameters"]["ConnectedAccountQuery"];
                 /** @description How many objects to return (1 to 100). */
                 limit?: components["parameters"]["Limit"];
                 /** @description The `id` of the last object of the previous page. */
                 starting_after?: components["parameters"]["StartingAfter"];
-                type?: "payment" | "refund" | "payout";
+                type?: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal";
                 /** @description A payment id (also matches its refunds), refund id or payout id. */
                 source?: string;
             };

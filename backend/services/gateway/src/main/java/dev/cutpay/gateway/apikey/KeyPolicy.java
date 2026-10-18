@@ -19,6 +19,7 @@ final class KeyPolicy {
             Map.entry("/v1/payment_stats", "payments"),
             Map.entry("/v1/payment_links", "payment_links"),
             Map.entry("/v1/customers", "customers"),
+            Map.entry("/v1/connected_accounts", "connected_accounts"),
             Map.entry("/v1/products", "billing"),
             Map.entry("/v1/prices", "billing"),
             Map.entry("/v1/subscriptions", "billing"),

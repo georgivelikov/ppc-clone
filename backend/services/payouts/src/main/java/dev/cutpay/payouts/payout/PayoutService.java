@@ -87,6 +87,35 @@ public class PayoutService {
         ensureSchedule(merchantId);
     }
 
+    /**
+     * A connected account is paid out like a merchant: it gets a bank account from the IBAN its platform gave and a
+     * daily schedule. When the IBAN changes, the new account replaces the old one for future payouts.
+     */
+    @Transactional
+    public void onConnectedAccount(String eventId, String accountId, boolean livemode, String iban, String holder,
+                                   String currency, boolean replace) {
+        if (!inbox.firstTime(eventId)) {
+            return;
+        }
+        ensureSchedule(accountId);
+        if (replace) {
+            jdbc.sql("UPDATE bank_accounts SET status = 'removed' WHERE merchant_id = :account AND status = 'active'")
+                    .param("account", accountId).update();
+        }
+        jdbc.sql("""
+                        INSERT INTO bank_accounts (id, merchant_id, livemode, iban, holder_name, currency, status, created_at)
+                        VALUES (:id, :account, :livemode, :iban, :holder, :currency, 'active', :now)
+                        """)
+                .param("id", Ids.generate("ba"))
+                .param("account", accountId)
+                .param("livemode", livemode)
+                .param("iban", iban)
+                .param("holder", holder)
+                .param("currency", currency)
+                .param("now", Sql.ts(clock.instant()))
+                .update();
+    }
+
     /** New merchants start with a daily payout, two days after the sale. */
     public void ensureSchedule(String merchantId) {
         jdbc.sql("""

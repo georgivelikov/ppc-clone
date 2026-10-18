@@ -1,4 +1,4 @@
-package dev.cutpay.payouts.iban;
+package dev.cutpay.money;
 
 import java.util.Locale;
 import java.util.Optional;

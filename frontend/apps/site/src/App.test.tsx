@@ -127,12 +127,13 @@ describe("docs", () => {
     expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Payment links" })).toBeInTheDocument();
   });
 
-  it("billing guide explains retries, proration and holds", () => {
+  it("billing guide explains retries, proration, holds and split payments", () => {
     renderAt("/docs/billing");
     expect(screen.getByRole("heading", { name: "Changing plan" })).toBeInTheDocument();
     expect(screen.getByText(/1, 3, 5 and 7 days/)).toBeInTheDocument();
     expect(screen.getByText(/Halfway through a 31-day month/)).toBeInTheDocument();
     expect(screen.getByText(/seven days/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Split payments for marketplaces" })).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Billing" })).toBeInTheDocument();
   });
 

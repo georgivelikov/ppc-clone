@@ -72,18 +72,28 @@ test.describe("merchant authentication", () => {
     await expect(page.getByTestId("merchant-name")).toHaveText("Rose Cafe Sofia");
   });
 
-  test("keeps the sidebar entries for later phases disabled", async ({ page }) => {
+  test("shows a sidebar entry for every area built so far", async ({ page }) => {
     await signUp(page, uniqueEmail());
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav).toBeVisible();
-    // Built so far: payments, balances, payouts, links, the terminal and the developer tools.
-    for (const built of ["Payments", "Balances", "Payouts", "Links", "Terminal", "Developers", "Settings"]) {
+    // Payments, balances, payouts, links and the terminal, customers and billing, connected accounts, the developer tools.
+    for (const built of [
+      "Payments",
+      "Balances",
+      "Payouts",
+      "Links",
+      "Terminal",
+      "Customers",
+      "Products",
+      "Subscriptions",
+      "Invoices",
+      "Connected accounts",
+      "Developers",
+      "Settings",
+    ]) {
       await expect(nav.getByRole("link", { name: built })).toBeVisible();
     }
-    // Still to come.
-    for (const later of ["Customers", "Subscriptions"]) {
-      await expect(nav.getByRole("link", { name: later })).toHaveCount(0);
-      await expect(nav.getByText(later)).toHaveAttribute("aria-disabled", "true");
-    }
+    // Nothing is shown as "coming soon" in the sidebar any more.
+    await expect(nav.locator('[aria-disabled="true"]')).toHaveCount(0);
   });
 });

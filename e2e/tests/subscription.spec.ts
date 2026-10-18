@@ -71,6 +71,8 @@ async function advanceBilling(request: import("@playwright/test").APIRequestCont
 async function eventually(page: Page, check: () => Promise<void>, timeout = 45_000) {
   await expect(async () => {
     await page.reload();
+    // A reload renews the session; let that finish before the next reload can interrupt it.
+    await page.waitForLoadState("networkidle");
     await check();
   }).toPass({ timeout, intervals: [1000, 2000, 3000] });
 }

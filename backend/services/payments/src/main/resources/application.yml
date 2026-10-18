@@ -41,6 +41,8 @@ management:
 cutpay:
   # Where the hosted checkout lives; used to build the URL returned by POST /v1/checkout_sessions.
   checkout-url: http://localhost:5174
+  # Where connected accounts are looked up before a split payment is accepted.
+  identity-url: http://localhost:8081
   acquirer:
     url: http://localhost:8083
     connect-timeout: PT2S

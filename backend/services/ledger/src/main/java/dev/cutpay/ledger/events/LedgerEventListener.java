@@ -4,8 +4,11 @@ import dev.cutpay.ledger.config.Topics;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
+import dev.cutpay.ledger.posting.LedgerEvents.Transfer;
 import dev.cutpay.ledger.posting.LedgerService;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -40,6 +43,8 @@ class LedgerEventListener {
         switch (type(event)) {
             case "MerchantCreated" -> ledger.onMerchantCreated(eventId(event),
                     text(event.path("payload"), "merchant_id"), text(event.path("payload"), "default_currency"));
+            case "ConnectedAccountCreated" -> ledger.onConnectedAccountCreated(eventId(event),
+                    text(event.path("payload"), "account_id"), merchantId(event), livemode(event));
             default -> log.trace("Ignoring {}", type(event));
         }
     }
@@ -53,7 +58,8 @@ class LedgerEventListener {
         JsonNode payload = event.path("payload");
         ledger.onPaymentSucceeded(new PaymentSucceeded(eventId(event), occurredAt(event), merchantId(event),
                 livemode(event), text(payload, "payment_id"), payload.path("amount").asLong(),
-                text(payload, "currency"), nullableText(payload, "card_type"), nullableText(payload, "card_region")));
+                text(payload, "currency"), nullableText(payload, "card_type"), nullableText(payload, "card_region"),
+                transfers(payload)));
     }
 
     @KafkaListener(topics = Topics.REFUND)
@@ -87,6 +93,14 @@ class LedgerEventListener {
         return new Payout(eventId(event), occurredAt(event), merchantId(event), livemode(event),
                 text(payload, "payout_id"), payload.path("amount").asLong(), payload.path("fee").asLong(0),
                 text(payload, "currency"));
+    }
+
+    private static List<Transfer> transfers(JsonNode payload) {
+        List<Transfer> found = new ArrayList<>();
+        for (JsonNode node : payload.path("transfers")) {
+            found.add(new Transfer(text(node, "destination"), node.path("amount").asLong()));
+        }
+        return found;
     }
 
     private static String type(JsonNode event) {

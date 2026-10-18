@@ -175,6 +175,16 @@ export function PaymentDetailPage() {
               <Row label="Refunded">{formatMoney(payment.amount_refunded, payment.currency)}</Row>
             )}
             {payment.failure_message && <Row label="Failure">{payment.failure_message}</Row>}
+            {(payment.transfer_data ?? []).map((transfer) => (
+              <Row key={transfer.destination} label="Sent to">
+                <Link to={`/connected-accounts/${transfer.destination}`} className="text-brand-700 hover:underline" data-testid="payment-transfer">
+                  {transfer.destination} · {formatMoney(transfer.amount, payment.currency)}
+                </Link>
+              </Row>
+            ))}
+            {payment.application_fee_amount != null && (
+              <Row label="Platform fee">{formatMoney(payment.application_fee_amount, payment.currency)}</Row>
+            )}
           </dl>
           {settled && (
             <dl className="mt-2 divide-y divide-border border-t border-border">

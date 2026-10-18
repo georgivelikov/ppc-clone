@@ -138,6 +138,46 @@ class PayoutsFlowIT {
     }
 
     @Test
+    void aConnectedAccountIsPaidOutToItsOwnIbanAndThePlatformNeverSeesThatBankAccount() throws Exception {
+        String account = "acct_" + UUID.randomUUID().toString().replace("-", "");
+        payouts.onConnectedAccount("evt_" + UUID.randomUUID(), account, false, WORKING_IBAN, "Pizza Palace", "EUR", false);
+        String entry = "je_" + UUID.randomUUID().toString().replace("-", "");
+        payouts.onFundsAvailable("evt_" + UUID.randomUUID(), account, false, "EUR", entry, "pay_" + entry, 6_000);
+
+        var created = payouts.createScheduledPayout(new Group(account, false, "EUR"));
+
+        assertThat(created).isPresent();
+        assertThat(created.get().amount()).isEqualTo(6_000);
+        assertThat(jdbc.sql("SELECT holder_name FROM bank_accounts WHERE merchant_id = :m AND status = 'active'")
+                .param("m", account).query(String.class).single()).isEqualTo("Pizza Palace");
+        // The platform lists only its own bank accounts.
+        mvc.perform(get("/v1/bank_accounts").with(asMerchant())).andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void whenTheIbanOfAConnectedAccountChangesFuturePayoutsGoToTheNewOne() throws Exception {
+        String account = "acct_" + UUID.randomUUID().toString().replace("-", "");
+        payouts.onConnectedAccount("evt_" + UUID.randomUUID(), account, false, WORKING_IBAN, "Pizza Palace", "EUR", false);
+        payouts.onConnectedAccount("evt_" + UUID.randomUUID(), account, false, "DE89370400440532013000", "Pizza Palace GmbH",
+                "EUR", true);
+
+        assertThat(jdbc.sql("SELECT holder_name FROM bank_accounts WHERE merchant_id = :m AND status = 'active'")
+                .param("m", account).query(String.class).list()).containsExactly("Pizza Palace GmbH");
+        assertThat(jdbc.sql("SELECT count(*) FROM bank_accounts WHERE merchant_id = :m").param("m", account)
+                .query(Long.class).single()).isEqualTo(2L);
+    }
+
+    @Test
+    void aConnectedAccountEventDeliveredTwiceChangesNothing() {
+        String account = "acct_" + UUID.randomUUID().toString().replace("-", "");
+        String event = "evt_" + UUID.randomUUID();
+        payouts.onConnectedAccount(event, account, false, WORKING_IBAN, "Pizza Palace", "EUR", false);
+        payouts.onConnectedAccount(event, account, false, WORKING_IBAN, "Pizza Palace", "EUR", false);
+        assertThat(jdbc.sql("SELECT count(*) FROM bank_accounts WHERE merchant_id = :m").param("m", account)
+                .query(Long.class).single()).isEqualTo(1L);
+    }
+
+    @Test
     void aClosedBankAccountFailsThePayoutAndReportsWhy() throws Exception {
         fundsAvailable(5_000);
         addBankAccount(CLOSED_IBAN);

@@ -15,6 +15,8 @@ const TYPE_LABEL: Record<BalanceTransactionType, string> = {
   refund: "Refund",
   payout: "Payout",
   payout_failure: "Payout failed",
+  transfer: "Transfer",
+  transfer_reversal: "Transfer taken back",
 };
 
 function amountIn(amounts: MoneyAmount[] | undefined, currency: string): number {

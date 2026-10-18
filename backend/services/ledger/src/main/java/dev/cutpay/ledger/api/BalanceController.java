@@ -41,7 +41,8 @@ class BalanceController {
      * merchant can expect, a negative one is money they owe (e.g. a refund after a payout).
      */
     @GetMapping("/v1/balance")
-    BalanceView balance(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode) {
+    BalanceView balance(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
+                        @RequestParam(name = "connected_account", required = false) String connectedAccount) {
         boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         record Row(String type, String currency, long amount) {
         }
@@ -52,7 +53,7 @@ class BalanceController {
                            AND a.type IN ('merchant_pending', 'merchant_available', 'merchant_reserve')
                          ORDER BY a.currency, a.type
                         """)
-                .param("merchant", merchant(jwt))
+                .param("merchant", owner(jwt, connectedAccount))
                 .param("livemode", livemode)
                 .query((rs, n) -> new Row(rs.getString("type"), rs.getString("currency").trim(),
                         rs.getLong("amount")))
@@ -77,6 +78,7 @@ class BalanceController {
                                  @RequestParam(required = false) String type,
                                  // A payment id also matches the refunds made against it.
                                  @RequestParam(required = false) String source,
+                                 @RequestParam(name = "connected_account", required = false) String connectedAccount,
                                  @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode,
                                  @RequestParam(name = "starting_after", required = false) String startingAfter,
                                  @RequestParam(defaultValue = "20") int limit) {
@@ -91,7 +93,7 @@ class BalanceController {
                  WHERE merchant_id = :merchant AND livemode = :livemode
                 """);
         Map<String, Object> params = new HashMap<>();
-        params.put("merchant", merchant(jwt));
+        params.put("merchant", owner(jwt, connectedAccount));
         params.put("livemode", livemode);
         if (type != null && !type.isBlank()) {
             sql.append(" AND type = :type");
@@ -171,6 +173,22 @@ class BalanceController {
             }
         }
         return new SummaryView("list", data);
+    }
+
+    /**
+     * Whose balance to read: the caller's own, or that of one of their connected accounts. An account of
+     * somebody else looks exactly like an account that does not exist.
+     */
+    private String owner(Jwt jwt, String connectedAccount) {
+        if (connectedAccount == null || connectedAccount.isBlank()) {
+            return merchant(jwt);
+        }
+        boolean theirs = jdbc.sql("SELECT count(*) FROM connected_accounts WHERE account_id = :account AND platform_id = :platform")
+                .param("account", connectedAccount).param("platform", merchant(jwt)).query(Long.class).single() > 0;
+        if (!theirs) {
+            throw ApiException.notFound("connected_account_not_found", "No such connected account");
+        }
+        return connectedAccount;
     }
 
     private static String merchant(Jwt jwt) {
