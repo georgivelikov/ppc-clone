@@ -103,6 +103,20 @@ public class PaymentIntent {
     @Column(name = "setup_future_usage")
     private String setupFutureUsage;
 
+    /** How the payment was settled: {@code card}, or {@code bnpl} when a provider financed it in instalments. */
+    @Column(name = "payment_method_type", nullable = false)
+    private String paymentMethodType = "card";
+
+    @Column(name = "bnpl_provider")
+    private String bnplProvider;
+
+    @Column(name = "bnpl_application_id")
+    private String bnplApplicationId;
+
+    /** What the BNPL provider keeps of the payment. */
+    @Column(name = "bnpl_fee")
+    private Long bnplFee;
+
     @Version
     private long version;
 
@@ -178,6 +192,37 @@ public class PaymentIntent {
         moveTo(PaymentStatus.SUCCEEDED);
         failureCode = null;
         failureMessage = null;
+    }
+
+    /**
+     * A buy-now-pay-later provider approved the customer and will pay Cutpay, so the payment is complete. Goes through
+     * processing like any payment, so the state table stays the only authority on what can follow what.
+     */
+    public void payWithBnpl(String provider, String applicationId, long fee) {
+        moveTo(PaymentStatus.PROCESSING);
+        moveTo(PaymentStatus.SUCCEEDED);
+        paymentMethodType = "bnpl";
+        bnplProvider = provider;
+        bnplApplicationId = applicationId;
+        bnplFee = fee;
+        failureCode = null;
+        failureMessage = null;
+    }
+
+    public String getPaymentMethodType() {
+        return paymentMethodType;
+    }
+
+    public String getBnplProvider() {
+        return bnplProvider;
+    }
+
+    public String getBnplApplicationId() {
+        return bnplApplicationId;
+    }
+
+    public Long getBnplFee() {
+        return bnplFee;
     }
 
     public void fail(String code, String message) {

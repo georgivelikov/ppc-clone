@@ -21,7 +21,21 @@ public class PaymentsClient {
 
     /** What the aggregator needs to know about the payment a customer is about to pay in instalments. */
     public record CheckoutFacts(String paymentId, String merchantId, boolean livemode, String merchantName, String status,
-                                long amount, String currency, String description, String customerEmail, String captureMethod) {
+                                long amount, String currency, String description, String customerEmail, String captureMethod,
+                                boolean split) {
+
+        /** Pay in instalments only applies to a payment nobody has paid yet and that is taken straight away. */
+        public void requireBnplPayable() {
+            if (!"requires_payment_method".equals(status)) {
+                throw ApiException.conflict("payment_not_payable", "This payment can no longer be paid", null);
+            }
+            if (split) {
+                throw ApiException.conflict("bnpl_not_available", "Pay in instalments is not available for a split payment", null);
+            }
+            if (!"automatic".equals(captureMethod)) {
+                throw ApiException.conflict("bnpl_not_available", "Pay in instalments is not available for a payment that is held", null);
+            }
+        }
     }
 
     private final RestClient http;

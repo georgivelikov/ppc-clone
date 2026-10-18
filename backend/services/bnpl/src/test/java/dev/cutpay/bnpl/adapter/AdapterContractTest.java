@@ -42,8 +42,10 @@ class AdapterContractTest {
     static void start() {
         provider.start();
         String base = provider.baseUrl();
-        properties = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", List.of(6, 12, 24),
-                new BnplProperties.Providers(base + "/splitnow/v1", base + "/lendo/api", base + "/kreditko", base + "/paylatereu/api"));
+        properties = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", "http://localhost:8090",
+                Duration.ofSeconds(5), Duration.ofHours(24), List.of(6, 12, 24),
+                new BnplProperties.Providers(base + "/splitnow/v1", base + "/lendo/api", base + "/kreditko", base + "/paylatereu/api",
+                        "lendo_test_secret"));
     }
 
     @AfterAll
@@ -148,9 +150,10 @@ class AdapterContractTest {
 
     @Test
     void aProviderThatCannotBeReachedIsUnavailable() {
-        var nowhere = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", List.of(6),
+        var nowhere = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", "http://localhost:8090",
+                Duration.ofSeconds(5), Duration.ofHours(24), List.of(6),
                 new BnplProperties.Providers("http://127.0.0.1:1/splitnow/v1", "http://127.0.0.1:1/lendo/api",
-                        "http://127.0.0.1:1/kreditko", "http://127.0.0.1:1/paylatereu/api"));
+                        "http://127.0.0.1:1/kreditko", "http://127.0.0.1:1/paylatereu/api", "lendo_test_secret"));
 
         assertFailure(() -> new SplitNowAdapter(nowhere, RestClient.builder()).quote(THREE_HUNDRED), Kind.UNAVAILABLE);
         assertFailure(() -> new LendoAdapter(nowhere, RestClient.builder()).quote(THREE_HUNDRED), Kind.UNAVAILABLE);

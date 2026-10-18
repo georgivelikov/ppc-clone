@@ -412,7 +412,8 @@ public class PaymentService {
 
     /** What a service acting for the checkout (the BNPL aggregator) needs to know about a payment. */
     public record CheckoutFacts(String paymentId, String merchantId, boolean livemode, String merchantName, String status,
-                                long amount, String currency, String description, String customerEmail, String captureMethod) {
+                                long amount, String currency, String description, String customerEmail, String captureMethod,
+                                boolean split) {
     }
 
     @Transactional(readOnly = true)
@@ -421,7 +422,8 @@ public class PaymentService {
                 .orElseThrow(() -> ApiException.notFound("session_not_found", "This payment link is not valid"));
         return new CheckoutFacts(intent.getId(), intent.getMerchantId(), intent.isLivemode(), intent.getMerchantName(),
                 intent.getStatus().wire(), intent.getAmount(), intent.getCurrency(), intent.getDescription(),
-                intent.getCustomerEmail(), intent.getCaptureMethod());
+                intent.getCustomerEmail(), intent.getCaptureMethod(),
+                !transfers.findByPaymentIntentIdOrderByIdAsc(intent.getId()).isEmpty());
     }
 
     @Transactional(readOnly = true)
@@ -527,6 +529,62 @@ public class PaymentService {
         }
     }
 
+    /** A buy-now-pay-later provider approved the customer for this payment. */
+    public record BnplApproval(String applicationId, String provider, long amount, String currency, long fee) {
+    }
+
+    /**
+     * Settles the payment with an approved BNPL application. The approval may arrive late, so the payment is checked again:
+     * if it was paid another way, is held for capture, is a split, or does not match the application, the approval is
+     * refused and a {@code BnplPaymentRejected} event tells the aggregator to close the application at the provider.
+     * Safe to receive twice.
+     */
+    @Transactional
+    public void applyBnplApproval(String paymentId, BnplApproval approval) {
+        PaymentIntent intent = intents.lockById(paymentId).orElse(null);
+        if (intent == null) {
+            log.warn("A BNPL approval {} names the unknown payment {}", approval.applicationId(), paymentId);
+            return;
+        }
+        if (approval.applicationId().equals(intent.getBnplApplicationId())) {
+            return;
+        }
+        String refusal = bnplRefusal(intent, approval);
+        if (refusal != null) {
+            log.info("Refusing the BNPL approval {} for payment {}: {}", approval.applicationId(), paymentId, refusal);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("application_id", approval.applicationId());
+            payload.put("payment_id", paymentId);
+            payload.put("reason", refusal);
+            outbox.write(KafkaTopicsConfig.PAYMENT_TOPIC, "BnplPaymentRejected", paymentId, intent.getMerchantId(),
+                    intent.isLivemode(), payload);
+            return;
+        }
+        intent.payWithBnpl(approval.provider(), approval.applicationId(), approval.fee());
+        attempts.save(PaymentAttempt.bnpl(Ids.generate("att"), intent.getId(), approval.applicationId()));
+        intents.save(intent);
+        publish("PaymentSucceeded", intent);
+    }
+
+    private String bnplRefusal(PaymentIntent intent, BnplApproval approval) {
+        if (intent.getStatus() != PaymentStatus.REQUIRES_PAYMENT_METHOD) {
+            return "payment_not_payable";
+        }
+        if (intent.isManualCapture()) {
+            return "capture_method_manual";
+        }
+        if (!transfers.findByPaymentIntentIdOrderByIdAsc(intent.getId()).isEmpty()) {
+            return "split_payment";
+        }
+        if (intent.getAmount() != approval.amount() || !intent.getCurrency().equals(approval.currency())) {
+            return "amount_mismatch";
+        }
+        if (approval.fee() < 0 || approval.fee() > intent.getAmount()) {
+            return "invalid_fee";
+        }
+        return null;
+    }
+
     /** Called by the acquirer once the customer answered the 3DS challenge. Safe to receive twice. */
     @Transactional
     public void completeThreeDs(String acquirerRef, boolean approved, String declineCode, String message) {
@@ -565,6 +623,12 @@ public class PaymentService {
         payload.put("channel", intent.getChannel());
         payload.put("off_session", intent.isOffSession());
         payload.put("metadata", intent.getMetadata());
+        payload.put("payment_method_type", intent.getPaymentMethodType());
+        if (intent.getBnplApplicationId() != null) {
+            payload.put("bnpl_provider", intent.getBnplProvider());
+            payload.put("bnpl_application_id", intent.getBnplApplicationId());
+            payload.put("bnpl_fee", intent.getBnplFee());
+        }
         var shares = transfers.findByPaymentIntentIdOrderByIdAsc(intent.getId());
         if (!shares.isEmpty()) {
             payload.put("transfers", shares.stream()

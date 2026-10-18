@@ -9,7 +9,9 @@ public enum AccountType {
     PLATFORM_FEES,
     PLATFORM_CASH,
     PAYOUTS_IN_TRANSIT,
-    CUSTOMER_FUNDS;
+    CUSTOMER_FUNDS,
+    /** What buy-now-pay-later providers owe the platform for payments they approved and have not yet settled. */
+    BNPL_RECEIVABLE;
 
     public String wire() {
         return name().toLowerCase(Locale.ROOT);

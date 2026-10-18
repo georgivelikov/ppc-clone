@@ -23,6 +23,8 @@ public class GatewayConfig {
                         .pathMatchers("/auth/**", "/.well-known/**").permitAll()
                         // The hosted checkout, payment links and the card vault are used by anonymous customers.
                         .pathMatchers("/checkout/**", "/vault/**", "/links/**", "/invoices/**").permitAll()
+                        // Buy-now-pay-later providers report their decisions here; the bnpl service checks each callback itself.
+                        .pathMatchers("/bnpl/callback/**").permitAll()
                         .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }))

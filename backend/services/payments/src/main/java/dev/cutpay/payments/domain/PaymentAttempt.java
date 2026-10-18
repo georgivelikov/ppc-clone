@@ -78,6 +78,18 @@ public class PaymentAttempt {
         this.createdAt = Instant.now();
     }
 
+    /** The attempt that a buy-now-pay-later approval stands for: no card, the application is the reference. */
+    public static PaymentAttempt bnpl(String id, String paymentIntentId, String applicationId) {
+        PaymentAttempt attempt = new PaymentAttempt();
+        attempt.id = id;
+        attempt.paymentIntentId = paymentIntentId;
+        attempt.methodType = "bnpl";
+        attempt.acquirerRef = applicationId;
+        attempt.status = "succeeded";
+        attempt.createdAt = Instant.now();
+        return attempt;
+    }
+
     public void requiresAction(String acquirerRef) {
         this.acquirerRef = acquirerRef;
         this.status = "requires_action";

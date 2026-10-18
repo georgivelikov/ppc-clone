@@ -12,7 +12,6 @@ import dev.cutpay.bnpl.routing.MerchantRouting;
 import dev.cutpay.bnpl.routing.RoutingEngine;
 import dev.cutpay.bnpl.routing.StatsSource;
 import dev.cutpay.bnpl.settings.SettingsService;
-import dev.cutpay.web.ApiException;
 import dev.cutpay.web.Ids;
 import java.time.Clock;
 import java.util.List;
@@ -56,12 +55,7 @@ public class OfferService {
 
     public Offers offers(String clientSecret, String requestedCountry) {
         CheckoutFacts payment = payments.checkout(clientSecret);
-        if (!"requires_payment_method".equals(payment.status())) {
-            throw ApiException.conflict("payment_not_payable", "This payment can no longer be paid", null);
-        }
-        if (!"automatic".equals(payment.captureMethod())) {
-            throw ApiException.conflict("bnpl_not_available", "Pay in instalments is not available for a payment that is held", null);
-        }
+        payment.requireBnplPayable();
         String country = requestedCountry == null || requestedCountry.isBlank() ? properties.defaultCountry()
                 : requestedCountry.trim().toUpperCase(Locale.ROOT);
         MerchantRouting routing = settings.get(payment.merchantId(), payment.livemode());

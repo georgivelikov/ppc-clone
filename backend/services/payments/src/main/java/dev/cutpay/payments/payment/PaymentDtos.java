@@ -90,14 +90,15 @@ public final class PaymentDtos {
                               String paymentMethod, boolean offSession, String failureCode,
                               String failureMessage, Instant createdAt, Instant updatedAt,
                               List<AttemptView> attempts, List<RefundView> refunds, Object latestAttempt,
-                              Long applicationFeeAmount, List<TransferView> transferData) {
+                              Long applicationFeeAmount, List<TransferView> transferData, String paymentMethodType,
+                              BnplView bnpl) {
 
         /** The same payment with the parts of it sent to connected accounts, which only a single payment shows. */
         PaymentView withTransfers(List<TransferView> transfers) {
             return new PaymentView(id, object, livemode, amount, currency, status, captureMethod, channel, description,
                     customerEmail, metadata, clientSecret, returnUrl, amountRefunded, amountAuthorized, captureBefore,
                     customer, paymentMethod, offSession, failureCode, failureMessage, createdAt, updatedAt, attempts,
-                    refunds, latestAttempt, applicationFeeAmount, transfers);
+                    refunds, latestAttempt, applicationFeeAmount, transfers, paymentMethodType, bnpl);
         }
 
         static PaymentView of(PaymentIntent p, List<PaymentAttempt> attempts, List<Refund> refunds) {
@@ -120,7 +121,16 @@ public final class PaymentDtos {
                     p.isOffSession(), p.getFailureCode(), p.getFailureMessage(),
                     p.getCreatedAt(), p.getUpdatedAt(),
                     attempts.stream().map(AttemptView::of).toList(),
-                    refunds.stream().map(RefundView::of).toList(), latest, p.getApplicationFeeAmount(), null);
+                    refunds.stream().map(RefundView::of).toList(), latest, p.getApplicationFeeAmount(), null,
+                    p.getPaymentMethodType(), BnplView.of(p));
+        }
+    }
+
+    /** How a payment financed in instalments was settled: by whom, which application, and what the provider kept. */
+    public record BnplView(String provider, String application, long fee) {
+        static BnplView of(PaymentIntent p) {
+            return p.getBnplApplicationId() == null ? null
+                    : new BnplView(p.getBnplProvider(), p.getBnplApplicationId(), p.getBnplFee() == null ? 0 : p.getBnplFee());
         }
     }
 

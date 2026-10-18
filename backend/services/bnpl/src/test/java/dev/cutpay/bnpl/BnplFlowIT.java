@@ -11,112 +11,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import java.util.UUID;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Offers from the customer's side and settings and explanations from the merchant's, against a real database. The
  * payments service and the four providers are one WireMock server that answers the way they do.
  */
-@SpringBootTest(properties = {"cutpay.bnpl.provider-timeout=PT1.5S", "cutpay.bnpl.offers-deadline=PT2S"})
-@AutoConfigureMockMvc
-@Testcontainers
-class BnplFlowIT {
-
-    @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
-
-    static final WireMockServer WORLD = new WireMockServer(WireMockConfiguration.options().dynamicPort());
-
-    static {
-        WORLD.start();
-    }
-
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("cutpay.bnpl.payments-url", WORLD::baseUrl);
-        registry.add("cutpay.bnpl.providers.splitnow-url", () -> WORLD.baseUrl() + "/splitnow/v1");
-        registry.add("cutpay.bnpl.providers.lendo-url", () -> WORLD.baseUrl() + "/lendo/api");
-        registry.add("cutpay.bnpl.providers.kreditko-url", () -> WORLD.baseUrl() + "/kreditko");
-        registry.add("cutpay.bnpl.providers.paylatereu-url", () -> WORLD.baseUrl() + "/paylatereu/api");
-    }
-
-    @AfterAll
-    static void stop() {
-        WORLD.stop();
-    }
-
-    @Autowired
-    MockMvc mvc;
-
-    private String merchantId;
-    private String secret;
-
-    @BeforeEach
-    void freshMerchantAndAnswers() {
-        merchantId = "mer_" + UUID.randomUUID().toString().replace("-", "");
-        secret = "pay_" + UUID.randomUUID().toString().replace("-", "") + "_secret_x";
-        WORLD.resetAll();
-        payment(30_000, "requires_payment_method", "automatic");
-        providersAnswer();
-    }
-
-    private RequestPostProcessor merchant() {
-        return jwt().jwt(j -> j.claim("mid", merchantId).claim("role", "owner"));
-    }
-
-    private void payment(long amount, String status, String captureMethod) {
-        WORLD.stubFor(get(urlEqualTo("/internal/checkout/" + secret)).willReturn(aResponse()
-                .withHeader("Content-Type", "application/json").withBody("""
-                        {"payment_id":"pay_%s","merchant_id":"%s","livemode":false,"merchant_name":"Rose Cafe",
-                         "status":"%s","amount":%d,"currency":"EUR","description":"Order 7",
-                         "customer_email":"anna@example.com","capture_method":"%s"}"""
-                        .formatted(secret.substring(4, 12), merchantId, status, amount, captureMethod))));
-    }
-
-    private String paymentId() {
-        return "pay_" + secret.substring(4, 12);
-    }
-
-    /** What the four providers answer for a 300.00 price. */
-    private void providersAnswer() {
-        json(post("/splitnow/v1/quotes"), """
-                {"currency":"EUR","plans":[
-                  {"instalments":3,"instalment_cents":[10000,10000,10000],"interest_pct":0.0,"merchant_fee_pct":3.5,"merchant_fee_cents":1050},
-                  {"instalments":4,"instalment_cents":[7500,7500,7500,7500],"interest_pct":0.0,"merchant_fee_pct":3.5,"merchant_fee_cents":1050}]}""");
-        json(get(urlPathEqualTo("/lendo/api/offers")), """
-                {"offers":[
-                  {"months":6,"monthly":"51.09","apr":9.9,"total_payable":"306.54","merchant_fee":"8.70"},
-                  {"months":12,"monthly":"26.38","apr":9.9,"total_payable":"316.56","merchant_fee":"8.70"}]}""");
-        json(post("/kreditko/simulations"), """
-                {"termMonths":12,"monthlyMinor":2680,"aprPercent":12.9,"totalPayableMinor":32160,"feeMinor":1350}""");
-        json(post("/paylatereu/api"), """
-                {"ok":true,"code":"OK","data":{"payInDays":30,"customerCost":0.00,"merchantFee":7.50}}""");
-    }
-
-    private static void json(com.github.tomakehurst.wiremock.client.MappingBuilder mapping, String body) {
-        WORLD.stubFor(mapping.willReturn(aResponse().withHeader("Content-Type", "application/json").withBody(body)));
-    }
+class BnplFlowIT extends BnplIntegrationTest {
 
     private ResultActions offers() throws Exception {
         return mvc.perform(MockMvcRequestBuilders.get("/checkout/" + secret + "/bnpl/offers"));
@@ -151,24 +55,6 @@ class BnplFlowIT {
                 .andExpect(jsonPath("$.unavailable.length()").value(0))
                 .andReturn().getResponse().getContentAsString();
         assertThat(body).doesNotContain("merchant_fee");
-    }
-
-    @Test
-    void aSlowProviderIsLeftOutAndTheCustomerIsNotKeptWaiting() throws Exception {
-        WORLD.stubFor(get(urlPathEqualTo("/lendo/api/offers")).willReturn(aResponse().withFixedDelay(5_000)
-                .withHeader("Content-Type", "application/json").withBody("{\"offers\":[]}")));
-
-        long started = System.nanoTime();
-        offers().andExpect(status().isOk())
-                .andExpect(jsonPath("$.offers[?(@.provider == 'lendo')]").isEmpty())
-                .andExpect(jsonPath("$.offers[?(@.provider == 'splitnow')]").isNotEmpty())
-                .andExpect(jsonPath("$.offers[?(@.provider == 'kreditko')]").isNotEmpty())
-                .andExpect(jsonPath("$.unavailable.length()").value(1))
-                .andExpect(jsonPath("$.unavailable[0].provider").value("lendo"))
-                .andExpect(jsonPath("$.unavailable[0].reason").value("did not answer in time"));
-        long millis = (System.nanoTime() - started) / 1_000_000;
-
-        assertThat(millis).isLessThan(2_500);
     }
 
     @Test

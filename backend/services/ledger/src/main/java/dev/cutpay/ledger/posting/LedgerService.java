@@ -1,5 +1,6 @@
 package dev.cutpay.ledger.posting;
 
+import static dev.cutpay.ledger.posting.AccountType.BNPL_RECEIVABLE;
 import static dev.cutpay.ledger.posting.AccountType.CUSTOMER_FUNDS;
 import static dev.cutpay.ledger.posting.AccountType.MERCHANT_AVAILABLE;
 import static dev.cutpay.ledger.posting.AccountType.MERCHANT_PENDING;
@@ -120,7 +121,10 @@ public class LedgerService {
             return;
         }
         PricingPlan plan = plans.findOrCreate(p.merchantId());
-        long fee = plan.strategy().feeFor(p.amount(), CardProfile.of(p.cardType(), p.cardRegion()));
+        long fee = p.isBnpl() ? p.bnplFee() : plan.strategy().feeFor(p.amount(), CardProfile.of(p.cardType(), p.cardRegion()));
+        if (p.isBnpl() && (p.bnplFee() < 0 || p.bnplFee() > p.amount() || !p.transfers().isEmpty())) {
+            throw new IllegalArgumentException("Payment " + p.paymentId() + " has an impossible BNPL fee or is split");
+        }
         long sent = p.transfers().stream().mapToLong(Transfer::amount).sum();
         if (sent > p.amount()) {
             throw new IllegalArgumentException("Payment " + p.paymentId() + " sends more than it is worth");
@@ -128,9 +132,14 @@ public class LedgerService {
         long net = p.amount() - fee - sent;
 
         List<Line> lines = new ArrayList<>();
-        lines.add(new Line(accounts.platform(p.livemode(), CUSTOMER_FUNDS, p.currency()), p.amount()));
+        if (p.isBnpl()) {
+            // The provider owes the price less its own fee; that fee is the merchant's cost, not platform revenue.
+            lines.add(new Line(accounts.platform(p.livemode(), BNPL_RECEIVABLE, p.currency()), p.amount() - fee));
+        } else {
+            lines.add(new Line(accounts.platform(p.livemode(), CUSTOMER_FUNDS, p.currency()), p.amount()));
+            lines.add(new Line(accounts.platform(p.livemode(), PLATFORM_FEES, p.currency()), -fee));
+        }
         lines.add(new Line(accounts.merchant(p.merchantId(), p.livemode(), MERCHANT_PENDING, p.currency()), -net));
-        lines.add(new Line(accounts.platform(p.livemode(), PLATFORM_FEES, p.currency()), -fee));
         for (Transfer transfer : p.transfers()) {
             lines.add(new Line(accounts.merchant(transfer.destination(), p.livemode(), MERCHANT_PENDING, p.currency()),
                     -transfer.amount()));

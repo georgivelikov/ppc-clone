@@ -59,7 +59,7 @@ class LedgerEventListener {
         ledger.onPaymentSucceeded(new PaymentSucceeded(eventId(event), occurredAt(event), merchantId(event),
                 livemode(event), text(payload, "payment_id"), payload.path("amount").asLong(),
                 text(payload, "currency"), nullableText(payload, "card_type"), nullableText(payload, "card_region"),
-                transfers(payload)));
+                transfers(payload), "bnpl".equals(nullableText(payload, "payment_method_type")) ? payload.path("bnpl_fee").asLong() : null));
     }
 
     @KafkaListener(topics = Topics.REFUND)

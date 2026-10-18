@@ -1,5 +1,6 @@
 package dev.cutpay.bnpl.offers;
 
+import dev.cutpay.bnpl.adapter.Adapters;
 import dev.cutpay.bnpl.model.Offer;
 import dev.cutpay.bnpl.offers.OfferService.Offers;
 import dev.cutpay.bnpl.routing.Decision.Ranked;
@@ -14,9 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class OfferController {
 
-    /** What the customer is shown. The merchant fee and the ranking are not for them. */
+    /** What the customer is shown, with what they must tell the provider to apply. The merchant fee and ranking are not for them. */
     record OfferView(String provider, String providerName, String plan, int instalments, List<Long> instalmentAmounts,
-                     int intervalDays, double apr, long totalPayable, long customerCost) {
+                     int intervalDays, double apr, long totalPayable, long customerCost,
+                     List<String> requiredFields) {
     }
 
     record Recommended(String provider, String plan) {
@@ -30,9 +32,11 @@ class OfferController {
     }
 
     private final OfferService service;
+    private final Adapters adapters;
 
-    OfferController(OfferService service) {
+    OfferController(OfferService service, Adapters adapters) {
         this.service = service;
+        this.adapters = adapters;
     }
 
     @GetMapping("/checkout/{clientSecret}/bnpl/offers")
@@ -44,7 +48,7 @@ class OfferController {
             for (Offer offer : ranked.offers()) {
                 offers.add(new OfferView(offer.provider(), ranked.name(), offer.plan(), offer.instalmentCount(),
                         offer.instalments(), offer.intervalDays(), offer.aprPercent(), offer.totalPayable(),
-                        offer.customerCost(price)));
+                        offer.customerCost(price), adapters.require(offer.provider()).requiredFields()));
             }
         }
         Recommended recommended = result.decision().ranked().isEmpty() ? null

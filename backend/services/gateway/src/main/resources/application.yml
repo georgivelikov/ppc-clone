@@ -96,6 +96,10 @@ spring:
               uri: ${cutpay.upstreams.bnpl}
               predicates:
                 - Path=/v1/bnpl/**
+            - id: bnpl-callback
+              uri: ${cutpay.upstreams.bnpl}
+              predicates:
+                - Path=/bnpl/callback/**
             # Must come before checkout-public, which would otherwise take every /checkout path to payments.
             - id: bnpl-public
               uri: ${cutpay.upstreams.bnpl}

@@ -17,6 +17,15 @@ spring:
           # Keys are fetched lazily, so bnpl can start before identity does.
           jwk-set-uri: http://localhost:8081/.well-known/jwks.json
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: bnpl
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
 management:
   endpoints:
     web:
@@ -40,6 +49,11 @@ cutpay:
     provider-timeout: PT1.8S
     # The country offers are quoted for when the checkout does not say.
     default-country: BG
+    # Where providers call back to. Direct to this service here; behind the gateway in a real deployment.
+    callback-base-url: http://localhost:8090
+    # How often applications that wait for a decision are asked about, and how long they may wait.
+    job-poll-interval: PT5S
+    application-expiry: PT24H
     # The terms KreditKo is asked to price (it prices one term per call).
     kreditko-terms: [6, 12, 24]
     providers:
@@ -47,3 +61,5 @@ cutpay:
       lendo-url: http://localhost:8089/lendo/api
       kreditko-url: http://localhost:8089/kreditko
       paylatereu-url: http://localhost:8089/paylatereu/api
+      # The key Lendo signs its callbacks with.
+      lendo-secret: lendo_test_secret

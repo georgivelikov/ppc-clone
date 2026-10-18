@@ -1,5 +1,6 @@
 package dev.cutpay.bnpl.offers;
 
+import dev.cutpay.bnpl.adapter.Adapters;
 import dev.cutpay.bnpl.adapter.BnplProviderAdapter;
 import dev.cutpay.bnpl.config.BnplProperties;
 import dev.cutpay.bnpl.model.Offer;
@@ -8,7 +9,6 @@ import dev.cutpay.bnpl.model.ProviderInfo;
 import dev.cutpay.bnpl.model.QuoteRequest;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,12 +36,12 @@ public class Quoter {
     public record Quotes(Map<String, List<Offer>> offers, Map<String, String> failures) {
     }
 
-    private final Map<String, BnplProviderAdapter> adapters = new HashMap<>();
+    private final Adapters adapters;
     private final Duration deadline;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public Quoter(List<BnplProviderAdapter> adapters, BnplProperties properties) {
-        adapters.forEach(adapter -> this.adapters.put(adapter.info().code(), adapter));
+    public Quoter(Adapters adapters, BnplProperties properties) {
+        this.adapters = adapters;
         this.deadline = properties.offersDeadline();
     }
 
@@ -53,10 +53,8 @@ public class Quoter {
     public Quotes quote(List<ProviderInfo> providers, QuoteRequest request) {
         Map<String, Future<List<Offer>>> pending = new LinkedHashMap<>();
         for (ProviderInfo provider : providers) {
-            BnplProviderAdapter adapter = adapters.get(provider.code());
-            if (adapter != null) {
-                pending.put(provider.code(), executor.submit(() -> adapter.quote(request)));
-            }
+            adapters.find(provider.code()).ifPresent(adapter ->
+                    pending.put(provider.code(), executor.submit(() -> adapter.quote(request))));
         }
         Map<String, List<Offer>> offers = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();

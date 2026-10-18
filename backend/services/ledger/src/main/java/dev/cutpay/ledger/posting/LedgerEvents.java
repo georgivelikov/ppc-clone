@@ -13,15 +13,30 @@ public final class LedgerEvents {
     public record Transfer(String destination, long amount) {
     }
 
-    /** {@code transfers} are the parts sent on to connected accounts; the platform keeps the rest, minus the fee. */
+    /**
+     * {@code transfers} are the parts sent on to connected accounts; the platform keeps the rest, minus the fee.
+     * {@code bnplFee} is set when a buy-now-pay-later provider financed the payment: it is then what the provider keeps,
+     * instead of a card fee, and the provider owes the rest.
+     */
     public record PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
                                    String paymentId, long amount, String currency, String cardType,
-                                   String cardRegion, List<Transfer> transfers) {
+                                   String cardRegion, List<Transfer> transfers, Long bnplFee) {
 
-        /** An ordinary payment, not split. */
+        /** A card payment, possibly split. */
+        public PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
+                                String paymentId, long amount, String currency, String cardType,
+                                String cardRegion, List<Transfer> transfers) {
+            this(eventId, occurredAt, merchantId, livemode, paymentId, amount, currency, cardType, cardRegion, transfers, null);
+        }
+
+        /** An ordinary card payment, not split. */
         public PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
                                 String paymentId, long amount, String currency, String cardType, String cardRegion) {
-            this(eventId, occurredAt, merchantId, livemode, paymentId, amount, currency, cardType, cardRegion, List.of());
+            this(eventId, occurredAt, merchantId, livemode, paymentId, amount, currency, cardType, cardRegion, List.of(), null);
+        }
+
+        public boolean isBnpl() {
+            return bnplFee != null;
         }
     }
 
