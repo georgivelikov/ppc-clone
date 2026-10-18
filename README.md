@@ -75,6 +75,7 @@ cd backend
 ./gradlew :services:webhooks:bootRun      # http://localhost:8086  (webhook endpoints, events, deliveries)
 ./gradlew :services:links:bootRun         # http://localhost:8087  (payment links, QR codes)
 ./gradlew :services:billing:bootRun       # http://localhost:8088  (products, subscriptions, invoices)
+./gradlew :services:bnpl-sim:bootRun      # http://localhost:8089  (four fake buy-now-pay-later providers, demo controls under /admin)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
 # 3. Dashboard

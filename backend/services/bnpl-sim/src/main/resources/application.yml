@@ -1,0 +1,33 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: bnpl-sim
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  bnpl-sim:
+    # How long each provider takes before it answers on its own. Every one of these can be changed at runtime through
+    # PUT /admin/providers/{code} (demos, chaos experiments, tests).
+    splitnow-latency: PT0.2S
+    lendo-decision-delay: PT8S
+    kreditko-review-delay: PT30S
+    paylatereu-timeout-rate: 0.2
+    # How long a request that times out hangs before the provider gives up with a 504.
+    timeout-hang: PT15S
+    # The key Lendo signs its callbacks with.
+    lendo-secret: lendo_test_secret
+    splitnow-blocklist:
+      - fraud@example.com
