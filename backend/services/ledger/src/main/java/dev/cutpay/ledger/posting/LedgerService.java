@@ -15,6 +15,7 @@ import dev.cutpay.ledger.config.Topics;
 import dev.cutpay.ledger.fees.CardProfile;
 import dev.cutpay.ledger.fees.PricingPlan;
 import dev.cutpay.ledger.fees.PricingPlans;
+import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
@@ -155,6 +156,15 @@ public class LedgerService {
                 p.amount(), fee, net, "Payment " + p.paymentId(), entryId.get(), availableOn, p.occurredAt());
         insertPendingRelease(p.paymentId(), p.merchantId(), p.livemode(), p.currency(), net, availableOn);
         emitPosted(entryId.get(), "payment", p.paymentId(), p.merchantId(), p.livemode(), p.currency(), net);
+        if (p.isBnpl()) {
+            jdbc.sql("""
+                            INSERT INTO bnpl_payments (payment_id, merchant_id, livemode, currency, gross, fee)
+                            VALUES (:payment, :merchant, :livemode, :currency, :gross, :fee)
+                            ON CONFLICT (payment_id) DO NOTHING
+                            """)
+                    .param("payment", p.paymentId()).param("merchant", p.merchantId()).param("livemode", p.livemode())
+                    .param("currency", p.currency()).param("gross", p.amount()).param("fee", fee).update();
+        }
 
         for (Transfer transfer : p.transfers()) {
             jdbc.sql("""
@@ -224,6 +234,16 @@ public class LedgerService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Payment " + r.paymentId() + " is not in the ledger yet; refund " + r.refundId()
                                 + " will be retried"));
+
+        var financed = jdbc.sql("SELECT gross, fee, refunded_gross, refunded_net, settled_at IS NOT NULL AS settled FROM bnpl_payments WHERE payment_id = :payment FOR UPDATE")
+                .param("payment", r.paymentId())
+                .query((rs, n) -> new BnplPayment(rs.getLong("gross"), rs.getLong("fee"), rs.getLong("refunded_gross"),
+                        rs.getLong("refunded_net"), rs.getBoolean("settled")))
+                .optional();
+        if (financed.isPresent()) {
+            refundBnpl(r, financed.get());
+            return;
+        }
 
         record Share(String destination, long amount, long reversed, long gross) {
         }
@@ -300,6 +320,87 @@ public class LedgerService {
             }
             emitPosted(entryId.get(), "refund", r.refundId(), party.getKey(), r.livemode(), r.currency(), -amount);
         }
+    }
+
+    /** What the ledger keeps about a payment a provider financed. */
+    private record BnplPayment(long gross, long fee, long refundedGross, long refundedNet, boolean settled) {
+    }
+
+    /**
+     * A refund of a payment financed in instalments. The provider gives the customer the refund and takes back the same
+     * share of its fee, so the merchant gives back only the share of the price they actually received. Taking the shares
+     * from the running total makes the pieces add up exactly: refunding everything returns the whole of price less fee.
+     * The provider owes the platform that much less if it has not paid yet; if it has, the platform pays it back.
+     */
+    private void refundBnpl(RefundSucceeded r, BnplPayment b) {
+        long received = b.gross() - b.fee();
+        long refundedGross = b.refundedGross() + r.amount();
+        if (refundedGross > b.gross()) {
+            throw new IllegalArgumentException("Refund " + r.refundId() + " is more than the payment " + r.paymentId());
+        }
+        long refundedNet = BigDecimal.valueOf(refundedGross).multiply(BigDecimal.valueOf(received))
+                .divide(BigDecimal.valueOf(b.gross()), 0, RoundingMode.HALF_UP).longValueExact();
+        long net = refundedNet - b.refundedNet();
+        jdbc.sql("UPDATE bnpl_payments SET refunded_gross = :gross, refunded_net = :net WHERE payment_id = :payment")
+                .param("gross", refundedGross).param("net", refundedNet).param("payment", r.paymentId()).update();
+        if (net == 0) {
+            return; // so small that the share of the merchant rounds to nothing
+        }
+        boolean released = Boolean.TRUE.equals(jdbc.sql("SELECT released_at IS NOT NULL FROM pending_releases WHERE payment_id = :payment AND merchant_id = :merchant")
+                .param("payment", r.paymentId()).param("merchant", r.merchantId()).query(Boolean.class).optional().orElse(false));
+        AccountType owedBy = released ? MERCHANT_AVAILABLE : MERCHANT_PENDING;
+        AccountType paidFrom = b.settled() ? CUSTOMER_FUNDS : BNPL_RECEIVABLE;
+        Optional<String> entryId = engine.post(new Entry(r.eventId(), "refund", "Refund " + r.refundId(), r.merchantId(),
+                r.livemode(), r.currency(), r.refundId(), r.occurredAt(),
+                List.of(new Line(accounts.merchant(r.merchantId(), r.livemode(), owedBy, r.currency()), net),
+                        new Line(accounts.platform(r.livemode(), paidFrom, r.currency()), -net))));
+        if (entryId.isEmpty()) {
+            return;
+        }
+        // The fee share that comes back shows as a negative fee: gross - fee = net.
+        insertBalanceTransaction(r.merchantId(), r.livemode(), r.currency(), "refund", r.refundId(), r.paymentId(),
+                -r.amount(), -(r.amount() - net), -net, "Refund " + r.refundId() + " of " + r.paymentId(), entryId.get(),
+                null, r.occurredAt());
+        if (released) {
+            emitFundsAvailable(entryId.get(), r.refundId(), r.merchantId(), r.livemode(), r.currency(), -net, "refund");
+        } else {
+            jdbc.sql("UPDATE pending_releases SET remaining = remaining - :amount WHERE payment_id = :payment AND merchant_id = :merchant")
+                    .param("amount", net).param("payment", r.paymentId()).param("merchant", r.merchantId()).update();
+        }
+        emitPosted(entryId.get(), "refund", r.refundId(), r.merchantId(), r.livemode(), r.currency(), -net);
+    }
+
+    /**
+     * The provider has paid the platform: what it still owed (the price less its fee less what was refunded) moves from the
+     * receivable to the platform's funds. Refunds from now on are paid from those funds.
+     */
+    @Transactional
+    public void onBnplSettled(BnplSettled s) {
+        if (!inbox.firstTime(s.eventId())) {
+            return;
+        }
+        var financed = jdbc.sql("SELECT gross, fee, refunded_gross, refunded_net, settled_at IS NOT NULL AS settled FROM bnpl_payments WHERE payment_id = :payment FOR UPDATE")
+                .param("payment", s.paymentId())
+                .query((rs, n) -> new BnplPayment(rs.getLong("gross"), rs.getLong("fee"), rs.getLong("refunded_gross"),
+                        rs.getLong("refunded_net"), rs.getBoolean("settled")))
+                .optional()
+                // Fails (and is retried) when the payment has not reached the ledger yet.
+                .orElseThrow(() -> new IllegalStateException("Payment " + s.paymentId() + " is not in the ledger yet; "
+                        + "its settlement will be retried"));
+        if (financed.settled()) {
+            return;
+        }
+        String currency = jdbc.sql("SELECT currency FROM bnpl_payments WHERE payment_id = :payment")
+                .param("payment", s.paymentId()).query(String.class).single().trim();
+        long owed = financed.gross() - financed.fee() - financed.refundedNet();
+        if (owed > 0) {
+            engine.post(new Entry(s.eventId(), "bnpl_settlement", "Settlement of " + s.paymentId(), s.merchantId(), s.livemode(),
+                    currency, s.paymentId(), s.occurredAt(),
+                    List.of(new Line(accounts.platform(s.livemode(), CUSTOMER_FUNDS, currency), owed),
+                            new Line(accounts.platform(s.livemode(), BNPL_RECEIVABLE, currency), -owed))));
+        }
+        jdbc.sql("UPDATE bnpl_payments SET settled_at = :at, settled_amount = :amount WHERE payment_id = :payment")
+                .param("at", Sql.ts(s.occurredAt())).param("amount", owed).param("payment", s.paymentId()).update();
     }
 
     // --- availability (T+N) -----------------------------------------------------------------------

@@ -50,6 +50,23 @@ public class BnplEvents {
         write("BnplCanceled", a);
     }
 
+    /** The provider paid Cutpay for the application. */
+    public void settled(Application a) {
+        write("BnplSettled", a);
+    }
+
+    /** The provider gave back part of the application. */
+    public void refunded(Application a, String refundId, long amount) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("application_id", a.id());
+        payload.put("payment_id", a.paymentId());
+        payload.put("provider", a.provider());
+        payload.put("refund_id", refundId);
+        payload.put("amount", amount);
+        payload.put("currency", a.currency());
+        outbox.write(Topics.BNPL, "BnplRefunded", a.id(), a.merchantId(), a.livemode(), payload);
+    }
+
     private void write(String eventType, Application a) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("application_id", a.id());

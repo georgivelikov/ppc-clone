@@ -104,7 +104,7 @@ public class ApplicationService {
                     payment.livemode(), offer.provider(), offer.plan(), ApplicationStatus.CREATED, null, payment.amount(),
                     payment.currency(), country, offer.instalmentCount(), offer.instalments(), offer.intervalDays(),
                     offer.aprPercent(), offer.totalPayable(), offer.merchantFee(), applicant.email(), null, null,
-                    now.plus(properties.applicationExpiry()), now, null, now);
+                    now.plus(properties.applicationExpiry()), now, null, null, now);
             applications.insert(created);
             events.created(created);
             return created;
@@ -219,6 +219,80 @@ public class ApplicationService {
             }
         }
         return expired;
+    }
+
+    // --- the provider pays Cutpay ------------------------------------------------------------------------------
+
+    /**
+     * Applications that were approved at least the settlement delay ago are paid by their provider. Nothing real moves: the
+     * application is marked settled and {@code BnplSettled} tells the ledger to clear what the provider owed.
+     */
+    public int settleDue(int limit) {
+        int settled = 0;
+        for (Application due : applications.dueForSettlement(clock.instant().minus(properties.settlementDelay()), limit)) {
+            Boolean moved = tx.execute(status -> {
+                Application locked = applications.lock(due.id()).orElseThrow();
+                if (!locked.status().canMoveTo(ApplicationStatus.SETTLED)) {
+                    return false;
+                }
+                applications.markSettled(locked.id(), clock.instant());
+                events.settled(applications.find(locked.id()).orElseThrow());
+                return true;
+            });
+            if (Boolean.TRUE.equals(moved)) {
+                settled++;
+            }
+        }
+        return settled;
+    }
+
+    // --- refunds -------------------------------------------------------------------------------------------------
+
+    /**
+     * Gives back {@code amount} of an approved application: the provider shortens the instalments of the customer. The refund
+     * is stored first under the id payments gave it and the provider is asked once; asking again with the same id answers
+     * what happened the first time.
+     */
+    public void refund(String applicationId, String refundId, long amount) {
+        Application application = tx.execute(status -> {
+            Application locked = applications.lock(applicationId)
+                    .orElseThrow(() -> ApiException.notFound("application_not_found", "No such application"));
+            if (locked.status() != ApplicationStatus.APPROVED && locked.status() != ApplicationStatus.SETTLED) {
+                throw ApiException.conflict("application_not_refundable", "Only an approved application can be refunded", null);
+            }
+            var existing = applications.findRefund(refundId);
+            if (existing.isPresent()) {
+                if (!existing.get().applicationId().equals(applicationId)) {
+                    throw ApiException.conflict("refund_id_in_use", "This refund id belongs to another application", null);
+                }
+                if (!"succeeded".equals(existing.get().status())) {
+                    throw ApiException.conflict("refund_in_progress", "This refund was already tried and has not succeeded", null);
+                }
+                return null; // already done
+            }
+            if (amount <= 0 || applications.refundedTotal(applicationId) + amount > locked.amount()) {
+                throw ApiException.invalidRequest("refund_exceeds_charge", "More than what is left of the payment", "amount");
+            }
+            applications.insertRefund(refundId, applicationId, amount, clock.instant());
+            return locked;
+        });
+        if (application == null) {
+            return;
+        }
+        try {
+            ask(application.provider(), () -> {
+                adapters.require(application.provider()).refund(application.providerRef(), amount);
+                return Boolean.TRUE;
+            });
+        } catch (ProviderException e) {
+            tx.executeWithoutResult(status -> applications.finishRefund(refundId, false, e.kind().name().toLowerCase(Locale.ROOT), clock.instant()));
+            throw new ApiException(e.kind() == Kind.REFUSED ? HttpStatus.UNPROCESSABLE_CONTENT : HttpStatus.BAD_GATEWAY, "api_error",
+                    "provider_refund_failed", "The provider could not refund: " + e.getMessage(), null);
+        }
+        tx.executeWithoutResult(status -> {
+            applications.finishRefund(refundId, true, null, clock.instant());
+            events.refunded(applications.find(applicationId).orElseThrow(), refundId, amount);
+        });
     }
 
     // --- closing -----------------------------------------------------------------------------------------------

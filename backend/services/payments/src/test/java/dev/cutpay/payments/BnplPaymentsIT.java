@@ -1,7 +1,10 @@
 package dev.cutpay.payments;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -62,6 +65,8 @@ class BnplPaymentsIT {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("cutpay.acquirer.url", ACQUIRER::baseUrl);
+        // The same stand-in plays the BNPL service.
+        registry.add("cutpay.bnpl-url", ACQUIRER::baseUrl);
     }
 
     @AfterAll
@@ -234,5 +239,76 @@ class BnplPaymentsIT {
         mvc.perform(get("/internal/checkout/" + field(created, "client_secret")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.split").value(false))
                 .andExpect(jsonPath("$.status").value("requires_payment_method")).andExpect(jsonPath("$.capture_method").value("automatic"));
+    }
+
+    // --- refunds -----------------------------------------------------------------------------------------------
+
+    private String paidWithBnpl(String applicationId) throws Exception {
+        String id = field(create(""), "id");
+        approved("evt_" + UUID.randomUUID(), id, applicationId, 30_000, 1050);
+        awaitStatus(id, "succeeded");
+        return id;
+    }
+
+    private org.springframework.test.web.servlet.ResultActions refund(String paymentId, String amountField) throws Exception {
+        return mvc.perform(post("/v1/refunds").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"payment_intent\":\"%s\"%s}".formatted(paymentId, amountField)));
+    }
+
+    @Test
+    void aPaymentFinancedInInstalmentsIsRefundedByAskingItsProviderNotTheCardNetwork() throws Exception {
+        String id = paidWithBnpl("bnpl_r1");
+        ACQUIRER.stubFor(WireMock.post(urlEqualTo("/internal/applications/bnpl_r1/refunds")).willReturn(aResponse()
+                .withHeader("Content-Type", "application/json").withBody("{\"status\":\"succeeded\"}")));
+
+        refund(id, ",\"amount\":10000").andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("succeeded"))
+                .andExpect(jsonPath("$.amount").value(10000));
+
+        ACQUIRER.verify(1, postRequestedFor(urlEqualTo("/internal/applications/bnpl_r1/refunds"))
+                .withRequestBody(containing("\"refund_id\":\"re_")).withRequestBody(containing("\"amount\":10000")));
+        ACQUIRER.verify(0, postRequestedFor(urlEqualTo("/refund")));
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant())).andExpect(jsonPath("$.status").value("partially_refunded"))
+                .andExpect(jsonPath("$.amount_refunded").value(10000));
+        assertThat(jdbc.sql("SELECT count(*) FROM outbox WHERE event_type = 'RefundSucceeded' AND payload LIKE :payment")
+                .param("payment", "%" + id + "%").query(Long.class).single()).isEqualTo(1);
+
+        // The rest of the payment, without naming an amount.
+        refund(id, "").andExpect(status().isCreated()).andExpect(jsonPath("$.amount").value(20000));
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant())).andExpect(jsonPath("$.status").value("refunded"));
+        refund(id, ",\"amount\":1").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void whenTheProviderRefusesOrCannotBeReachedTheRefundFailsAndThePaymentIsUntouched() throws Exception {
+        String id = paidWithBnpl("bnpl_r2");
+        ACQUIRER.stubFor(WireMock.post(urlPathMatching("/internal/applications/bnpl_r2/refunds")).willReturn(aResponse()
+                .withStatus(422).withHeader("Content-Type", "application/json")
+                .withBody("{\"error\":{\"code\":\"provider_refund_failed\"}}")));
+
+        refund(id, ",\"amount\":5000").andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("failed"))
+                .andExpect(jsonPath("$.failure_code").value("refund_rejected"));
+
+        ACQUIRER.stubFor(WireMock.post(urlPathMatching("/internal/applications/bnpl_r2/refunds")).willReturn(aResponse().withStatus(503)));
+        refund(id, ",\"amount\":5000").andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("failed"))
+                .andExpect(jsonPath("$.failure_code").value("bnpl_unavailable"));
+
+        mvc.perform(get("/v1/payment_intents/" + id).with(merchant())).andExpect(jsonPath("$.status").value("succeeded"))
+                .andExpect(jsonPath("$.amount_refunded").value(0));
+    }
+
+    @Test
+    void aCardPaymentIsStillRefundedThroughTheCardNetwork() throws Exception {
+        String created = create("");
+        String id = field(created, "id");
+        mvc.perform(post("/checkout/sessions/%s/confirm".formatted(field(created, "client_secret")))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"tok_visa\",\"email\":\"anna@example.com\"}"))
+                .andExpect(status().isOk());
+        ACQUIRER.stubFor(WireMock.post(urlEqualTo("/refund")).willReturn(aResponse().withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"succeeded\",\"refund_ref\":\"rf_1\"}")));
+
+        refund(id, ",\"amount\":1000").andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("succeeded"));
+
+        ACQUIRER.verify(1, postRequestedFor(urlEqualTo("/refund")));
+        ACQUIRER.verify(0, postRequestedFor(urlPathMatching("/internal/applications/.*")));
     }
 }

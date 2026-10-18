@@ -388,4 +388,132 @@ class ApplicationFlowIT extends BnplIntegrationTest {
         assertThat(events(id)).containsExactly("BnplApplicationCreated", "BnplApproved", "BnplCanceled");
         WORLD.verify(postRequestedFor(urlEqualTo("/lendo/api/applications/ld_1/cancel")));
     }
+
+    // --- refunds -----------------------------------------------------------------------------------------------
+
+    /** Refund ids are global, so each test gets its own: {@code re_1} here is {@code re_1_<random>} in the database. */
+    private final String refundSuffix = "_" + UUID.randomUUID().toString().substring(0, 8);
+
+    private ResultActions refund(String applicationId, String refundId, long amount) throws Exception {
+        return mvc.perform(MockMvcRequestBuilders.post("/internal/applications/" + applicationId + "/refunds")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"refund_id\":\"%s\",\"amount\":%d}".formatted(refundId + refundSuffix, amount)));
+    }
+
+    private String approvedWithSplitNow() throws Exception {
+        splitNowAnswers("approved", null);
+        return idOf(apply("splitnow", "splitnow_3", ANNA));
+    }
+
+    @Test
+    void aRefundIsGivenBackByTheProviderOnceAndAskingAgainChangesNothing() throws Exception {
+        String id = approvedWithSplitNow();
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\",\"state\":\"approved\",\"refunded_cents\":10000}");
+
+        refund(id, "re_1", 10_000).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("succeeded"));
+        WORLD.verify(1, postRequestedFor(urlEqualTo("/splitnow/v1/checkouts/sn_1/refunds")).withRequestBody(containing("\"amount_cents\":10000")));
+        assertThat(events(id)).containsExactly("BnplApplicationCreated", "BnplApproved", "BnplRefunded");
+
+        refund(id, "re_1", 10_000).andExpect(status().isOk());
+        WORLD.verify(1, postRequestedFor(urlEqualTo("/splitnow/v1/checkouts/sn_1/refunds")));
+        assertThat(events(id)).filteredOn("BnplRefunded"::equals).hasSize(1);
+    }
+
+    @Test
+    void refundsCannotAddUpToMoreThanTheApplicationAndAFailedOneFreesItsAmount() throws Exception {
+        String id = approvedWithSplitNow();
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\"}");
+
+        refund(id, "re_1", 20_000).andExpect(status().isOk());
+        refund(id, "re_2", 10_001).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("refund_exceeds_charge"));
+        refund(id, "re_0", 0).andExpect(status().isBadRequest());
+
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 422, "{\"error\":{\"type\":\"refund_too_large\"}}");
+        refund(id, "re_3", 5_000).andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.error.code").value("provider_refund_failed"));
+        // The refused 5.000 does not count against the application, so the rest can still be refunded.
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\"}");
+        refund(id, "re_4", 10_000).andExpect(status().isOk());
+        // The refund that failed stays failed: it is not tried again under the same id.
+        refund(id, "re_3", 5_000).andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("refund_in_progress"));
+    }
+
+    @Test
+    void aProviderThatCannotBeReachedFailsTheRefundWithoutLosingIt() throws Exception {
+        String id = approvedWithSplitNow();
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 503, "{}");
+
+        refund(id, "re_1", 5_000).andExpect(status().isBadGateway()).andExpect(jsonPath("$.error.code").value("provider_refund_failed"));
+        assertThat(jdbc.sql("SELECT status FROM bnpl_refunds WHERE refund_id = :id").param("id", "re_1" + refundSuffix).query(String.class).single()).isEqualTo("failed");
+        assertThat(events(id)).doesNotContain("BnplRefunded");
+    }
+
+    @Test
+    void aRefundIdBelongsToOneApplication() throws Exception {
+        String first = approvedWithSplitNow();
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\"}");
+        refund(first, "re_1", 1_000).andExpect(status().isOk());
+        // Another payment, another application.
+        secret = "pay_" + UUID.randomUUID().toString().replace("-", "") + "_secret_x";
+        payment(30_000, "requires_payment_method", "automatic");
+        String second = approvedWithSplitNow();
+
+        refund(second, "re_1", 1_000).andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("refund_id_in_use"));
+    }
+
+    @Test
+    void onlyAnApprovedApplicationCanBeRefunded() throws Exception {
+        lendoProcesses();
+        String pending = idOf(apply("lendo", "lendo_12", LENDO_APPLICANT));
+        refund(pending, "re_1", 1_000).andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("application_not_refundable"));
+        refund("bnpl_nope", "re_2", 1_000).andExpect(status().isNotFound());
+        WORLD.verify(0, postRequestedFor(urlEqualTo("/lendo/api/applications/ld_1/refund")));
+    }
+
+    @Test
+    void lendoIsRefundedWithAFormInDecimalEuros() throws Exception {
+        lendoProcesses();
+        String id = idOf(apply("lendo", "lendo_12", LENDO_APPLICANT));
+        String body = "application_id=ld_1&outcome=accepted&score=700&reference=" + id;
+        lendoCallback(body, sign(body)).andExpect(status().isNoContent());
+        json(post("/lendo/api/applications/ld_1/refund"), 201, "{\"application_id\":\"ld_1\",\"refunded\":\"100.50\"}");
+
+        refund(id, "re_1", 10_050).andExpect(status().isOk());
+
+        WORLD.verify(postRequestedFor(urlEqualTo("/lendo/api/applications/ld_1/refund")).withRequestBody(containing("amount=100.50")));
+    }
+
+    // --- settlement --------------------------------------------------------------------------------------------
+
+    @Test
+    void theProviderPaysADayAfterApprovingAndTheLedgerIsToldOnce() throws Exception {
+        String id = approvedWithSplitNow();
+
+        assertThat(service.settleDue(100)).isZero();
+        customerView(id).andExpect(jsonPath("$.status").value("approved"));
+
+        ((SimulatedClock) clock).advance(Duration.ofHours(25));
+        assertThat(service.settleDue(100)).isGreaterThanOrEqualTo(1);
+
+        merchantView(id).andExpect(jsonPath("$.status").value("settled"));
+        customerView(id).andExpect(jsonPath("$.message").value("Your application was approved."));
+        assertThat(events(id)).containsExactly("BnplApplicationCreated", "BnplApproved", "BnplSettled");
+        assertThat(service.settleDue(100)).isZero();
+        assertThat(events(id)).filteredOn("BnplSettled"::equals).hasSize(1);
+
+        // A settled application can still be refunded: the platform pays the provider back.
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\"}");
+        refund(id, "re_late", 3_000).andExpect(status().isOk());
+    }
+
+    @Test
+    void anApplicationThatIsNotApprovedIsNeverSettled() throws Exception {
+        lendoProcesses();
+        String pending = idOf(apply("lendo", "lendo_12", LENDO_APPLICANT));
+        splitNowAnswers("declined", "risk_check_failed");
+
+        ((SimulatedClock) clock).advance(Duration.ofHours(25));
+        service.settleDue(100);
+
+        customerView(pending).andExpect(jsonPath("$.status").value("pending_review"));
+        assertThat(events(pending)).doesNotContain("BnplSettled");
+    }
 }

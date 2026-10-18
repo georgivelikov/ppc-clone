@@ -38,6 +38,9 @@ public interface BnplProviderAdapter {
     /** Closes an application that has not been used, or whose payment was settled another way. */
     void cancel(String providerRef);
 
+    /** Gives back part of an approved application: the provider shortens or cancels the customer's instalments. */
+    void refund(String providerRef, long amount);
+
     /**
      * Checks and reads a callback. Empty if this provider does not call back. Throws {@link SecurityException} when the
      * callback cannot be trusted, for example a signature that does not match.

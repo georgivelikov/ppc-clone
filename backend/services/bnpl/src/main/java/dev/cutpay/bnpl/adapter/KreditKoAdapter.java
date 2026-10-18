@@ -98,6 +98,12 @@ class KreditKoAdapter implements BnplProviderAdapter {
         ProviderHttp.call(INFO.code(), () -> http.post().uri("/loans/{id}/cancel", providerRef).retrieve().toBodilessEntity());
     }
 
+    @Override
+    public void refund(String providerRef, long amount) {
+        ProviderHttp.call(INFO.code(), () -> http.post().uri("/loans/{id}/refunds", providerRef)
+                .body(Map.of("amountMinor", amount)).retrieve().toBodilessEntity());
+    }
+
     private static ProviderResult result(JsonNode body) {
         if (body == null || !body.has("loanId") || !body.has("status")) {
             throw new ProviderException(INFO.code(), Kind.INVALID_RESPONSE, "no loan in the answer");

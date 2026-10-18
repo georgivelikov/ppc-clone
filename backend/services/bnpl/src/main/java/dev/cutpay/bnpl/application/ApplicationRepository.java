@@ -21,13 +21,13 @@ public class ApplicationRepository {
                               String country, int instalmentCount, List<Long> instalments, int intervalDays,
                               double aprPercent, long totalPayable, long merchantFee, String customerEmail,
                               String declineReason, Long decisionMs, Instant expiresAt, Instant createdAt,
-                              Instant decidedAt, Instant updatedAt) {
+                              Instant decidedAt, Instant settledAt, Instant updatedAt) {
     }
 
     private static final String COLUMNS = """
             id, payment_id, merchant_id, livemode, provider, plan, status, provider_ref, amount, currency, country,
             instalment_count, instalments::text AS instalments, interval_days, apr_percent, total_payable, merchant_fee,
-            customer_email, decline_reason, decision_ms, expires_at, created_at, decided_at, updated_at
+            customer_email, decline_reason, decision_ms, expires_at, created_at, decided_at, settled_at, updated_at
             """;
 
     private final JdbcClient jdbc;
@@ -119,6 +119,51 @@ public class ApplicationRepository {
                 .param("decided", ts(decidedAt), Types.TIMESTAMP_WITH_TIMEZONE).param("now", ts(now)).update();
     }
 
+    /** Approved applications whose provider is due to have paid by now, oldest first. */
+    public List<Application> dueForSettlement(Instant approvedBefore, int limit) {
+        return jdbc.sql("SELECT " + COLUMNS + """
+                         FROM bnpl_applications WHERE status = 'approved' AND decided_at <= :before
+                        ORDER BY decided_at LIMIT :limit
+                        """)
+                .param("before", ts(approvedBefore)).param("limit", limit).query(this::map).list();
+    }
+
+    public void markSettled(String id, Instant now) {
+        jdbc.sql("UPDATE bnpl_applications SET status = 'settled', settled_at = :now, updated_at = :now WHERE id = :id")
+                .param("id", id).param("now", ts(now)).update();
+    }
+
+    // --- refunds -----------------------------------------------------------------------------------------------
+
+    public record Refund(String refundId, String applicationId, long amount, String status, String failure) {
+    }
+
+    public Optional<Refund> findRefund(String refundId) {
+        return jdbc.sql("SELECT refund_id, application_id, amount, status, failure FROM bnpl_refunds WHERE refund_id = :id FOR UPDATE")
+                .param("id", refundId).query((rs, n) -> new Refund(rs.getString("refund_id"), rs.getString("application_id"),
+                        rs.getLong("amount"), rs.getString("status"), rs.getString("failure"))).optional();
+    }
+
+    /** What has been given back or is being given back: a failed refund returned nothing. */
+    public long refundedTotal(String applicationId) {
+        return jdbc.sql("SELECT COALESCE(SUM(amount), 0) FROM bnpl_refunds WHERE application_id = :id AND status <> 'failed'")
+                .param("id", applicationId).query(Long.class).single();
+    }
+
+    public void insertRefund(String refundId, String applicationId, long amount, Instant now) {
+        jdbc.sql("""
+                        INSERT INTO bnpl_refunds (refund_id, application_id, amount, status, created_at, updated_at)
+                        VALUES (:id, :application, :amount, 'pending', :now, :now)
+                        """)
+                .param("id", refundId).param("application", applicationId).param("amount", amount).param("now", ts(now)).update();
+    }
+
+    public void finishRefund(String refundId, boolean succeeded, String failure, Instant now) {
+        jdbc.sql("UPDATE bnpl_refunds SET status = :status, failure = :failure, updated_at = :now WHERE refund_id = :id")
+                .param("id", refundId).param("status", succeeded ? "succeeded" : "failed")
+                .param("failure", failure, Types.VARCHAR).param("now", ts(now)).update();
+    }
+
     private Application map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         long ms = rs.getLong("decision_ms");
         Long decisionMs = rs.wasNull() ? null : ms;
@@ -129,6 +174,6 @@ public class ApplicationRepository {
                 rs.getString("currency").trim(), rs.getString("country"), rs.getInt("instalment_count"), instalments,
                 rs.getInt("interval_days"), rs.getDouble("apr_percent"), rs.getLong("total_payable"),
                 rs.getLong("merchant_fee"), rs.getString("customer_email"), rs.getString("decline_reason"), decisionMs,
-                instant(rs, "expires_at"), instant(rs, "created_at"), instant(rs, "decided_at"), instant(rs, "updated_at"));
+                instant(rs, "expires_at"), instant(rs, "created_at"), instant(rs, "decided_at"), instant(rs, "settled_at"), instant(rs, "updated_at"));
     }
 }

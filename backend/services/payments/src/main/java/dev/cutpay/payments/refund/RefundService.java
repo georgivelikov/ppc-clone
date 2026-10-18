@@ -3,6 +3,7 @@ package dev.cutpay.payments.refund;
 import dev.cutpay.events.OutboxWriter;
 import dev.cutpay.payments.acquirer.AcquirerClient;
 import dev.cutpay.payments.acquirer.AcquirerClient.RefundResult;
+import dev.cutpay.payments.bnpl.BnplClient;
 import dev.cutpay.payments.config.KafkaTopicsConfig;
 import dev.cutpay.payments.domain.PaymentAttempt;
 import dev.cutpay.payments.domain.PaymentIntent;
@@ -32,22 +33,24 @@ public class RefundService {
     public record CreateRefund(String paymentIntent, Long amount, String reason) {
     }
 
-    private record Reserved(String refundId, String intentId, String acquirerRef, long amount) {
+    private record Reserved(String refundId, String intentId, String acquirerRef, long amount, boolean bnpl) {
     }
 
     private final PaymentIntentRepository intents;
     private final PaymentAttemptRepository attempts;
     private final RefundRepository refunds;
     private final AcquirerClient acquirer;
+    private final BnplClient bnpl;
     private final OutboxWriter outbox;
     private final TransactionTemplate tx;
 
     public RefundService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
-                         AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx) {
+                         AcquirerClient acquirer, BnplClient bnpl, OutboxWriter outbox, TransactionTemplate tx) {
         this.intents = intents;
         this.attempts = attempts;
         this.refunds = refunds;
         this.acquirer = acquirer;
+        this.bnpl = bnpl;
         this.outbox = outbox;
         this.tx = tx;
     }
@@ -55,7 +58,9 @@ public class RefundService {
     /** {@code claimedMode} is the mode an API key is limited to; null for dashboard sessions. */
     public RefundView create(String merchantId, Boolean claimedMode, CreateRefund request) {
         Reserved reserved = tx.execute(status -> reserve(merchantId, claimedMode, request));
-        RefundResult result = acquirer.refund(reserved.acquirerRef(), reserved.amount());
+        // A payment financed in instalments is refunded by asking its provider; a card payment by asking the card network.
+        RefundResult result = reserved.bnpl() ? bnpl.refund(reserved.acquirerRef(), reserved.refundId(), reserved.amount())
+                : acquirer.refund(reserved.acquirerRef(), reserved.amount());
         Refund refund = tx.execute(status -> settle(reserved, result));
         return RefundView.of(refund);
     }
@@ -89,7 +94,9 @@ public class RefundService {
             throw ApiException.invalidRequest("refund_exceeds_charge",
                     "Refund is larger than the amount still available (%d)".formatted(intent.refundable()), "amount");
         }
-        String acquirerRef = attempts.findByPaymentIntentIdOrderByCreatedAtAsc(intent.getId()).stream()
+        boolean financed = intent.getBnplApplicationId() != null;
+        String acquirerRef = financed ? intent.getBnplApplicationId()
+                : attempts.findByPaymentIntentIdOrderByCreatedAtAsc(intent.getId()).stream()
                 .filter(a -> "succeeded".equals(a.getStatus()))
                 .map(PaymentAttempt::getAcquirerRef)
                 .reduce((first, second) -> second)
@@ -101,7 +108,7 @@ public class RefundService {
         refunds.save(refund);
         intent.reserveRefund(amount);
         publish("RefundCreated", refund, intent);
-        return new Reserved(refund.getId(), intent.getId(), acquirerRef, amount);
+        return new Reserved(refund.getId(), intent.getId(), acquirerRef, amount, financed);
     }
 
     private Refund settle(Reserved reserved, RefundResult result) {

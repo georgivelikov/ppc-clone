@@ -54,6 +54,8 @@ cutpay:
     # How often applications that wait for a decision are asked about, and how long they may wait.
     job-poll-interval: PT5S
     application-expiry: PT24H
+    # How long after approving an application the provider pays Cutpay (simulated: nothing really moves).
+    settlement-delay: P1D
     # The terms KreditKo is asked to price (it prices one term per call).
     kreditko-terms: [6, 12, 24]
     providers:

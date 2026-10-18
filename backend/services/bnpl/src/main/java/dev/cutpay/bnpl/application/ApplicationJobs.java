@@ -8,7 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Asks providers about applications that wait for a decision, and closes those nobody decided in time. One instance at a
+ * Asks providers about applications that wait for a decision, closes those nobody decided in time, and marks the approved
+ * ones as settled once the provider is due to have paid. One instance at a
  * time (JobLock); expiry runs on the simulated clock, so a test can move a day forward and watch an application expire.
  */
 @Component
@@ -29,8 +30,9 @@ class ApplicationJobs {
         lock.runLocked("bnpl-applications", Duration.ofMinutes(5), () -> {
             int answered = service.pollWaiting(100);
             int expired = service.expireStale(100);
-            if (answered > 0 || expired > 0) {
-                log.info("Applications: {} decided by asking the provider, {} expired", answered, expired);
+            int settled = service.settleDue(100);
+            if (answered > 0 || expired > 0 || settled > 0) {
+                log.info("Applications: {} decided by asking the provider, {} expired, {} settled", answered, expired, settled);
             }
         });
     }

@@ -49,7 +49,7 @@ class ApplicationContractTest {
         provider.start();
         String base = provider.baseUrl();
         properties = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", "http://localhost:8090",
-                Duration.ofSeconds(5), Duration.ofHours(24), List.of(6, 12, 24),
+                Duration.ofSeconds(5), Duration.ofHours(24), Duration.ofDays(1), List.of(6, 12, 24),
                 new BnplProperties.Providers(base + "/splitnow/v1", base + "/lendo/api", base + "/kreditko", base + "/paylatereu/api",
                         "lendo_test_secret"));
     }
@@ -191,6 +191,46 @@ class ApplicationContractTest {
         assertThat(splitnow().handleCallback(Map.of(), "x")).isEmpty();
         assertThat(kreditko().handleCallback(Map.of(), "x")).isEmpty();
         assertThat(paylater().handleCallback(Map.of(), "x")).isEmpty();
+    }
+
+    // --- refunds -----------------------------------------------------------------------------------------------
+
+    @Test
+    void eachProviderIsRefundedInItsOwnUnitsAndShape() {
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 201, "{\"id\":\"sn_1\",\"refunded_cents\":10050}");
+        splitnow().refund("sn_1", 10_050);
+        provider.verify(postRequestedFor(urlEqualTo("/splitnow/v1/checkouts/sn_1/refunds")).withRequestBody(equalToJson("{\"amount_cents\":10050}")));
+
+        json(post("/lendo/api/applications/ld_1/refund"), 201, "{\"application_id\":\"ld_1\",\"refunded\":\"100.50\"}");
+        lendo().refund("ld_1", 10_050);
+        provider.verify(postRequestedFor(urlEqualTo("/lendo/api/applications/ld_1/refund"))
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded")).withRequestBody(containing("amount=100.50")));
+
+        json(post("/kreditko/loans/KK-1/refunds"), 201, "{\"loanId\":\"KK-1\",\"refundedMinor\":10050}");
+        kreditko().refund("KK-1", 10_050);
+        provider.verify(postRequestedFor(urlEqualTo("/kreditko/loans/KK-1/refunds")).withRequestBody(equalToJson("{\"amountMinor\":10050}")));
+
+        json(post("/paylatereu/api"), 200, "{\"ok\":true,\"code\":\"OK\",\"data\":{\"authId\":\"PL1\",\"refunded\":100.50}}");
+        paylater().refund("PL1", 10_050);
+        provider.verify(postRequestedFor(urlEqualTo("/paylatereu/api")).withRequestBody(equalToJson(
+                "{\"action\":\"refund\",\"authId\":\"PL1\",\"amount\":100.50}", true, true)));
+    }
+
+    @Test
+    void aRefundTheProviderRefusesIsToldApartFromOneThatCouldNotBeAsked() {
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 422, "{\"error\":{\"type\":\"refund_too_large\"}}");
+        assertFailure(() -> splitnow().refund("sn_1", 1), Kind.REFUSED);
+        json(post("/kreditko/loans/KK-1/refunds"), 409, "{\"code\":\"NOT_REFUNDABLE\"}");
+        assertFailure(() -> kreditko().refund("KK-1", 1), Kind.REFUSED);
+        json(post("/lendo/api/applications/ld_1/refund"), 422, "{\"error\":\"refund_too_large\"}");
+        assertFailure(() -> lendo().refund("ld_1", 1), Kind.REFUSED);
+        json(post("/paylatereu/api"), 200, "{\"ok\":false,\"code\":\"REFUND_TOO_LARGE\",\"data\":null}");
+        assertFailure(() -> paylater().refund("PL1", 1), Kind.REFUSED);
+
+        json(post("/lendo/api/applications/ld_1/refund"), 503, "{}");
+        assertFailure(() -> lendo().refund("ld_1", 1), Kind.UNAVAILABLE);
+        json(post("/splitnow/v1/checkouts/sn_1/refunds"), 504, "{}");
+        assertFailure(() -> splitnow().refund("sn_1", 1), Kind.TIMEOUT);
     }
 
     // --- KreditKo ----------------------------------------------------------------------------------------------

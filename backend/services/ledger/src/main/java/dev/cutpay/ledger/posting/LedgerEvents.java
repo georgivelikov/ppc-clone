@@ -44,6 +44,11 @@ public final class LedgerEvents {
                                   String refundId, String paymentId, long amount, String currency) {
     }
 
+    /** A buy-now-pay-later provider has paid the platform for a payment it financed. */
+    public record BnplSettled(String eventId, Instant occurredAt, String merchantId, boolean livemode, String paymentId,
+                              String applicationId) {
+    }
+
     /** {@code amount} is what reaches the bank; {@code fee} is an instant-payout fee on top. */
     public record Payout(String eventId, Instant occurredAt, String merchantId, boolean livemode, String payoutId,
                          long amount, long fee, String currency) {

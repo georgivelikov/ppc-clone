@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import dev.cutpay.ledger.posting.AccountType;
+import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
+import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.Transfer;
 import dev.cutpay.ledger.posting.LedgerService;
 import dev.cutpay.web.SimulatedClock;
@@ -182,6 +184,129 @@ class BnplPaymentsLedgerTest {
                 .formatted(id("evt"), pay, merchant, pay));
 
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isEqualTo(28_950));
+        assertTrialBalanceIsZero();
+    }
+
+    // --- refunds -----------------------------------------------------------------------------------------------
+
+    private void refund(long amount) {
+        ledger.onRefundSucceeded(new RefundSucceeded(id("evt"), clock.instant(), merchant, false, id("re"), pay, amount, "EUR"));
+    }
+
+    private void settle(String eventId) {
+        ledger.onBnplSettled(new BnplSettled(eventId, clock.instant(), merchant, false, pay, id("bnpl")));
+    }
+
+    @Test
+    void aRefundGivesBackOnlyTheMerchantsShareOfThePriceBecauseTheProviderReturnsItsFeeShare() {
+        long receivable = platform(AccountType.BNPL_RECEIVABLE);
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+
+        refund(10_000);
+
+        // 10.000 of 30.000 is a third: the merchant received 289.50, so gives back 96.50 (and the 3.50 of fee comes back).
+        assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isEqualTo(28_950 - 9_650);
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isEqualTo(28_950 - 9_650);
+        var row = jdbc.sql("SELECT gross, fee, net FROM balance_transactions WHERE merchant_id = :m AND type = 'refund'")
+                .param("m", merchant).query((rs, n) -> List.of(rs.getLong("gross"), rs.getLong("fee"), rs.getLong("net"))).single();
+        assertThat(row).containsExactly(-10_000L, -350L, -9_650L);
+        assertTrialBalanceIsZero();
+    }
+
+    @Test
+    void refundingInPiecesReturnsExactlyWhatTheMerchantReceivedNoMoreAndNoLess() {
+        long receivable = platform(AccountType.BNPL_RECEIVABLE);
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+
+        refund(10_000);
+        refund(7_777);
+        refund(12_223);
+
+        assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isZero();
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isZero();
+        // The pieces of fee that came back add up to the whole fee.
+        assertThat(jdbc.sql("SELECT -SUM(fee) FROM balance_transactions WHERE merchant_id = :m AND type = 'refund'")
+                .param("m", merchant).query(Long.class).single()).isEqualTo(1_050);
+        assertTrialBalanceIsZero();
+        assertThatThrownBy(() -> refund(1)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aRefundAfterTheFundsWereReleasedComesOutOfTheAvailableBalance() {
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+        ((SimulatedClock) clock).advance(Duration.ofDays(3));
+        ledger.releaseDueFunds(100);
+
+        refund(30_000);
+
+        assertThat(owed(merchant, AccountType.MERCHANT_AVAILABLE)).isZero();
+        assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isZero();
+        assertTrialBalanceIsZero();
+    }
+
+    // --- settlement --------------------------------------------------------------------------------------------
+
+    @Test
+    void whenTheProviderPaysTheReceivableBecomesTheFundsOfThePlatform() {
+        long receivable = platform(AccountType.BNPL_RECEIVABLE);
+        long funds = platform(AccountType.CUSTOMER_FUNDS);
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+
+        String event = id("evt");
+        settle(event);
+
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isZero();
+        assertThat(platform(AccountType.CUSTOMER_FUNDS) - funds).isEqualTo(28_950);
+        // The merchant is not affected: they were paid at the time of the payment.
+        assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isEqualTo(28_950);
+        assertTrialBalanceIsZero();
+
+        settle(event);
+        settle(id("evt"));
+        assertThat(platform(AccountType.CUSTOMER_FUNDS) - funds).as("settled once").isEqualTo(28_950);
+    }
+
+    @Test
+    void settlementPaysWhatIsLeftAfterRefundsAndLaterRefundsComeOutOfThatMoney() {
+        long receivable = platform(AccountType.BNPL_RECEIVABLE);
+        long funds = platform(AccountType.CUSTOMER_FUNDS);
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+        refund(10_000);
+
+        settle(id("evt"));
+
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isZero();
+        assertThat(platform(AccountType.CUSTOMER_FUNDS) - funds).isEqualTo(28_950 - 9_650);
+
+        refund(20_000);
+
+        // The receivable stays at zero; the platform gives back the rest of what it was paid.
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isZero();
+        assertThat(platform(AccountType.CUSTOMER_FUNDS) - funds).isZero();
+        assertThat(owed(merchant, AccountType.MERCHANT_PENDING)).isZero();
+        assertTrialBalanceIsZero();
+    }
+
+    @Test
+    void aSettlementThatArrivesBeforeThePaymentIsRetriedNotLost() {
+        assertThatThrownBy(() -> settle(id("evt"))).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not in the ledger yet");
+    }
+
+    @Test
+    void theSettlementEventFromKafkaClearsTheReceivable() {
+        long receivable = platform(AccountType.BNPL_RECEIVABLE);
+        ledger.onPaymentSucceeded(bnplPayment(id("evt"), 30_000, 1_050));
+        assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isEqualTo(28_950);
+
+        kafka.send("bnpl.events", "bnpl_1", """
+                {"event_id":"%s","event_type":"BnplSettled","occurred_at":"2026-10-20T10:00:00Z","aggregate_id":"bnpl_1",
+                 "merchant_id":"%s","livemode":false,"version":1,
+                 "payload":{"application_id":"bnpl_1","payment_id":"%s","provider":"splitnow","amount":30000,"currency":"EUR",
+                            "status":"settled"}}""".formatted(id("evt"), merchant, pay));
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
+                assertThat(platform(AccountType.BNPL_RECEIVABLE) - receivable).isZero());
         assertTrialBalanceIsZero();
     }
 }

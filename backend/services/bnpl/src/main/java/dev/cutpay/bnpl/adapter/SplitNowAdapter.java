@@ -85,6 +85,12 @@ class SplitNowAdapter implements BnplProviderAdapter {
         ProviderHttp.call(INFO.code(), () -> http.post().uri("/checkouts/{id}/cancel", providerRef).retrieve().toBodilessEntity());
     }
 
+    @Override
+    public void refund(String providerRef, long amount) {
+        ProviderHttp.call(INFO.code(), () -> http.post().uri("/checkouts/{id}/refunds", providerRef)
+                .body(Map.of("amount_cents", amount)).retrieve().toBodilessEntity());
+    }
+
     private static ProviderResult result(JsonNode body) {
         if (body == null || !body.has("id") || !body.has("state")) {
             throw new ProviderException(INFO.code(), Kind.INVALID_RESPONSE, "no checkout in the answer");

@@ -1,6 +1,7 @@
 package dev.cutpay.ledger.events;
 
 import dev.cutpay.ledger.config.Topics;
+import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
@@ -60,6 +61,17 @@ class LedgerEventListener {
                 livemode(event), text(payload, "payment_id"), payload.path("amount").asLong(),
                 text(payload, "currency"), nullableText(payload, "card_type"), nullableText(payload, "card_region"),
                 transfers(payload), "bnpl".equals(nullableText(payload, "payment_method_type")) ? payload.path("bnpl_fee").asLong() : null));
+    }
+
+    @KafkaListener(topics = Topics.BNPL)
+    void onBnplEvent(String message) {
+        JsonNode event = mapper.readTree(message);
+        if (!"BnplSettled".equals(type(event))) {
+            return;
+        }
+        JsonNode payload = event.path("payload");
+        ledger.onBnplSettled(new BnplSettled(eventId(event), occurredAt(event), merchantId(event), livemode(event),
+                text(payload, "payment_id"), text(payload, "application_id")));
     }
 
     @KafkaListener(topics = Topics.REFUND)

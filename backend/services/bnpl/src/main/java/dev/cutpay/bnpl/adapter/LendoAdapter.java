@@ -114,6 +114,14 @@ class LendoAdapter implements BnplProviderAdapter {
         ProviderHttp.call(INFO.code(), () -> http.post().uri("/applications/{id}/cancel", providerRef).retrieve().toBodilessEntity());
     }
 
+    @Override
+    public void refund(String providerRef, long amount) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("amount", Money.toDecimal(amount));
+        ProviderHttp.call(INFO.code(), () -> http.post().uri("/applications/{id}/refund", providerRef)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().toBodilessEntity());
+    }
+
     /** Lendo signs the exact body it sends with HMAC-SHA256 and a shared key; anything else is not from Lendo. */
     @Override
     public Optional<Callback> handleCallback(Map<String, String> headers, String body) {

@@ -22,6 +22,8 @@ public class SecurityConfig {
                         .requestMatchers("/checkout/**").permitAll()
                         // Providers call back here; each adapter checks the callback itself.
                         .requestMatchers("/bnpl/callback/**").permitAll()
+                        // Service to service; the gateway has no route to these.
+                        .requestMatchers("/internal/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())

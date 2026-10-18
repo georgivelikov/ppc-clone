@@ -90,6 +90,14 @@ class PayLaterEuAdapter implements BnplProviderAdapter {
         }
     }
 
+    @Override
+    public void refund(String providerRef, long amount) {
+        JsonNode body = rpc(Map.of("action", "refund", "authId", providerRef, "amount", Money.toDecimalNumber(amount)));
+        if (!body.get("ok").asBoolean()) {
+            throw new ProviderException(INFO.code(), Kind.REFUSED, "could not refund: " + body.path("code").asString());
+        }
+    }
+
     private JsonNode rpc(Map<String, Object> call) {
         JsonNode body = ProviderHttp.call(INFO.code(), () -> http.post().uri("").body(call).retrieve().body(JsonNode.class));
         if (body == null || !body.has("ok")) {
