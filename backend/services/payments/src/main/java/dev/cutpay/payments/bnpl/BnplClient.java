@@ -25,7 +25,7 @@ public class BnplClient {
 
     private final RestClient http;
 
-    public BnplClient(@Value("${cutpay.bnpl-url:http://localhost:8090}") String url, RestClient.Builder builder) {
+    public BnplClient(@Value("${cutpay.bnpl-url:http://localhost:8091}") String url, RestClient.Builder builder) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(2)).build());
         // The provider is asked to agree, which can take a moment.
         factory.setReadTimeout(Duration.ofSeconds(8));

@@ -120,6 +120,10 @@ export interface Payment {
   payment_method: string | null;
   /** Charged without the customer present, using a saved card. */
   off_session: boolean;
+  /** How the payment was settled: by card, or financed in instalments by a provider. */
+  payment_method_type?: "card" | "bnpl";
+  /** When financed in instalments: who, which application, and what the provider kept. */
+  bnpl?: { provider: string; application: string; fee: number } | null;
   /** What the platform keeps of a split payment, when it said so. */
   application_fee_amount?: number | null;
   /** How the payment is shared with connected accounts. Only on a single payment. */

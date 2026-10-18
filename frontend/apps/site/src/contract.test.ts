@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { FEE_PLANS } from "./lib/pricing";
+import { PROVIDERS } from "./pages/docs/InstalmentsPage";
 import { FEE_CARDS, TEST_CARDS } from "./pages/docs/TestCardsPage";
 
 const root = resolve(import.meta.dirname, "../../../..");
@@ -119,6 +120,29 @@ describe("the docs agree with the platform", () => {
     expect(numbers.length).toBe(8);
     const documented = TEST_CARDS.map((card) => card.number.replaceAll(" ", ""));
     for (const number of numbers) expect(documented, number).toContain(number);
+  });
+
+  it("describes the BNPL providers with the limits and fees the platform really has", () => {
+    const catalogue = read("backend/services/bnpl/src/main/java/dev/cutpay/bnpl/model/ProviderCatalog.java");
+    const entries = [...catalogue.matchAll(/new ProviderInfo\(\w+, "(\w+)", ([\d_]+), ([\d_]+),/g)].map((m) => ({
+      name: m[1],
+      min: Number(m[2]!.replaceAll("_", "")),
+      max: Number(m[3]!.replaceAll("_", "")),
+    }));
+    expect(entries.length).toBe(PROVIDERS.length);
+    for (const provider of PROVIDERS) {
+      expect(entries, provider.name).toContainEqual({ name: provider.name, min: provider.min, max: provider.max });
+    }
+    const feeSources: Record<string, string> = {
+      splitnow: "SplitNowController",
+      lendo: "LendoController",
+      kreditko: "KreditKoController",
+      paylatereu: "PayLaterEuController",
+    };
+    for (const provider of PROVIDERS) {
+      const source = read(`backend/services/bnpl-sim/src/main/java/dev/cutpay/bnplsim/${feeSources[provider.code]}.java`);
+      expect(source, provider.name).toMatch(new RegExp(`FEE_BPS = ${provider.feeBps};`));
+    }
   });
 
   it("uses fee-tier cards that really have those BINs", () => {

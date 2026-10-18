@@ -6,7 +6,7 @@ const pnpm = "npx --yes pnpm@10.34.7";
 
 /**
  * End-to-end tests run against the real stack: the browser talks to the Vite dev server, which proxies
- * to the gateway, which routes to identity, payments, ledger, payouts, webhooks, links and billing (Postgres + Kafka). Infrastructure must already be running:
+ * to the gateway, which routes to identity, payments, ledger, payouts, webhooks, links, billing and bnpl (Postgres + Kafka). Infrastructure must already be running:
  *
  *     docker compose -f infra/docker-compose.yml up -d
  *
@@ -79,6 +79,21 @@ export default defineConfig({
       command: `${gradle} :services:billing:bootRun`,
       cwd: "../backend",
       url: "http://localhost:8088/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // The four pretend buy-now-pay-later providers, then the aggregator that talks to them.
+      command: `${gradle} :services:bnpl-sim:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8089/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: `${gradle} :services:bnpl:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8091/actuator/health",
       timeout: 240_000,
       reuseExistingServer: !process.env.CI,
     },

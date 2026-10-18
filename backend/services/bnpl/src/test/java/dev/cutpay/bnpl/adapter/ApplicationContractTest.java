@@ -48,7 +48,7 @@ class ApplicationContractTest {
     static void start() {
         provider.start();
         String base = provider.baseUrl();
-        properties = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", "http://localhost:8090",
+        properties = new BnplProperties("http://unused", Duration.ofSeconds(2), Duration.ofMillis(600), "BG", "http://localhost:8091",
                 Duration.ofSeconds(5), Duration.ofHours(24), Duration.ofDays(1), List.of(6, 12, 24),
                 new BnplProperties.Providers(base + "/splitnow/v1", base + "/lendo/api", base + "/kreditko", base + "/paylatereu/api",
                         "lendo_test_secret"));
@@ -145,7 +145,7 @@ class ApplicationContractTest {
                 .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
                 .withRequestBody(containing("amount=300.00")).withRequestBody(containing("months=12"))
                 .withRequestBody(containing("birthdate=1990-01-15")).withRequestBody(containing("reference=bnpl_1"))
-                .withRequestBody(containing("callback_url=http%3A%2F%2Flocalhost%3A8090%2Fbnpl%2Fcallback%2Flendo")));
+                .withRequestBody(containing("callback_url=http%3A%2F%2Flocalhost%3A8091%2Fbnpl%2Fcallback%2Flendo")));
 
         json(get(urlPathEqualTo("/lendo/api/applications/ld_1")), 200, "{\"application_id\":\"ld_1\",\"status\":\"accepted\",\"score\":700}");
         assertThat(lendo().status("ld_1")).isEqualTo(ProviderResult.approved("ld_1"));

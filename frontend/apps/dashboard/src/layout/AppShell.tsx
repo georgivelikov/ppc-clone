@@ -1,6 +1,7 @@
 import { Badge, cn } from "@cutpay/ui";
 import {
   Banknote,
+  CalendarClock,
   Code2,
   CreditCard,
   Home,
@@ -38,6 +39,7 @@ const NAV: NavItem[] = [
   { label: "Customers", to: "/customers", icon: Users },
   { label: "Products", to: "/products", icon: Package },
   { label: "Subscriptions", to: "/subscriptions", icon: Repeat },
+  { label: "Instalments", to: "/instalments", icon: CalendarClock },
   { label: "Invoices", to: "/invoices", icon: FileText },
   { label: "Connected accounts", to: "/connected-accounts", icon: Network },
   { label: "Developers", to: "/developers", icon: Code2 },

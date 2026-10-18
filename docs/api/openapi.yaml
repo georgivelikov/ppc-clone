@@ -60,6 +60,8 @@ tags:
     description: Sub-merchants of a platform, who receive part of its payments.
   - name: Billing
     description: Products and prices, subscriptions and invoices.
+  - name: Instalments
+    description: Customers pay in parts with buy-now-pay-later providers; you are paid up front.
   - name: Payment links
     description: Get paid without a website, with a shareable link or a QR code.
   - name: Refunds
@@ -1220,6 +1222,149 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/bnpl/settings:
+    get:
+      tags: [Instalments]
+      operationId: getBnplSettings
+      summary: Which providers you offer and how the best one is chosen
+      description: A merchant who never changed anything has every provider on, in the catalogue order, and lets the customer choose.
+      responses:
+        "200":
+          description: The routing mode, its weights and every provider with its limits, in your order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BnplSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Instalments]
+      operationId: updateBnplSettings
+      summary: Change the providers, their order or the routing mode
+      description: |
+        Everything is optional; what is left out stays as it is. A provider's `priority` is a position, 0 being first: it
+        takes exactly that place and the others keep their order around it. Two providers cannot be given the same place.
+        `routing_mode` is one of `customer_choice`, `cheapest`, `fastest`, `best_approval` and `weighted`;
+        `weights` count only in the last.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBnplSettings"
+      responses:
+        "200":
+          description: The saved settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BnplSettings"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/bnpl/applications:
+    get:
+      tags: [Instalments]
+      operationId: listBnplApplications
+      summary: List applications for instalments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BnplApplicationStatus"
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: payment
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+      responses:
+        "200":
+          description: Newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BnplApplicationList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/bnpl/applications/{id}:
+    get:
+      tags: [Instalments]
+      operationId: getBnplApplication
+      summary: Retrieve an application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The application, with what the provider keeps and what you receive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BnplApplication"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/bnpl/analytics:
+    get:
+      tags: [Instalments]
+      operationId: getBnplAnalytics
+      summary: How each provider has done for you
+      description: |
+        Per provider over the last `days` days (1 to 365, default 30): applications by outcome, the approval rate among those
+        decided, how long a decision took, financed volume, fees paid, and the state of the provider's circuit right now
+        (`open` means customers are not sent to it).
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        "200":
+          description: The figures.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BnplAnalytics"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/bnpl/routing_decisions/{payment_intent}:
+    get:
+      tags: [Instalments]
+      operationId: getRoutingDecision
+      summary: Why a provider was chosen for a payment
+      description: |
+        The latest time offers were worked out for the payment: who was ranked how, what each would cost, who was left out and
+        why, and a sentence that says it all. A 404 means the customer never looked at instalments.
+      parameters:
+        - name: payment_intent
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingDecision"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/checkout_sessions:
     post:
       tags: [Payments]
@@ -3363,6 +3508,297 @@ components:
         created_at:
           type: string
           format: date-time
+    RoutingMode:
+      type: string
+      enum: [customer_choice, cheapest, fastest, best_approval, weighted]
+    BnplWeights:
+      type: object
+      required: [cost, speed, approval]
+      properties:
+        cost:
+          type: integer
+          minimum: 0
+        speed:
+          type: integer
+          minimum: 0
+        approval:
+          type: integer
+          minimum: 0
+    BnplProvider:
+      type: object
+      properties:
+        code:
+          type: string
+          examples: [splitnow]
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          description: The position of the provider in your order, 0 first.
+        min_amount:
+          type: integer
+          format: int64
+        max_amount:
+          type: integer
+          format: int64
+        currencies:
+          type: array
+          items:
+            type: string
+        countries:
+          type: array
+          items:
+            type: string
+    BnplSettings:
+      type: object
+      properties:
+        object:
+          type: string
+          const: bnpl_settings
+        routing_mode:
+          $ref: "#/components/schemas/RoutingMode"
+        weights:
+          $ref: "#/components/schemas/BnplWeights"
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/BnplProvider"
+    UpdateBnplSettings:
+      type: object
+      properties:
+        routing_mode:
+          $ref: "#/components/schemas/RoutingMode"
+        weights:
+          $ref: "#/components/schemas/BnplWeights"
+        providers:
+          type: array
+          items:
+            type: object
+            required: [code]
+            properties:
+              code:
+                type: string
+              enabled:
+                type: boolean
+              priority:
+                type: integer
+                minimum: 0
+    BnplApplicationStatus:
+      type: string
+      description: |
+        `created` and `pending_review` mean the provider has not decided; `approved` and `declined` are its answer;
+        `failed` means it could not be reached; `expired` and `canceled` mean it was abandoned; `settled` means the
+        provider has paid Cutpay.
+      enum: [created, pending_review, approved, declined, failed, expired, canceled, settled]
+    BnplApplication:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: bnpl_application
+        livemode:
+          type: boolean
+        payment:
+          type: string
+        provider:
+          type: string
+        provider_name:
+          type: string
+        plan:
+          type: string
+          examples: [splitnow_3]
+        status:
+          $ref: "#/components/schemas/BnplApplicationStatus"
+        provider_ref:
+          type: [string, "null"]
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        country:
+          type: string
+        instalments:
+          type: integer
+        instalment_amounts:
+          type: array
+          items:
+            type: integer
+            format: int64
+        interval_days:
+          type: integer
+        apr:
+          type: number
+        total_payable:
+          type: integer
+          format: int64
+        merchant_fee:
+          type: integer
+          format: int64
+          description: What the provider keeps.
+        net_amount:
+          type: integer
+          format: int64
+          description: What you receive, the price less the fee.
+        customer_email:
+          type: [string, "null"]
+        decline_reason:
+          type: [string, "null"]
+        decision_ms:
+          type: [integer, "null"]
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: [string, "null"]
+          format: date-time
+    BnplApplicationList:
+      type: object
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BnplApplication"
+        has_more:
+          type: boolean
+    RoutingDecision:
+      type: object
+      properties:
+        object:
+          type: string
+          const: routing_decision
+        id:
+          type: string
+        payment:
+          type: string
+        strategy:
+          $ref: "#/components/schemas/RoutingMode"
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        country:
+          type: string
+        chosen_provider:
+          type: [string, "null"]
+        reason:
+          type: string
+          examples: ["Chose PayLaterEU: cheapest eligible (2.5% vs 2.9% for Lendo)"]
+        ranked:
+          type: array
+          description: Every provider that could finance the payment, best first.
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              name:
+                type: string
+              rank:
+                type: integer
+              score:
+                type: number
+              best:
+                type: object
+                description: The offer that costs you least.
+                properties:
+                  plan:
+                    type: string
+                  merchant_fee:
+                    type: integer
+                    format: int64
+                  total_payable:
+                    type: integer
+                    format: int64
+              stats:
+                type: object
+                properties:
+                  approval_rate:
+                    type: number
+                  p50_decision_ms:
+                    type: integer
+        excluded:
+          type: array
+          description: The providers left out and why.
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              code:
+                type: string
+                examples: [below_minimum]
+              message:
+                type: string
+        created_at:
+          type: string
+          format: date-time
+    BnplAnalytics:
+      type: object
+      properties:
+        object:
+          type: string
+          const: bnpl_analytics
+        days:
+          type: integer
+        providers:
+          type: array
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              name:
+                type: string
+              applications:
+                type: integer
+              approved:
+                type: integer
+              declined:
+                type: integer
+              failed:
+                type: integer
+              pending:
+                type: integer
+              abandoned:
+                type: integer
+              approval_rate:
+                type: [number, "null"]
+                description: Of the applications that were decided; null while there are none.
+              avg_decision_ms:
+                type: integer
+              p50_decision_ms:
+                type: integer
+              volume:
+                type: integer
+                format: int64
+              fees:
+                type: integer
+                format: int64
+              circuit:
+                type: string
+                enum: [closed, open, half_open]
+        applications:
+          type: integer
+        approved:
+          type: integer
+        volume:
+          type: integer
+          format: int64
+        fees:
+          type: integer
+          format: int64
     PaymentIntent:
       type: object
       required: [id, object, livemode, amount, currency, status, created_at]
@@ -3412,6 +3848,21 @@ components:
         off_session:
           type: boolean
           description: Charged to a saved card without the customer present.
+        payment_method_type:
+          type: string
+          enum: [card, bnpl]
+          description: How the payment was settled; `bnpl` when a provider financed it in instalments.
+        bnpl:
+          type: [object, "null"]
+          description: Who financed a payment settled in instalments, and what they kept.
+          properties:
+            provider:
+              type: string
+            application:
+              type: string
+            fee:
+              type: integer
+              format: int64
         application_fee_amount:
           type: [integer, "null"]
           format: int64

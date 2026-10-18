@@ -137,6 +137,16 @@ describe("docs", () => {
     expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Billing" })).toBeInTheDocument();
   });
 
+  it("instalments guide lists the providers, how one is chosen and how refunds work", () => {
+    renderAt("/docs/instalments");
+    expect(screen.getByRole("heading", { name: "Pay in instalments" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Providers" })).getByText("SplitNow")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Choosing the provider" })).toBeInTheDocument();
+    expect(screen.getByText(/returns the same share of its fee/)).toBeInTheDocument();
+    expect(screen.getByText(/circuit breaker/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Docs" })).getByRole("link", { name: "Instalments" })).toBeInTheDocument();
+  });
+
   it("api reference is part of the docs navigation", async () => {
     renderAt("/docs/api");
     expect(await screen.findByText("API reference stand-in")).toBeInTheDocument();

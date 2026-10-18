@@ -2,7 +2,7 @@ import { Alert, formatMoney } from "@cutpay/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { CheckoutApiError, getSession, type Session } from "./api";
-import { PaymentForm } from "./PaymentForm";
+import { PaymentMethods } from "./PaymentMethods";
 import { Shell } from "./Shell";
 import { ThreeDsChallenge } from "./ThreeDsChallenge";
 import { Outcome } from "./Outcome";
@@ -53,7 +53,7 @@ export function CheckoutPage() {
     case "requires_payment_method":
       return (
         <Shell aside={aside}>
-          <PaymentForm secret={secret} session={session} onUpdate={update} />
+          <PaymentMethods secret={secret} session={session} onUpdate={update} />
         </Shell>
       );
     case "requires_action":

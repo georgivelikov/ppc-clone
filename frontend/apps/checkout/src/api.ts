@@ -48,7 +48,7 @@ export class CheckoutApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown, publishableKey?: string): Promise<T> {
+export async function call<T>(method: string, path: string, body?: unknown, publishableKey?: string): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   // Embedded checkouts identify the merchant integration; the gateway ignores it on these public routes.

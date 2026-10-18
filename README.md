@@ -42,7 +42,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 3 | [Developer platform](docs/plans/phase-03-developer-platform.md) — API keys, webhooks, SDK, demo shop, docs | ✅ Built |
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) — payment links, QR codes, charge-with-QR, virtual terminal | ✅ Built |
 | 5 | [Billing](docs/plans/phase-05-billing.md) — saved cards, pre-auth, subscriptions, invoices, split payments | ✅ Built |
-| 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine | ⏳ Planned |
+| 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine, circuit breakers | ✅ Built |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ⏳ Planned |
 | 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ⏳ Planned |
 | 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | ⏳ Planned |
@@ -75,7 +75,7 @@ cd backend
 ./gradlew :services:webhooks:bootRun      # http://localhost:8086  (webhook endpoints, events, deliveries)
 ./gradlew :services:links:bootRun         # http://localhost:8087  (payment links, QR codes)
 ./gradlew :services:billing:bootRun       # http://localhost:8088  (products, subscriptions, invoices)
-./gradlew :services:bnpl:bootRun          # http://localhost:8090  (BNPL aggregator: offers from several providers, routing)
+./gradlew :services:bnpl:bootRun          # http://localhost:8091  (BNPL aggregator: offers from several providers, routing)
 ./gradlew :services:bnpl-sim:bootRun      # http://localhost:8089  (four fake buy-now-pay-later providers, demo controls under /admin)
 ./gradlew :services:gateway:bootRun       # http://localhost:8080
 
@@ -157,6 +157,12 @@ To scan a code with a phone on the same network, serve the checkout on your comp
 - **Products** hold prices; **Subscriptions** bills them every period, with trials, plan changes that credit the unused part of the old plan and charge the rest at the new one (the preview shows the lines first), pause and cancel. When a payment fails the subscription goes past due and the invoice is tried again on days 1, 3, 5 and 7, then the subscription is canceled (or kept unpaid, as you choose). A downgrade that credits more than the next invoice leaves the rest as customer credit, which later invoices use before the card is charged; the Subscriptions page also charts churn month by month. The customer is emailed at every step; the emails are recorded under the subscription until real delivery arrives in phase 8.
 - **Invoices** also covers one-off invoices: draft, finalize (numbered INV-0001…), email a link to the page at `/i/{token}` where the customer pays or downloads the PDF.
 - **Connected accounts** are the sellers on your platform. Create a payment with `transfer_data` (or pick an account in "Create test payment") and each account is credited its part, with its own balance and its own payouts; refunds are taken back in proportion ([ADR 0016](docs/adr/0016-split-payments.md)).
+
+## Pay in instalments
+
+- At the checkout a **Pay in instalments** tab appears when a provider can finance the price: SplitNow, Lendo, KreditKo or PayLaterEU, four pretend providers with their own limits, fees and ways of answering ([ADR 0017](docs/adr/0017-bnpl-provider-simulator.md)). The page at `http://localhost:8089` switches one off, slows it down or makes it hang.
+- **Instalments** in the dashboard sets which providers you offer and how the best one is chosen (the customer, cheapest, fastest, most likely to approve, or a weighted mix), and shows how each has done and whether its circuit is open. A payment says who financed it and why that provider was chosen ([ADR 0018](docs/adr/0018-bnpl-aggregation-and-routing.md)).
+- You are paid the price less the provider fee as soon as it approves ([ADR 0019](docs/adr/0019-bnpl-applications-and-settlement-of-the-payment.md)); the provider settles a day later and refunds go through it ([ADR 0020](docs/adr/0020-bnpl-settlement-and-refunds.md)). A provider that is down drops out of the offers and comes back by itself ([ADR 0021](docs/adr/0021-bnpl-resilience-cascade-and-learning.md)).
 
 Billing, ledger and payouts run on simulated clocks. To watch a trial end and the next month renew:
 

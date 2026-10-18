@@ -124,4 +124,45 @@ describe("ApiClient", () => {
       expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("DELETE");
     });
   });
+
+  describe("pay in instalments", () => {
+    const urlAt = (fetchMock: ReturnType<typeof vi.fn<typeof fetch>>, call: number) => String(fetchMock.mock.calls[call]?.[0]);
+
+    it("reads and writes the settings in the mode asked for", async () => {
+      const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => json(200, { object: "bnpl_settings", providers: [] }));
+      const client = new ApiClient({ fetch: fetchMock });
+
+      await client.getBnplSettings();
+      await client.updateBnplSettings({ routing_mode: "cheapest", providers: [{ code: "lendo", enabled: false }] }, true);
+
+      expect(urlAt(fetchMock, 0)).toBe("/v1/bnpl/settings");
+      expect(urlAt(fetchMock, 1)).toBe("/v1/bnpl/settings?livemode=true");
+      expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
+      expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+        routing_mode: "cheapest",
+        providers: [{ code: "lendo", enabled: false }],
+      });
+    });
+
+    it("lists applications with filters, and asks for analytics over a period", async () => {
+      const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => json(200, { object: "list", data: [], has_more: false }));
+      const client = new ApiClient({ fetch: fetchMock });
+
+      await client.listBnplApplications({ status: "declined", provider: "lendo", limit: 5 });
+      await client.getBnplAnalytics(90);
+      await client.getBnplApplication("bnpl_1");
+
+      expect(urlAt(fetchMock, 0)).toBe("/v1/bnpl/applications?status=declined&provider=lendo&limit=5");
+      expect(urlAt(fetchMock, 1)).toBe("/v1/bnpl/analytics?days=90");
+      expect(urlAt(fetchMock, 2)).toBe("/v1/bnpl/applications/bnpl_1");
+    });
+
+    it("asks why a provider was chosen, and a payment without a decision is a 404", async () => {
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json(404, { error: { type: "invalid_request_error", code: "routing_decision_not_found", message: "none" } }));
+      const client = new ApiClient({ fetch: fetchMock });
+
+      await expect(client.getRoutingDecision("pay_1")).rejects.toMatchObject({ status: 404, code: "routing_decision_not_found" });
+      expect(urlAt(fetchMock, 0)).toBe("/v1/bnpl/routing_decisions/pay_1");
+    });
+  });
 });

@@ -1,5 +1,5 @@
 server:
-  port: 8090
+  port: 8091
 
 spring:
   application:
@@ -50,7 +50,7 @@ cutpay:
     # The country offers are quoted for when the checkout does not say.
     default-country: BG
     # Where providers call back to. Direct to this service here; behind the gateway in a real deployment.
-    callback-base-url: http://localhost:8090
+    callback-base-url: http://localhost:8091
     # How often applications that wait for a decision are asked about, and how long they may wait.
     job-poll-interval: PT5S
     application-expiry: PT24H

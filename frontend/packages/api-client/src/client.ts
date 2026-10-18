@@ -49,6 +49,15 @@ import type {
   UpdateCustomerInput,
 } from "./customers";
 import type {
+  BnplAnalytics,
+  BnplApplication,
+  BnplApplicationList,
+  BnplApplicationListParams,
+  BnplSettings,
+  RoutingDecision,
+  UpdateBnplSettingsInput,
+} from "./bnpl";
+import type {
   BillingNotification,
   BillingSettings,
   CreateInvoiceInput,
@@ -455,6 +464,31 @@ export class ApiClient {
 
   invoicePdf(id: string): Promise<Blob> {
     return this.fetchBlob(`/v1/invoices/${encodeURIComponent(id)}/pdf`);
+  }
+
+  getBnplSettings(livemode = false): Promise<BnplSettings> {
+    return this.request("GET", `/v1/bnpl/settings${toQuery({ livemode })}`);
+  }
+
+  updateBnplSettings(input: UpdateBnplSettingsInput, livemode = false): Promise<BnplSettings> {
+    return this.request("PUT", `/v1/bnpl/settings${toQuery({ livemode })}`, input);
+  }
+
+  listBnplApplications(params: BnplApplicationListParams = {}): Promise<BnplApplicationList> {
+    return this.request("GET", `/v1/bnpl/applications${toQuery(params)}`);
+  }
+
+  getBnplApplication(id: string, livemode = false): Promise<BnplApplication> {
+    return this.request("GET", `/v1/bnpl/applications/${encodeURIComponent(id)}${toQuery({ livemode })}`);
+  }
+
+  getBnplAnalytics(days = 30, livemode = false): Promise<BnplAnalytics> {
+    return this.request("GET", `/v1/bnpl/analytics${toQuery({ days, livemode })}`);
+  }
+
+  /** Why a provider was chosen for a payment. A 404 when the customer never looked at instalments. */
+  getRoutingDecision(paymentId: string, livemode = false): Promise<RoutingDecision> {
+    return this.request("GET", `/v1/bnpl/routing_decisions/${encodeURIComponent(paymentId)}${toQuery({ livemode })}`);
   }
 
   getBillingSettings(): Promise<BillingSettings> {

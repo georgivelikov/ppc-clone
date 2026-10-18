@@ -44,7 +44,7 @@ cutpay:
   # Where connected accounts are looked up before a split payment is accepted.
   identity-url: http://localhost:8081
   # Where payments financed in instalments are refunded: the provider has to agree.
-  bnpl-url: http://localhost:8090
+  bnpl-url: http://localhost:8091
   acquirer:
     url: http://localhost:8083
     connect-timeout: PT2S

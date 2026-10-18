@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
+import { BnplPaymentCard } from "./bnpl/BnplPaymentCard";
 import { CaptureDialog } from "./CaptureDialog";
 import { RefundDialog } from "./RefundDialog";
 
@@ -22,8 +23,8 @@ interface TimelineEvent {
 export function buildTimeline(payment: Payment): TimelineEvent[] {
   const events: TimelineEvent[] = [{ at: payment.created_at, title: "Payment created" }];
   for (const attempt of payment.attempts) {
-    const card = `${attempt.card_brand ?? "Card"} •••• ${attempt.card_last4 ?? "????"}`;
-    events.push({ at: attempt.created_at, title: `Payment attempted with ${card}` });
+    const card = attempt.method_type === "bnpl" ? "instalments" : `${attempt.card_brand ?? "Card"} •••• ${attempt.card_last4 ?? "????"}`;
+    events.push({ at: attempt.created_at, title: attempt.method_type === "bnpl" ? "Approved for instalments" : `Payment attempted with ${card}` });
     if (attempt.three_ds_status) {
       events.push({ at: attempt.created_at, title: "3-D Secure authentication required" });
     }
@@ -206,7 +207,11 @@ export function PaymentDetailPage() {
         </Card>
         <Card>
           <h2 className="font-semibold">Payment method</h2>
-          {attempt ? (
+          {attempt?.method_type === "bnpl" ? (
+            <p className="mt-2 text-sm" data-testid="method-instalments">
+              Paid in instalments{payment.bnpl ? ` with ${payment.bnpl.provider}` : ""}.
+            </p>
+          ) : attempt ? (
             <dl className="mt-2 divide-y divide-border">
               <Row label="Card">
                 <span data-testid="card-summary">
@@ -223,6 +228,8 @@ export function PaymentDetailPage() {
           )}
         </Card>
       </div>
+
+      <BnplPaymentCard payment={payment} />
 
       <Card>
         <h2 className="font-semibold">Timeline</h2>

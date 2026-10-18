@@ -17,6 +17,7 @@ import { NewSubscriptionPage } from "./pages/billing/NewSubscriptionPage";
 import { ProductsPage } from "./pages/billing/ProductsPage";
 import { SubscriptionDetailPage } from "./pages/billing/SubscriptionDetailPage";
 import { SubscriptionsPage } from "./pages/billing/SubscriptionsPage";
+import { BnplPage } from "./pages/bnpl/BnplPage";
 import { ConnectedAccountDetailPage } from "./pages/connected/ConnectedAccountDetailPage";
 import { ConnectedAccountsPage } from "./pages/connected/ConnectedAccountsPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
@@ -53,6 +54,7 @@ export function App() {
             <Route path="customers" element={<CustomersPage />} />
             <Route path="connected-accounts" element={<ConnectedAccountsPage />} />
             <Route path="connected-accounts/:id" element={<ConnectedAccountDetailPage />} />
+            <Route path="instalments" element={<BnplPage />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="subscriptions/new" element={<NewSubscriptionPage />} />

@@ -701,6 +701,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bnpl/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which providers you offer and how the best one is chosen
+         * @description A merchant who never changed anything has every provider on, in the catalogue order, and lets the customer choose.
+         */
+        get: operations["getBnplSettings"];
+        /**
+         * Change the providers, their order or the routing mode
+         * @description Everything is optional; what is left out stays as it is. A provider's `priority` is a position, 0 being first: it
+         *     takes exactly that place and the others keep their order around it. Two providers cannot be given the same place.
+         *     `routing_mode` is one of `customer_choice`, `cheapest`, `fastest`, `best_approval` and `weighted`;
+         *     `weights` count only in the last.
+         */
+        put: operations["updateBnplSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bnpl/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List applications for instalments */
+        get: operations["listBnplApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bnpl/applications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieve an application */
+        get: operations["getBnplApplication"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bnpl/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How each provider has done for you
+         * @description Per provider over the last `days` days (1 to 365, default 30): applications by outcome, the approval rate among those
+         *     decided, how long a decision took, financed volume, fees paid, and the state of the provider's circuit right now
+         *     (`open` means customers are not sent to it).
+         */
+        get: operations["getBnplAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bnpl/routing_decisions/{payment_intent}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why a provider was chosen for a payment
+         * @description The latest time offers were worked out for the payment: who was ranked how, what each would cost, who was left out and
+         *     why, and a sentence that says it all. A 404 means the customer never looked at instalments.
+         */
+        get: operations["getRoutingDecision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/checkout_sessions": {
         parameters: {
             query?: never;
@@ -1840,6 +1944,171 @@ export interface components {
             /** Format: date-time */
             created_at?: string;
         };
+        /** @enum {string} */
+        RoutingMode: "customer_choice" | "cheapest" | "fastest" | "best_approval" | "weighted";
+        BnplWeights: {
+            cost: number;
+            speed: number;
+            approval: number;
+        };
+        BnplProvider: {
+            /** @example splitnow */
+            code?: string;
+            name?: string;
+            enabled?: boolean;
+            /** @description The position of the provider in your order, 0 first. */
+            priority?: number;
+            /** Format: int64 */
+            min_amount?: number;
+            /** Format: int64 */
+            max_amount?: number;
+            currencies?: string[];
+            countries?: string[];
+        };
+        BnplSettings: {
+            /** @constant */
+            object?: "bnpl_settings";
+            routing_mode?: components["schemas"]["RoutingMode"];
+            weights?: components["schemas"]["BnplWeights"];
+            providers?: components["schemas"]["BnplProvider"][];
+        };
+        UpdateBnplSettings: {
+            routing_mode?: components["schemas"]["RoutingMode"];
+            weights?: components["schemas"]["BnplWeights"];
+            providers?: {
+                code: string;
+                enabled?: boolean;
+                priority?: number;
+            }[];
+        };
+        /**
+         * @description `created` and `pending_review` mean the provider has not decided; `approved` and `declined` are its answer;
+         *     `failed` means it could not be reached; `expired` and `canceled` mean it was abandoned; `settled` means the
+         *     provider has paid Cutpay.
+         * @enum {string}
+         */
+        BnplApplicationStatus: "created" | "pending_review" | "approved" | "declined" | "failed" | "expired" | "canceled" | "settled";
+        BnplApplication: {
+            id?: string;
+            /** @constant */
+            object?: "bnpl_application";
+            livemode?: boolean;
+            payment?: string;
+            provider?: string;
+            provider_name?: string;
+            /** @example splitnow_3 */
+            plan?: string;
+            status?: components["schemas"]["BnplApplicationStatus"];
+            provider_ref?: string | null;
+            /** Format: int64 */
+            amount?: number;
+            currency?: string;
+            country?: string;
+            instalments?: number;
+            instalment_amounts?: number[];
+            interval_days?: number;
+            apr?: number;
+            /** Format: int64 */
+            total_payable?: number;
+            /**
+             * Format: int64
+             * @description What the provider keeps.
+             */
+            merchant_fee?: number;
+            /**
+             * Format: int64
+             * @description What you receive, the price less the fee.
+             */
+            net_amount?: number;
+            customer_email?: string | null;
+            decline_reason?: string | null;
+            decision_ms?: number | null;
+            /** Format: date-time */
+            expires_at?: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            decided_at?: string | null;
+        };
+        BnplApplicationList: {
+            /** @constant */
+            object?: "list";
+            data?: components["schemas"]["BnplApplication"][];
+            has_more?: boolean;
+        };
+        RoutingDecision: {
+            /** @constant */
+            object?: "routing_decision";
+            id?: string;
+            payment?: string;
+            strategy?: components["schemas"]["RoutingMode"];
+            /** Format: int64 */
+            amount?: number;
+            currency?: string;
+            country?: string;
+            chosen_provider?: string | null;
+            /** @example Chose PayLaterEU: cheapest eligible (2.5% vs 2.9% for Lendo) */
+            reason?: string;
+            /** @description Every provider that could finance the payment, best first. */
+            ranked?: {
+                provider?: string;
+                name?: string;
+                rank?: number;
+                score?: number;
+                /** @description The offer that costs you least. */
+                best?: {
+                    plan?: string;
+                    /** Format: int64 */
+                    merchant_fee?: number;
+                    /** Format: int64 */
+                    total_payable?: number;
+                };
+                stats?: {
+                    approval_rate?: number;
+                    p50_decision_ms?: number;
+                };
+            }[];
+            /** @description The providers left out and why. */
+            excluded?: {
+                provider?: string;
+                /** @example below_minimum */
+                code?: string;
+                message?: string;
+            }[];
+            /** Format: date-time */
+            created_at?: string;
+        };
+        BnplAnalytics: {
+            /** @constant */
+            object?: "bnpl_analytics";
+            days?: number;
+            providers?: {
+                provider?: string;
+                name?: string;
+                applications?: number;
+                approved?: number;
+                declined?: number;
+                failed?: number;
+                pending?: number;
+                abandoned?: number;
+                /** @description Of the applications that were decided; null while there are none. */
+                approval_rate?: number | null;
+                avg_decision_ms?: number;
+                p50_decision_ms?: number;
+                /** Format: int64 */
+                volume?: number;
+                /** Format: int64 */
+                fees?: number;
+                /** @enum {string} */
+                circuit?: "closed" | "open" | "half_open";
+            }[];
+            applications?: number;
+            approved?: number;
+            /** Format: int64 */
+            volume?: number;
+            /** Format: int64 */
+            fees?: number;
+        };
         PaymentIntent: {
             id: string;
             /** @constant */
@@ -1870,6 +2139,18 @@ export interface components {
             payment_method?: string | null;
             /** @description Charged to a saved card without the customer present. */
             off_session?: boolean;
+            /**
+             * @description How the payment was settled; `bnpl` when a provider financed it in instalments.
+             * @enum {string}
+             */
+            payment_method_type?: "card" | "bnpl";
+            /** @description Who financed a payment settled in instalments, and what they kept. */
+            bnpl?: {
+                provider?: string;
+                application?: string;
+                /** Format: int64 */
+                fee?: number;
+            } | null;
             /** Format: int64 */
             application_fee_amount?: number | null;
             /** @description How the payment is shared with connected accounts. Only on a single payment. */
@@ -3652,6 +3933,153 @@ export interface operations {
             };
             400: components["responses"]["InvalidRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getBnplSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The routing mode, its weights and every provider with its limits, in your order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BnplSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateBnplSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBnplSettings"];
+            };
+        };
+        responses: {
+            /** @description The saved settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BnplSettings"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listBnplApplications: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["BnplApplicationStatus"];
+                provider?: string;
+                payment?: string;
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BnplApplicationList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getBnplApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The application, with what the provider keeps and what you receive. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BnplApplication"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBnplAnalytics: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The figures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BnplAnalytics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getRoutingDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_intent: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The decision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingDecision"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     createCheckoutSession: {

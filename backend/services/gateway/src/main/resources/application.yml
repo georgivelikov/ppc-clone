@@ -163,4 +163,4 @@ cutpay:
     webhooks: http://localhost:8086
     links: http://localhost:8087
     billing: http://localhost:8088
-    bnpl: http://localhost:8090
+    bnpl: http://localhost:8091
