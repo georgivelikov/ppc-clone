@@ -54,6 +54,12 @@ class InternalPaymentController {
                 intent.getStatus().wire(), intent.getFailureCode(), intent.getFailureMessage());
     }
 
+    /** What the BNPL aggregator needs to know about the payment a customer is about to pay in instalments. */
+    @GetMapping("/internal/checkout/{clientSecret}")
+    PaymentService.CheckoutFacts checkout(@PathVariable String clientSecret) {
+        return payments.checkoutFacts(clientSecret);
+    }
+
     /** What billing needs to know about a customer before it bills them. */
     @GetMapping("/internal/merchants/{merchantId}/customers/{customerId}")
     CustomerView customer(@PathVariable String merchantId, @PathVariable String customerId) {

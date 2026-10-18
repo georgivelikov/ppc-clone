@@ -25,5 +25,6 @@ include(
     "services:webhooks",
     "services:links",
     "services:billing",
+    "services:bnpl",
     "services:bnpl-sim",
 )

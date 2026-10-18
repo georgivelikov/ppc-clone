@@ -49,6 +49,16 @@ class KeyPolicyTest {
     }
 
     @Test
+    void bnplSettingsAndExplanationsHaveTheirOwnScope() {
+        assertThat(KeyPolicy.allows(List.of("bnpl:write"), HttpMethod.PUT, "/v1/bnpl/settings")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("bnpl:read"), HttpMethod.GET, "/v1/bnpl/routing_decisions/pay_1")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("bnpl:read"), HttpMethod.PUT, "/v1/bnpl/settings")).isFalse();
+        assertThat(KeyPolicy.allows(List.of("billing:write"), HttpMethod.PUT, "/v1/bnpl/settings")).isFalse();
+        // The customer's own offers are reachable with the browser-safe key like the rest of the checkout.
+        assertThat(KeyPolicy.isPublishableAllowed("/checkout/pay_1_secret_x/bnpl/offers")).isTrue();
+    }
+
+    @Test
     void customersAndBillingHaveTheirOwnScopes() {
         assertThat(KeyPolicy.allows(List.of("customers:write"), HttpMethod.POST, "/v1/customers")).isTrue();
         assertThat(KeyPolicy.allows(List.of("customers:read"), HttpMethod.GET, "/v1/customers/cus_1/payment_methods")).isTrue();

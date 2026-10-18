@@ -410,6 +410,20 @@ public class PaymentService {
 
     // --- hosted checkout -------------------------------------------------------------------------
 
+    /** What a service acting for the checkout (the BNPL aggregator) needs to know about a payment. */
+    public record CheckoutFacts(String paymentId, String merchantId, boolean livemode, String merchantName, String status,
+                                long amount, String currency, String description, String customerEmail, String captureMethod) {
+    }
+
+    @Transactional(readOnly = true)
+    public CheckoutFacts checkoutFacts(String clientSecret) {
+        PaymentIntent intent = intents.findByClientSecret(clientSecret)
+                .orElseThrow(() -> ApiException.notFound("session_not_found", "This payment link is not valid"));
+        return new CheckoutFacts(intent.getId(), intent.getMerchantId(), intent.isLivemode(), intent.getMerchantName(),
+                intent.getStatus().wire(), intent.getAmount(), intent.getCurrency(), intent.getDescription(),
+                intent.getCustomerEmail(), intent.getCaptureMethod());
+    }
+
     @Transactional(readOnly = true)
     public SessionView session(String clientSecret) {
         PaymentIntent intent = intents.findByClientSecret(clientSecret)

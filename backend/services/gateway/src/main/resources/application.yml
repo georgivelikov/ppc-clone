@@ -92,6 +92,23 @@ spring:
                     redis-rate-limiter.replenishRate: 10
                     redis-rate-limiter.burstCapacity: 20
                     redis-rate-limiter.requestedTokens: 1
+            - id: bnpl-api
+              uri: ${cutpay.upstreams.bnpl}
+              predicates:
+                - Path=/v1/bnpl/**
+            # Must come before checkout-public, which would otherwise take every /checkout path to payments.
+            - id: bnpl-public
+              uri: ${cutpay.upstreams.bnpl}
+              predicates:
+                - Path=/checkout/*/bnpl/**
+              filters:
+                # Every request fans out to the providers, so keep it tighter than the rest of the checkout.
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@clientIpKeyResolver}"
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    redis-rate-limiter.requestedTokens: 1
             - id: checkout-public
               uri: ${cutpay.upstreams.payments}
               predicates:
@@ -142,3 +159,4 @@ cutpay:
     webhooks: http://localhost:8086
     links: http://localhost:8087
     billing: http://localhost:8088
+    bnpl: http://localhost:8090

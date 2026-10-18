@@ -1,0 +1,49 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: bnpl
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bnpl
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are fetched lazily, so bnpl can start before identity does.
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  clock:
+    # Lets e2e tests push time forward via POST /admin/clock/advance (provider settlement happens a day later).
+    simulated: true
+  bnpl:
+    payments-url: http://localhost:8082
+    # The customer waits while offers are collected: every provider is asked at once, and whoever has not
+    # answered by then is left out of the list.
+    offers-deadline: PT2S
+    # Each call to a provider is given a little less than the deadline.
+    provider-timeout: PT1.8S
+    # The country offers are quoted for when the checkout does not say.
+    default-country: BG
+    # The terms KreditKo is asked to price (it prices one term per call).
+    kreditko-terms: [6, 12, 24]
+    providers:
+      splitnow-url: http://localhost:8089/splitnow/v1
+      lendo-url: http://localhost:8089/lendo/api
+      kreditko-url: http://localhost:8089/kreditko
+      paylatereu-url: http://localhost:8089/paylatereu/api

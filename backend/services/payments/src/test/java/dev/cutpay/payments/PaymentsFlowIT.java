@@ -118,6 +118,24 @@ class PaymentsFlowIT {
     }
 
     @Test
+    void theBnplAggregatorCanReadWhatItNeedsAboutAnOpenCheckoutAndNothingIsLeakedElsewhere() throws Exception {
+        String payment = createPayment();
+        String secret = field(payment, "client_secret");
+
+        mvc.perform(get("/internal/checkout/%s".formatted(secret)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payment_id").value(field(payment, "id")))
+                .andExpect(jsonPath("$.merchant_name").value("Rose Cafe"))
+                .andExpect(jsonPath("$.status").value("requires_payment_method"))
+                .andExpect(jsonPath("$.amount").value(2500))
+                .andExpect(jsonPath("$.currency").value("EUR"))
+                .andExpect(jsonPath("$.capture_method").value("automatic"))
+                .andExpect(jsonPath("$.merchant_id").isNotEmpty())
+                .andExpect(jsonPath("$.livemode").value(false));
+        mvc.perform(get("/internal/checkout/nope")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void payingWithAnApprovedCardSucceedsAndStoresOnlySafeCardData() throws Exception {
         stubAuthorize("""
                 {"status":"approved","acquirer_ref":"auth_1"}""");
