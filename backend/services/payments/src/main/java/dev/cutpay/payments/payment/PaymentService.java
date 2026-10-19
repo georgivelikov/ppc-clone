@@ -74,12 +74,15 @@ public class PaymentService {
     private final PaymentTransferRepository transfers;
     private final IdentityClient identity;
     private final Duration authorizationValidity;
+    private final PaymentMethodSettings methodSettings;
 
     public PaymentService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
                           AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx,
                           PaymentStreams streams, Clock clock, CustomerService customers,
                           PaymentTransferRepository transfers, IdentityClient identity,
+                          PaymentMethodSettings methodSettings,
                           @Value("${cutpay.payments.authorization-validity:P7D}") Duration authorizationValidity) {
+        this.methodSettings = methodSettings;
         this.streams = streams;
         this.clock = clock;
         this.customers = customers;
@@ -431,7 +434,8 @@ public class PaymentService {
     public List<String> methods(String clientSecret) {
         PaymentIntent intent = intents.findByClientSecret(clientSecret)
                 .orElseThrow(() -> ApiException.notFound("session_not_found", "This payment link is not valid"));
-        return PaymentMethodRules.available(intent.getCurrency(), intent.getCaptureMethod());
+        return PaymentMethodRules.available(intent.getCurrency(), intent.getCaptureMethod(),
+                methodSettings.disabled(intent.getMerchantId()));
     }
 
     @Transactional(readOnly = true)
@@ -461,6 +465,7 @@ public class PaymentService {
             throw ApiException.conflict("payment_not_confirmable", "This payment can no longer be paid", null);
         }
         if (request.isBlik()) {
+            requireEnabled(snapshot, PaymentMethodRules.BLIK);
             confirmBlik(snapshot, request);
             return session(clientSecret);
         }
@@ -468,8 +473,17 @@ public class PaymentService {
             throw ApiException.invalidRequest("token_required", "A card token is required", "token");
         }
         CardInfo card = acquirer.describeToken(request.token());
+        if (card.walletType() != null) {
+            requireEnabled(snapshot, card.walletType());
+        }
         execute(snapshot, request.token(), card, request.email());
         return session(clientSecret);
+    }
+
+    private void requireEnabled(PaymentIntent intent, String method) {
+        if (!methodSettings.enabled(intent.getMerchantId(), method)) {
+            throw ApiException.invalidRequest("method_disabled", "This merchant does not accept that way of paying", "method");
+        }
     }
 
     /**
@@ -718,6 +732,9 @@ public class PaymentService {
         payload.put("status", intent.getStatus().wire());
         payload.put("amount", intent.getAmount());
         payload.put("currency", intent.getCurrency());
+        // What the customer pays. What the merchant settles in is decided later, by the ledger, when funds become available.
+        payload.put("presentment_amount", intent.getAmount());
+        payload.put("presentment_currency", intent.getCurrency());
         payload.put("customer_email", intent.getCustomerEmail());
         payload.put("failure_code", intent.getFailureCode());
         payload.put("channel", intent.getChannel());

@@ -2,6 +2,7 @@ import { Alert, formatMoney } from "@cutpay/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { CheckoutApiError, getSession, type Session } from "./api";
+import { BlikWaiting } from "./BlikWaiting";
 import { PaymentMethods } from "./PaymentMethods";
 import { Shell } from "./Shell";
 import { ThreeDsChallenge } from "./ThreeDsChallenge";
@@ -59,7 +60,11 @@ export function CheckoutPage() {
     case "requires_action":
       return (
         <Shell aside={aside}>
-          <ThreeDsChallenge session={session} onDone={() => queryClient.invalidateQueries({ queryKey: key })} />
+          {session.next_action?.type === "blik" ? (
+            <BlikWaiting secret={secret} onDone={update} />
+          ) : (
+            <ThreeDsChallenge session={session} onDone={() => queryClient.invalidateQueries({ queryKey: key })} />
+          )}
         </Shell>
       );
     default:

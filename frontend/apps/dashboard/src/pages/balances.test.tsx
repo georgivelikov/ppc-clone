@@ -7,7 +7,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BalancesPage } from "./BalancesPage";
 
 vi.mock("../api", () => ({
-  api: { getBalance: vi.fn(), balanceSummary: vi.fn(), listBalanceTransactions: vi.fn() },
+  api: {
+    getBalance: vi.fn(),
+    balanceSummary: vi.fn(),
+    listBalanceTransactions: vi.fn(),
+    getFxReport: vi.fn(),
+    listFxConversions: vi.fn(),
+    getCurrencySettings: vi.fn(),
+  },
 }));
 vi.mock("../auth/AuthProvider", () => ({
   useSession: () => ({ merchant: { display_name: "Rose Cafe", default_currency: "EUR" } }),

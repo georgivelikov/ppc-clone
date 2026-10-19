@@ -82,6 +82,11 @@ class KeyPolicyTest {
         List<String> scopes = List.of("payments:write");
         assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/payouts")).isFalse();
         assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/balance")).isFalse();
+        // Conversions and the settlement settings belong to the balance resource.
+        assertThat(KeyPolicy.allows(List.of("balance:write"), HttpMethod.POST, "/v1/balance/convert")).isTrue();
+        assertThat(KeyPolicy.allows(List.of("balance:read"), HttpMethod.POST, "/v1/fx/quotes")).isFalse();
+        assertThat(KeyPolicy.allows(List.of("balance:read"), HttpMethod.GET, "/v1/fx/rates")).isTrue();
+        assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/currency_settings")).isFalse();
         // Unknown paths are denied rather than allowed by default.
         assertThat(KeyPolicy.allows(scopes, HttpMethod.GET, "/v1/something_new")).isFalse();
         // A longer path that merely starts with a resource name is a different resource.

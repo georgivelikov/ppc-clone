@@ -11,7 +11,9 @@ public enum AccountType {
     PAYOUTS_IN_TRANSIT,
     CUSTOMER_FUNDS,
     /** What buy-now-pay-later providers owe the platform for payments they approved and have not yet settled. */
-    BNPL_RECEIVABLE;
+    BNPL_RECEIVABLE,
+    /** The platform's side of currency conversions, one per currency: what it bought from merchants and sold to them. */
+    PLATFORM_FX;
 
     public String wire() {
         return name().toLowerCase(Locale.ROOT);

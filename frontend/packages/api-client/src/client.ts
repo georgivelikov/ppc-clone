@@ -48,6 +48,18 @@ import type {
   SetupIntent,
   UpdateCustomerInput,
 } from "./customers";
+import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
+import type {
+  ConvertBalanceInput,
+  CreateFxQuoteInput,
+  CurrencySettings,
+  FxConversion,
+  FxConversionList,
+  FxQuote,
+  FxRates,
+  FxReport,
+  UpdateCurrencySettingsInput,
+} from "./fx";
 import type {
   BnplAnalytics,
   BnplApplication,
@@ -539,6 +551,48 @@ export class ApiClient {
   /** Daily card volume and fees per currency; days without payments are included as zeros. */
   balanceSummary(days = 14, livemode = false): Promise<BalanceSummary> {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
+  }
+
+  // --- payment methods ----------------------------------------------------
+
+  getPaymentMethodSettings(): Promise<PaymentMethodSettings> {
+    return this.request("GET", "/v1/payment_method_settings");
+  }
+
+  updatePaymentMethodSettings(input: UpdatePaymentMethodSettingsInput): Promise<PaymentMethodSettings> {
+    return this.request("PUT", "/v1/payment_method_settings", input);
+  }
+
+  // --- currencies ---------------------------------------------------------
+
+  getFxRates(base = "EUR"): Promise<FxRates> {
+    return this.request("GET", `/v1/fx/rates${toQuery({ base })}`);
+  }
+
+  /** Locks a rate for 15 minutes. */
+  createFxQuote(input: CreateFxQuoteInput, livemode = false): Promise<FxQuote> {
+    return this.request("POST", `/v1/fx/quotes${toQuery({ livemode })}`, input);
+  }
+
+  /** Moves available money to another currency, at the quoted rate when a quote is given. */
+  convertBalance(input: ConvertBalanceInput, livemode = false): Promise<FxConversion> {
+    return this.request("POST", `/v1/balance/convert${toQuery({ livemode })}`, input);
+  }
+
+  listFxConversions(params: { starting_after?: string; limit?: number; livemode?: boolean } = {}): Promise<FxConversionList> {
+    return this.request("GET", `/v1/fx/conversions${toQuery(params)}`);
+  }
+
+  getFxReport(days = 30, livemode = false): Promise<FxReport> {
+    return this.request("GET", `/v1/fx/report${toQuery({ days, livemode })}`);
+  }
+
+  getCurrencySettings(): Promise<CurrencySettings> {
+    return this.request("GET", "/v1/currency_settings");
+  }
+
+  updateCurrencySettings(input: UpdateCurrencySettingsInput): Promise<CurrencySettings> {
+    return this.request("PUT", "/v1/currency_settings", input);
   }
 
   // --- payouts ------------------------------------------------------------

@@ -93,9 +93,12 @@ class GatewayRoutingIT {
     @Test
     void balanceAndPayoutRoutesNeedAToken() {
         for (String path : new String[] {"/v1/balance", "/v1/balance_transactions", "/v1/balance_summary",
-                "/v1/payouts", "/v1/payouts/po_1", "/v1/payout_schedule", "/v1/bank_accounts"}) {
+                "/v1/payouts", "/v1/payouts/po_1", "/v1/payout_schedule", "/v1/bank_accounts", "/v1/fx/rates",
+                "/v1/fx/conversions", "/v1/currency_settings", "/v1/payment_method_settings"}) {
             client.get().uri(path).exchange().expectStatus().isUnauthorized();
         }
+        client.post().uri("/v1/balance/convert").exchange().expectStatus().isUnauthorized();
+        client.post().uri("/v1/fx/quotes").exchange().expectStatus().isUnauthorized();
         client.post().uri("/v1/payouts").exchange().expectStatus().isUnauthorized();
     }
 
@@ -104,7 +107,7 @@ class GatewayRoutingIT {
         var merchant = client.mutateWith(mockJwt().jwt(jwt -> jwt.subject("usr_1").claim("mid", "mer_1")
                 .claim("role", "owner")));
         for (String path : new String[] {"/v1/balance", "/v1/balance_transactions", "/v1/payouts",
-                "/v1/payout_schedule", "/v1/bank_accounts"}) {
+                "/v1/payout_schedule", "/v1/bank_accounts", "/v1/fx/rates", "/v1/currency_settings"}) {
             merchant.get().uri(path).exchange()
                     .expectStatus().isOk()
                     .expectBody(String.class).isEqualTo("user=usr_1 merchant=mer_1 role=owner");

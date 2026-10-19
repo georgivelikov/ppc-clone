@@ -4,6 +4,7 @@ import { NavLink } from "react-router";
 const TABS = [
   { label: "Business profile", to: "/settings", end: true },
   { label: "Payouts", to: "/settings/payouts", end: false },
+  { label: "Payment methods", to: "/settings/methods", end: false },
 ];
 
 /** Switches between the settings pages. */

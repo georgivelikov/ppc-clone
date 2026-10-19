@@ -218,6 +218,28 @@ describe("payments pages", () => {
     expect(await screen.findByTestId("card-summary")).toHaveTextContent("visa •••• 4242");
   });
 
+  it("names the wallet that presented the card and says the wallet did the authentication", async () => {
+    const attempt = { ...payment.attempts[0]!, method_type: "google_pay" };
+    vi.mocked(api.getPayment).mockResolvedValue({ ...payment, payment_method_type: "google_pay", attempts: [attempt] });
+    renderAt("/payments/pay_1");
+
+    expect(await screen.findByTestId("method-wallet")).toHaveTextContent("Google Pay");
+    expect(screen.getByTestId("card-summary")).toHaveTextContent("visa •••• 4242");
+    expect(screen.getByText("Done by the wallet")).toBeInTheDocument();
+    expect(buildTimeline({ ...payment, attempts: [attempt] }).map((event) => event.title)).toContain(
+      "Payment attempted with Google Pay (visa •••• 4242)",
+    );
+  });
+
+  it("shows a BLIK payment without any card", async () => {
+    const attempt = { ...payment.attempts[0]!, method_type: "blik", card_brand: null, card_last4: null };
+    vi.mocked(api.getPayment).mockResolvedValue({ ...payment, currency: "PLN", payment_method_type: "blik", attempts: [attempt] });
+    renderAt("/payments/pay_1");
+
+    expect(await screen.findByTestId("method-blik")).toHaveTextContent("Paid with BLIK");
+    expect(screen.queryByTestId("card-summary")).not.toBeInTheDocument();
+  });
+
   it("builds a timeline with attempts, the outcome and refunds in order", () => {
     const events = buildTimeline({
       ...payment,

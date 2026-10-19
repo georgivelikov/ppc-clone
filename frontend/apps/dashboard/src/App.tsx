@@ -32,6 +32,7 @@ import { PaymentDetailPage } from "./pages/PaymentDetailPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
 import { PayoutSettingsPage } from "./pages/PayoutSettingsPage";
+import { PaymentMethodsPage } from "./pages/PaymentMethodsPage";
 import { PayoutsPage } from "./pages/PayoutsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
@@ -80,6 +81,7 @@ export function App() {
             <Route path="developers/logs" element={<LogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/payouts" element={<PayoutSettingsPage />} />
+            <Route path="settings/methods" element={<PaymentMethodsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

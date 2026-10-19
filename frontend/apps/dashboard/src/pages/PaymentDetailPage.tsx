@@ -19,12 +19,25 @@ interface TimelineEvent {
   detail?: string;
 }
 
+const WALLET_NAME: Record<string, string> = { apple_pay: "Apple Pay", google_pay: "Google Pay" };
+
 /** Builds a readable history from what the payment recorded: attempts, 3DS, outcome and refunds. */
 export function buildTimeline(payment: Payment): TimelineEvent[] {
   const events: TimelineEvent[] = [{ at: payment.created_at, title: "Payment created" }];
   for (const attempt of payment.attempts) {
-    const card = attempt.method_type === "bnpl" ? "instalments" : `${attempt.card_brand ?? "Card"} •••• ${attempt.card_last4 ?? "????"}`;
-    events.push({ at: attempt.created_at, title: attempt.method_type === "bnpl" ? "Approved for instalments" : `Payment attempted with ${card}` });
+    const card = `${attempt.card_brand ?? "Card"} •••• ${attempt.card_last4 ?? "????"}`;
+    const wallet = WALLET_NAME[attempt.method_type];
+    events.push({
+      at: attempt.created_at,
+      title:
+        attempt.method_type === "bnpl"
+          ? "Approved for instalments"
+          : attempt.method_type === "blik"
+            ? "Payment attempted with BLIK"
+            : wallet
+              ? `Payment attempted with ${wallet} (${card})`
+              : `Payment attempted with ${card}`,
+    });
     if (attempt.three_ds_status) {
       events.push({ at: attempt.created_at, title: "3-D Secure authentication required" });
     }
@@ -211,8 +224,17 @@ export function PaymentDetailPage() {
             <p className="mt-2 text-sm" data-testid="method-instalments">
               Paid in instalments{payment.bnpl ? ` with ${payment.bnpl.provider}` : ""}.
             </p>
+          ) : attempt?.method_type === "blik" ? (
+            <p className="mt-2 text-sm" data-testid="method-blik">
+              Paid with BLIK, confirmed in the customer&apos;s banking app.
+            </p>
           ) : attempt ? (
             <dl className="mt-2 divide-y divide-border">
+              {WALLET_NAME[attempt.method_type] && (
+                <Row label="Wallet">
+                  <span data-testid="method-wallet">{WALLET_NAME[attempt.method_type]}</span>
+                </Row>
+              )}
               <Row label="Card">
                 <span data-testid="card-summary">
                   {attempt.card_brand} •••• {attempt.card_last4}
@@ -221,7 +243,9 @@ export function PaymentDetailPage() {
               <Row label="Expires">
                 {attempt.card_exp_month}/{attempt.card_exp_year}
               </Row>
-              <Row label="3-D Secure">{attempt.three_ds_status?.replace("_", " ") ?? "Not required"}</Row>
+              <Row label="3-D Secure">
+                {attempt.three_ds_status?.replace("_", " ") ?? (WALLET_NAME[attempt.method_type] ? "Done by the wallet" : "Not required")}
+              </Row>
             </dl>
           ) : (
             <p className="mt-2 text-sm text-muted">The customer has not entered a card yet.</p>

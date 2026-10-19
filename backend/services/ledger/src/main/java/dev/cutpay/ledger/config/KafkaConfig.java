@@ -20,6 +20,11 @@ public class KafkaConfig {
         return TopicBuilder.name(Topics.LEDGER_ENTRIES).partitions(3).replicas(1).build();
     }
 
+    @Bean
+    NewTopic fxEvents() {
+        return TopicBuilder.name(Topics.FX).partitions(3).replicas(1).build();
+    }
+
     // Dead-letter topics for the topics this service consumes. The recoverer sends a record to the same
     // partition number, so these need at least as many partitions as the source topics (3).
     @Bean

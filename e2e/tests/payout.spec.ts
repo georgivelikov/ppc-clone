@@ -25,7 +25,7 @@ async function payHundredEuros(page: Page, context: import("@playwright/test").B
     context.waitForEvent("page"),
     page.getByRole("link", { name: "Open checkout" }).click(),
   ]);
-  await checkout.getByLabel("Email").fill("anna@example.com");
+  await checkout.getByRole("form", { name: "Payment details" }).getByLabel("Email").fill("anna@example.com");
   await checkout.getByLabel("Card number").fill("4242 4242 4242 4242");
   await checkout.getByLabel("Expiry").fill("1299");
   await checkout.getByLabel("CVC").fill("123");

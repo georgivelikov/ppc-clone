@@ -121,7 +121,7 @@ export interface Payment {
   /** Charged without the customer present, using a saved card. */
   off_session: boolean;
   /** How the payment was settled: by card, or financed in instalments by a provider. */
-  payment_method_type?: "card" | "bnpl";
+  payment_method_type?: "card" | "apple_pay" | "google_pay" | "blik" | "bnpl";
   /** When financed in instalments: who, which application, and what the provider kept. */
   bnpl?: { provider: string; application: string; fee: number } | null;
   /** What the platform keeps of a split payment, when it said so. */
@@ -207,7 +207,14 @@ export interface Balance {
   reserved: MoneyAmount[];
 }
 
-export type BalanceTransactionType = "payment" | "refund" | "payout" | "payout_failure" | "transfer" | "transfer_reversal";
+export type BalanceTransactionType =
+  | "payment"
+  | "refund"
+  | "payout"
+  | "payout_failure"
+  | "transfer"
+  | "transfer_reversal"
+  | "conversion";
 
 export interface BalanceTransaction {
   id: string;

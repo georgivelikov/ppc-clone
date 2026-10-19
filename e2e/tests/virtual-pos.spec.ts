@@ -87,7 +87,7 @@ test.describe("charge with QR", () => {
     const address = await screen.getByRole("link", { name: "Open payment page" }).getAttribute("href");
     const customer = await context.newPage();
     await customer.goto(address!);
-    await customer.getByLabel("Email").fill("anna@example.com");
+    await customer.getByRole("form", { name: "Payment details" }).getByLabel("Email").fill("anna@example.com");
     await customer.getByLabel("Card number").fill("4242 4242 4242 4242");
     await customer.getByLabel("Expiry").fill("1299");
     await customer.getByLabel("CVC").fill("123");

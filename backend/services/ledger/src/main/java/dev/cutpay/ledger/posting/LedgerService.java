@@ -15,6 +15,7 @@ import dev.cutpay.ledger.config.Topics;
 import dev.cutpay.ledger.fees.CardProfile;
 import dev.cutpay.ledger.fees.PricingPlan;
 import dev.cutpay.ledger.fees.PricingPlans;
+import dev.cutpay.ledger.fx.FxService;
 import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
@@ -57,9 +58,11 @@ public class LedgerService {
     private final OutboxWriter outbox;
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final FxService fx;
 
     public LedgerService(PostingEngine engine, Accounts accounts, PricingPlans plans, InboxGuard inbox,
-                         OutboxWriter outbox, JdbcClient jdbc, Clock clock) {
+                         OutboxWriter outbox, JdbcClient jdbc, Clock clock, FxService fx) {
+        this.fx = fx;
         this.engine = engine;
         this.accounts = accounts;
         this.plans = plans;
@@ -77,6 +80,7 @@ public class LedgerService {
             return;
         }
         plans.createStandardIfMissing(merchantId);
+        fx.createSettingsIfMissing(merchantId, defaultCurrency);
         for (boolean livemode : new boolean[] {false, true}) {
             accounts.merchant(merchantId, livemode, MERCHANT_PENDING, defaultCurrency);
             accounts.merchant(merchantId, livemode, MERCHANT_AVAILABLE, defaultCurrency);
@@ -454,6 +458,8 @@ public class LedgerService {
                         "release");
                 emitPosted(id, "funds_available", d.paymentId(), d.merchantId(), d.livemode(), d.currency(), 0);
             });
+            // A merchant who settles in another currency has these funds converted as they become available.
+            fx.settleInto(d.merchantId(), d.livemode(), d.currency(), d.remaining(), d.paymentId());
         }
         return due.size();
     }

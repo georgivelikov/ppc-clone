@@ -2,7 +2,8 @@
 // There is no login here — the unguessable client secret in the URL is the credential.
 
 export interface NextAction {
-  type: "three_ds";
+  /** `three_ds`: the bank asks for a code; `blik`: the customer confirms in their banking app. */
+  type: "three_ds" | "blik";
   challenge_id: string;
 }
 
@@ -85,6 +86,35 @@ export async function tokenize(card: CardInput, publishableKey?: string): Promis
 
 export function confirm(secret: string, token: string, email: string, publishableKey?: string): Promise<Session> {
   return call("POST", `/checkout/sessions/${encodeURIComponent(secret)}/confirm`, { token, email }, publishableKey);
+}
+
+/** The ways of paying this checkout offers, decided by the server (currency, how the payment is captured, ...). */
+export function getMethods(secret: string): Promise<{ methods: string[] }> {
+  return call("GET", `/checkout/sessions/${encodeURIComponent(secret)}/methods`);
+}
+
+/** Pays with a BLIK code. The bank then asks the customer to confirm in their app, so the answer is "requires_action". */
+export function confirmBlik(secret: string, code: string, email: string): Promise<Session> {
+  return call("POST", `/checkout/sessions/${encodeURIComponent(secret)}/confirm`, { method: "blik", blik_code: code, email });
+}
+
+export type WalletType = "apple_pay" | "google_pay";
+
+export interface WalletCard {
+  id: string;
+  label: string;
+  brand: string;
+  last4: string;
+}
+
+/** The test cards in the pretend wallet. */
+export function getWalletCards(): Promise<WalletCard[]> {
+  return call("GET", "/vault/wallet/cards");
+}
+
+/** What the wallet hands over once the customer confirmed on their device: a token standing for the card. */
+export function authenticateWallet(wallet: WalletType, cardId: string): Promise<{ token: string }> {
+  return call("POST", "/vault/wallet/authenticate", { wallet_type: wallet, card_id: cardId, authenticated: true });
 }
 
 /** The customer's answer on the fake bank page. The bank then notifies payments, so re-read the session afterwards. */

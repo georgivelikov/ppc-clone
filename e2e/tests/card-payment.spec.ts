@@ -31,7 +31,7 @@ async function startCheckout(page: Page, context: BrowserContext, amount = "25.0
 }
 
 async function payWithCard(checkout: Page, number: string) {
-  await checkout.getByLabel("Email").fill("anna@example.com");
+  await checkout.getByRole("form", { name: "Payment details" }).getByLabel("Email").fill("anna@example.com");
   await checkout.getByLabel("Card number").fill(number);
   await checkout.getByLabel("Expiry").fill("1299");
   await checkout.getByLabel("CVC").fill("123");

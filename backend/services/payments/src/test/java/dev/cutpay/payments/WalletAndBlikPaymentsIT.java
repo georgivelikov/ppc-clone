@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -205,6 +206,40 @@ class WalletAndBlikPaymentsIT {
                 .andExpect(jsonPath("$.methods[3]").value("blik"));
         mvc.perform(get("/checkout/sessions/" + field(create("EUR", ""), "client_secret") + "/methods"))
                 .andExpect(jsonPath("$.methods.length()").value(3));
+    }
+
+    @Test
+    void aMerchantCanSwitchOffWalletsAndBlikButNotCards() throws Exception {
+        mvc.perform(get("/v1/payment_method_settings").with(merchant())).andExpect(jsonPath("$.data.length()").value(4))
+                .andExpect(jsonPath("$.data[0].method").value("card")).andExpect(jsonPath("$.data[0].locked").value(true))
+                .andExpect(jsonPath("$.data[3].enabled").value(true));
+
+        mvc.perform(put("/v1/payment_method_settings").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"methods\":[{\"method\":\"blik\",\"enabled\":false},{\"method\":\"google_pay\",\"enabled\":false}]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[3].enabled").value(false))
+                .andExpect(jsonPath("$.data[2].enabled").value(false)).andExpect(jsonPath("$.data[1].enabled").value(true));
+        mvc.perform(put("/v1/payment_method_settings").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"methods\":[{\"method\":\"card\",\"enabled\":false}]}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("card_cannot_be_disabled"));
+        mvc.perform(put("/v1/payment_method_settings").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"methods\":[{\"method\":\"cheque\",\"enabled\":false}]}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("unknown_method"));
+
+        // The checkout stops offering them and refuses them if somebody tries anyway.
+        String created = create("PLN", "");
+        String secret = field(created, "client_secret");
+        mvc.perform(get("/checkout/sessions/" + secret + "/methods")).andExpect(jsonPath("$.methods.length()").value(2))
+                .andExpect(jsonPath("$.methods[0]").value("card")).andExpect(jsonPath("$.methods[1]").value("apple_pay"));
+        confirm(secret, "{\"method\":\"blik\",\"blik_code\":\"777123\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("method_disabled"));
+        confirm(secret, "{\"token\":\"tok_gpay\",\"email\":\"anna@example.com\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("method_disabled"));
+        mvc.perform(get("/checkout/sessions/" + secret)).andExpect(jsonPath("$.status").value("requires_payment_method"));
+
+        // Another merchant is not affected, and switching a method back on works.
+        merchantId = "mer_" + UUID.randomUUID().toString().replace("-", "");
+        mvc.perform(get("/checkout/sessions/" + field(create("PLN", ""), "client_secret") + "/methods"))
+                .andExpect(jsonPath("$.methods.length()").value(4));
     }
 
     @Test

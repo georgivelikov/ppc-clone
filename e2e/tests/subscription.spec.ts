@@ -216,7 +216,7 @@ test.describe("invoices", () => {
     await hosted.getByLabel("Card number").fill("4242 4242 4242 4242");
     await hosted.getByLabel("Expiry").fill("1299");
     await hosted.getByLabel("CVC").fill("123");
-    await hosted.getByLabel("Email").fill("anna@example.com");
+    await hosted.getByRole("form", { name: "Payment details" }).getByLabel("Email").fill("anna@example.com");
     await hosted.getByRole("button", { name: /^Pay/ }).click();
     await expect(hosted.getByRole("heading", { name: "Payment successful" })).toBeVisible({ timeout: 30_000 });
     await hosted.getByRole("link", { name: /Return to/ }).click();

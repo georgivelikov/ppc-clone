@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":libs:common-money"))
     implementation(project(":libs:common-web"))
     implementation(project(":libs:common-events"))
 

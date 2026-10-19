@@ -33,7 +33,7 @@ export interface SessionSummary {
   currency: string;
   failure_code: string | null;
   failure_message: string | null;
-  next_action: { type: "three_ds"; challenge_id: string } | null;
+  next_action: { type: "three_ds" | "blik"; challenge_id: string } | null;
   return_url: string | null;
 }
 

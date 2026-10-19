@@ -1,11 +1,15 @@
 import type { BalanceTransaction, BalanceTransactionType, MoneyAmount } from "@cutpay/api-client";
 import { Button, Card, formatMoney, toMajorString } from "@cutpay/ui";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api";
 import { useSession } from "../auth/AuthProvider";
 import { useTestMode } from "../layout/testMode";
+import { ConvertDialog } from "./fx/ConvertDialog";
+import { CurrencySettingsCard } from "./fx/CurrencySettingsCard";
+import { FxReportCard } from "./fx/FxReportCard";
 
 const PAGE_SIZE = 20;
 const SUMMARY_DAYS = 14;
@@ -17,6 +21,7 @@ const TYPE_LABEL: Record<BalanceTransactionType, string> = {
   payout_failure: "Payout failed",
   transfer: "Transfer",
   transfer_reversal: "Transfer taken back",
+  conversion: "Conversion",
 };
 
 function amountIn(amounts: MoneyAmount[] | undefined, currency: string): number {
@@ -118,6 +123,8 @@ export function BalancesPage() {
     }));
   const hasVolume = chartData.some((day) => day.volume > 0);
   const others = otherCurrencies([balance.data?.pending, balance.data?.available], currency);
+  const [converting, setConverting] = useState<string | null>(null);
+  const convertible = (code: string) => amountIn(balance.data?.available, code) > 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -145,17 +152,42 @@ export function BalancesPage() {
           <h2 className="font-semibold">Other currencies</h2>
           <ul className="mt-2 divide-y divide-border text-sm">
             {others.map((code) => (
-              <li key={code} className="flex justify-between py-2">
+              <li key={code} className="flex items-center justify-between gap-3 py-2" data-testid={`balance-${code}`}>
                 <span className="text-muted">{code}</span>
-                <span>
-                  <Amount minor={amountIn(balance.data?.available, code)} currency={code} /> available ·{" "}
-                  <Amount minor={amountIn(balance.data?.pending, code)} currency={code} /> pending
+                <span className="flex items-center gap-3">
+                  <span>
+                    <Amount minor={amountIn(balance.data?.available, code)} currency={code} /> available ·{" "}
+                    <Amount minor={amountIn(balance.data?.pending, code)} currency={code} /> pending
+                  </span>
+                  {convertible(code) && (
+                    <Button variant="secondary" size="sm" onClick={() => setConverting(code)} aria-label={`Convert ${code}`}>
+                      Convert
+                    </Button>
+                  )}
                 </span>
               </li>
             ))}
           </ul>
         </Card>
       )}
+      {convertible(currency) && (
+        <div className="flex justify-end">
+          <Button variant="secondary" size="sm" onClick={() => setConverting(currency)} aria-label={`Convert ${currency}`}>
+            Convert {currency}…
+          </Button>
+        </div>
+      )}
+      {converting && (
+        <ConvertDialog
+          from={converting}
+          available={amountIn(balance.data?.available, converting)}
+          preferred={converting === currency ? others[0] ?? "EUR" : currency}
+          onClose={() => setConverting(null)}
+        />
+      )}
+
+      <FxReportCard />
+      <CurrencySettingsCard />
 
       <Card>
         <h2 className="font-semibold">Volume and fees, last {SUMMARY_DAYS} days</h2>
