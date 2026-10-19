@@ -26,7 +26,31 @@ public class AcquirerClient {
 
     /** {@code cardType} / {@code cardRegion} come from the issuer BIN lookup and drive the fee schedule. */
     public record CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
-                           String cardType, String cardRegion) {
+                           String cardType, String cardRegion, String walletType) {
+
+        public CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
+                        String cardType, String cardRegion) {
+            this(token, brand, last4, expMonth, expYear, fingerprint, cardType, cardRegion, null);
+        }
+    }
+
+    /** The first answer to a BLIK code. An approved code is not final: the customer still has to confirm in their app. */
+    public sealed interface BlikResult {
+        record Pending(String acquirerRef) implements BlikResult {
+        }
+
+        record Declined(String code, String message) implements BlikResult {
+        }
+
+        /** The code is not a valid BLIK code; the customer can type another. */
+        record InvalidCode(String message) implements BlikResult {
+        }
+
+        record Unavailable(String reason) implements BlikResult {
+        }
+    }
+
+    record BlikRequest(String code, long amount, String currency, String reference) {
     }
 
     public sealed interface AuthResult {
@@ -73,7 +97,7 @@ public class AcquirerClient {
 
     public AcquirerClient(AcquirerProperties properties, RestClient.Builder builder) {
         var factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build());
+                HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(properties.connectTimeout()).build());
         factory.setReadTimeout(properties.readTimeout());
         this.http = builder.baseUrl(properties.url()).requestFactory(factory).build();
         this.breaker = CircuitBreaker.of("acquirer", CircuitBreakerConfig.custom()
@@ -116,6 +140,26 @@ public class AcquirerClient {
         return call("authorize", () -> http.post().uri("/authorize")
                 .body(new AuthorizeRequest(token, amount, currency, reference, channel, offSession))
                 .retrieve().body(AuthorizeResponse.class));
+    }
+
+    public BlikResult blikCharge(String code, long amount, String currency, String reference) {
+        try {
+            AuthorizeResponse response = breaker.executeSupplier(() -> http.post().uri("/blik/charge")
+                    .body(new BlikRequest(code, amount, currency, reference)).retrieve().body(AuthorizeResponse.class));
+            if (response == null) {
+                return new BlikResult.Unavailable("empty response");
+            }
+            return switch (response.status()) {
+                case "requires_action" -> new BlikResult.Pending(response.acquirerRef());
+                case "invalid_code" -> new BlikResult.InvalidCode(response.message());
+                default -> new BlikResult.Declined(response.declineCode(), response.message());
+            };
+        } catch (CallNotPermittedException e) {
+            return new BlikResult.Unavailable("circuit open");
+        } catch (RuntimeException e) {
+            log.warn("Acquirer BLIK call failed: {}", e.toString());
+            return new BlikResult.Unavailable(e.getClass().getSimpleName());
+        }
     }
 
     /** Checks a card without charging it, for saving it. May ask the customer to authenticate (once). */

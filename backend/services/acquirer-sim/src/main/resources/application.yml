@@ -26,3 +26,5 @@ cutpay:
     failure-rate: 0.0
     timeout-card-delay: PT10S
     three-ds-code: "1234"
+    # How long a BLIK request waits in the pretend bank app before it is approved by itself.
+    blik-delay: PT5S

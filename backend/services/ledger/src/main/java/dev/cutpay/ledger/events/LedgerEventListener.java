@@ -60,7 +60,8 @@ class LedgerEventListener {
         ledger.onPaymentSucceeded(new PaymentSucceeded(eventId(event), occurredAt(event), merchantId(event),
                 livemode(event), text(payload, "payment_id"), payload.path("amount").asLong(),
                 text(payload, "currency"), nullableText(payload, "card_type"), nullableText(payload, "card_region"),
-                transfers(payload), "bnpl".equals(nullableText(payload, "payment_method_type")) ? payload.path("bnpl_fee").asLong() : null));
+                transfers(payload), "bnpl".equals(nullableText(payload, "payment_method_type")) ? payload.path("bnpl_fee").asLong() : null,
+                methodType(payload)));
     }
 
     @KafkaListener(topics = Topics.BNPL)
@@ -143,6 +144,12 @@ class LedgerEventListener {
             throw new IllegalArgumentException("Event is missing required field '" + field + "'");
         }
         return value.asString();
+    }
+
+    /** Older events carry no method; they were card payments. */
+    private static String methodType(JsonNode payload) {
+        String type = nullableText(payload, "payment_method_type");
+        return type == null ? "card" : type;
     }
 
     private static String nullableText(JsonNode node, String field) {

@@ -90,10 +90,37 @@ public class PaymentAttempt {
         return attempt;
     }
 
+    /** A BLIK payment: no card, the customer confirms a request in their banking app. */
+    public static PaymentAttempt blik(String id, String paymentIntentId) {
+        PaymentAttempt attempt = new PaymentAttempt();
+        attempt.id = id;
+        attempt.paymentIntentId = paymentIntentId;
+        attempt.methodType = "blik";
+        attempt.status = "processing";
+        attempt.createdAt = Instant.now();
+        return attempt;
+    }
+
+    /** The card behind this attempt was presented by a wallet ({@code apple_pay}, {@code google_pay}). */
+    public PaymentAttempt viaWallet(String walletType) {
+        this.methodType = walletType;
+        return this;
+    }
+
+    public boolean isCard() {
+        return "card".equals(methodType);
+    }
+
     public void requiresAction(String acquirerRef) {
         this.acquirerRef = acquirerRef;
         this.status = "requires_action";
         this.threeDsStatus = "challenge_required";
+    }
+
+    /** A BLIK request is waiting in the customer's banking app. */
+    public void awaitingBank(String acquirerRef) {
+        this.acquirerRef = acquirerRef;
+        this.status = "requires_action";
     }
 
     public void succeeded(String acquirerRef) {

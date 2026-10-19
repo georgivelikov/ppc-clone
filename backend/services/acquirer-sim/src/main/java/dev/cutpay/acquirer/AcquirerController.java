@@ -35,7 +35,7 @@ class AcquirerController {
 
     private static final Logger log = LoggerFactory.getLogger(AcquirerController.class);
 
-    record StoredCard(String pan, int expMonth, int expYear) {
+    record StoredCard(String pan, int expMonth, int expYear, String walletType) {
     }
 
     record PendingChallenge(String authorizationId, long amount, String currency) {
@@ -48,7 +48,7 @@ class AcquirerController {
     }
 
     record TokenizeResponse(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
-                            String cardType, String cardRegion) {
+                            String cardType, String cardRegion, String walletType) {
     }
 
     record VerifyRequest(@NotBlank String token, String channel) {
@@ -109,10 +109,10 @@ class AcquirerController {
         }
         int expYear = request.expYear() < 100 ? 2000 + request.expYear() : request.expYear();
         String token = "tok_" + UUID.randomUUID().toString().replace("-", "");
-        tokens.put(token, new StoredCard(pan, request.expMonth(), expYear));
+        tokens.put(token, new StoredCard(pan, request.expMonth(), expYear, null));
         BinTable.BinInfo bin = BinTable.lookup(pan);
         return new TokenizeResponse(token, TestCards.brand(pan), pan.substring(pan.length() - 4), request.expMonth(),
-                expYear, fingerprint(pan), bin.cardType(), bin.cardRegion());
+                expYear, fingerprint(pan), bin.cardType(), bin.cardRegion(), null);
     }
 
     /** What payments is allowed to know about a card: never the number itself. */
@@ -124,7 +124,62 @@ class AcquirerController {
         }
         BinTable.BinInfo bin = BinTable.lookup(card.pan());
         return new TokenizeResponse(token, TestCards.brand(card.pan()), card.pan().substring(card.pan().length() - 4),
-                card.expMonth(), card.expYear(), fingerprint(card.pan()), bin.cardType(), bin.cardRegion());
+                card.expMonth(), card.expYear(), fingerprint(card.pan()), bin.cardType(), bin.cardRegion(), card.walletType());
+    }
+
+    record WalletCard(String id, String label, String brand, String last4) {
+    }
+
+    record WalletAuthRequest(@NotBlank String walletType, @NotBlank String cardId, Boolean authenticated) {
+    }
+
+    /** What a wallet hands the merchant after the customer confirmed on their device: a network token, not a card. */
+    record WalletToken(String token, String walletType, String dpan, String cryptogram, String eci, String brand,
+                       String last4) {
+    }
+
+    private static final Map<String, String> WALLET_CARDS = Map.of(
+            "visa", "4242424242424242",
+            "mastercard", "5555555555554444",
+            "secure", "4000000000003220");
+
+    /** The test cards "stored" in the pretend wallet. The last one is a card that would ask for 3-D Secure. */
+    @GetMapping("/wallet/cards")
+    java.util.List<WalletCard> walletCards() {
+        return java.util.List.of(
+                new WalletCard("visa", "Everyday Visa", "visa", "4242"),
+                new WalletCard("mastercard", "Travel Mastercard", "mastercard", "4444"),
+                new WalletCard("secure", "Visa that asks for 3-D Secure", "visa", "3220"));
+    }
+
+    /**
+     * The customer "authenticates" on the pretend wallet (Face ID, a PIN) and gets a device token with a cryptogram.
+     * The token stands for the card but is marked as a wallet token, so payments made with it skip 3-D Secure.
+     */
+    @PostMapping("/wallet/authenticate")
+    WalletToken walletAuthenticate(@Valid @RequestBody WalletAuthRequest request) {
+        if (!java.util.Set.of("apple_pay", "google_pay").contains(request.walletType())) {
+            throw ApiException.invalidRequest("invalid_wallet", "Unknown wallet", "wallet_type");
+        }
+        String pan = WALLET_CARDS.get(request.cardId());
+        if (pan == null) {
+            throw ApiException.invalidRequest("invalid_wallet_card", "That card is not in the wallet", "card_id");
+        }
+        if (!Boolean.TRUE.equals(request.authenticated())) {
+            throw ApiException.invalidRequest("wallet_not_authenticated", "The customer did not confirm on the device",
+                    "authenticated");
+        }
+        String token = "tok_" + UUID.randomUUID().toString().replace("-", "");
+        tokens.put(token, new StoredCard(pan, 12, 2099, request.walletType()));
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        byte[] cryptogram = new byte[16];
+        random.nextBytes(cryptogram);
+        // The device account number is a made-up number, never the card's own.
+        String dpan = "4999" + String.format("%012d", Math.floorMod(random.nextLong(), 1_000_000_000_000L));
+        String brand = TestCards.brand(pan);
+        return new WalletToken(token, request.walletType(), dpan,
+                java.util.Base64.getEncoder().encodeToString(cryptogram), "mastercard".equals(brand) ? "02" : "05", brand,
+                pan.substring(pan.length() - 4));
     }
 
     @PostMapping("/authorize")
@@ -185,7 +240,10 @@ class AcquirerController {
         // copies of the card can be charged off-session.
         boolean asksForChallenge = outcome.behaviour() == TestCards.Behaviour.THREE_DS
                 || outcome.behaviour() == TestCards.Behaviour.THREE_DS_ALWAYS;
-        if (asksForChallenge && !moto && !offSession) {
+        // A wallet already authenticated the customer on their device (Face ID, PIN), which satisfies strong customer
+        // authentication, so the issuer does not ask again.
+        boolean wallet = card.walletType() != null;
+        if (asksForChallenge && !moto && !offSession && !wallet) {
             challenges.put(ref, new PendingChallenge(ref, amount, currency));
             return new AuthorizeResponse("requires_action", ref, null, "3-D Secure authentication required");
         }
@@ -276,6 +334,11 @@ class AcquirerController {
             refunded.put(request.acquirerRef(), already + request.amount());
         }
         return new RefundResponse("succeeded", "ref_" + UUID.randomUUID().toString().replace("-", ""));
+    }
+
+    /** Lets another simulated payment method (BLIK) register what it approved, so it can be refunded. */
+    void recordAuthorization(String ref, long amount) {
+        authorizations.put(ref, amount);
     }
 
     /** Chaos knobs for later phases; no authentication because this service is never exposed by the gateway. */

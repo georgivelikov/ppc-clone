@@ -125,12 +125,12 @@ spring:
                     redis-rate-limiter.replenishRate: 10
                     redis-rate-limiter.burstCapacity: 20
                     redis-rate-limiter.requestedTokens: 1
-            # Only the card vault and the fake bank's 3DS page are public. Everything else on the
+            # Only the card vault, the pretend wallet, and the fake bank's 3DS and BLIK pages are public. Everything else on the
             # acquirer (/authorize, /refund, /admin/**) is deliberately not routed.
             - id: acquirer-public
               uri: ${cutpay.upstreams.acquirer}
               predicates:
-                - Path=/vault/tokenize,/vault/3ds/challenge/*/complete
+                - Path=/vault/tokenize,/vault/3ds/challenge/*/complete,/vault/wallet/cards,/vault/wallet/authenticate,/vault/blik/requests,/vault/blik/requests/*/approve,/vault/blik/requests/*/reject,/vault/sim/blik-app
               filters:
                 - StripPrefix=1
                 - name: RequestRateLimiter

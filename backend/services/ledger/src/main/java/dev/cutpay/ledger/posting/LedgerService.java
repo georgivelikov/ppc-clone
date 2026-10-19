@@ -122,7 +122,9 @@ public class LedgerService {
             return;
         }
         PricingPlan plan = plans.findOrCreate(p.merchantId());
-        long fee = p.isBnpl() ? p.bnplFee() : plan.strategy().feeFor(p.amount(), CardProfile.of(p.cardType(), p.cardRegion()));
+        long fee = p.isBnpl() ? p.bnplFee()
+                : p.isBlik() ? PricingPlan.blikFee(p.amount())
+                : plan.strategy().feeFor(p.amount(), CardProfile.of(p.cardType(), p.cardRegion()));
         if (p.isBnpl() && (p.bnplFee() < 0 || p.bnplFee() > p.amount() || !p.transfers().isEmpty())) {
             throw new IllegalArgumentException("Payment " + p.paymentId() + " has an impossible BNPL fee or is split");
         }

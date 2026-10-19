@@ -426,6 +426,14 @@ public class PaymentService {
                 !transfers.findByPaymentIntentIdOrderByIdAsc(intent.getId()).isEmpty());
     }
 
+    /** The ways of paying this checkout offers. */
+    @Transactional(readOnly = true)
+    public List<String> methods(String clientSecret) {
+        PaymentIntent intent = intents.findByClientSecret(clientSecret)
+                .orElseThrow(() -> ApiException.notFound("session_not_found", "This payment link is not valid"));
+        return PaymentMethodRules.available(intent.getCurrency(), intent.getCaptureMethod());
+    }
+
     @Transactional(readOnly = true)
     public SessionView session(String clientSecret) {
         PaymentIntent intent = intents.findByClientSecret(clientSecret)
@@ -433,7 +441,8 @@ public class PaymentService {
         NextAction next = null;
         if (intent.getStatus() == PaymentStatus.REQUIRES_ACTION) {
             next = attempts.findFirstByPaymentIntentIdOrderByCreatedAtDesc(intent.getId())
-                    .map(a -> new NextAction("three_ds", a.getAcquirerRef())).orElse(null);
+                    .map(a -> new NextAction("blik".equals(a.getMethodType()) ? "blik" : "three_ds", a.getAcquirerRef()))
+                    .orElse(null);
         }
         return new SessionView(intent.getId(), intent.getStatus().wire(), intent.getAmount(), intent.getCurrency(),
                 intent.getDescription(), intent.getMerchantName(), intent.getReturnUrl(), intent.getFailureCode(),
@@ -451,9 +460,94 @@ public class PaymentService {
         if (snapshot.getStatus() != PaymentStatus.REQUIRES_PAYMENT_METHOD) {
             throw ApiException.conflict("payment_not_confirmable", "This payment can no longer be paid", null);
         }
+        if (request.isBlik()) {
+            confirmBlik(snapshot, request);
+            return session(clientSecret);
+        }
+        if (request.token() == null || request.token().isBlank()) {
+            throw ApiException.invalidRequest("token_required", "A card token is required", "token");
+        }
         CardInfo card = acquirer.describeToken(request.token());
         execute(snapshot, request.token(), card, request.email());
         return session(clientSecret);
+    }
+
+    /**
+     * Pays with a BLIK code. The bank answers in two steps: it accepts the code at once, then the customer confirms in their
+     * banking app, and that answer arrives later as a call back ({@link #completeBlik}). A code that is not a valid code
+     * leaves the payment untouched, so the customer can type another.
+     */
+    private void confirmBlik(PaymentIntent snapshot, ConfirmRequest request) {
+        if (!"PLN".equals(snapshot.getCurrency())) {
+            throw ApiException.invalidRequest("blik_pln_only", "BLIK is only available for payments in PLN", "method");
+        }
+        if (snapshot.isManualCapture()) {
+            throw ApiException.invalidRequest("blik_automatic_capture_only", "A BLIK payment cannot be captured later",
+                    "method");
+        }
+        String code = request.blikCode() == null ? "" : request.blikCode().trim();
+        if (!code.matches("[0-9]{6}")) {
+            throw ApiException.invalidRequest("invalid_blik_code", "A BLIK code has six digits", "blik_code");
+        }
+        AcquirerClient.BlikResult result = acquirer.blikCharge(code, snapshot.getAmount(), snapshot.getCurrency(),
+                snapshot.getId());
+        if (result instanceof AcquirerClient.BlikResult.InvalidCode invalid) {
+            throw ApiException.invalidRequest("invalid_blik_code", invalid.message(), "blik_code");
+        }
+        if (result instanceof AcquirerClient.BlikResult.Unavailable) {
+            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "api_error", "acquirer_unavailable",
+                    "BLIK is unavailable, please try again", null);
+        }
+        try {
+            tx.execute(status -> {
+                PaymentIntent intent = intents.findById(snapshot.getId()).orElseThrow();
+                intent.startProcessing(request.email());
+                intent.useMethod("blik");
+                // save() may hand back a different instance than the one given, and that one is the one tracked.
+                PaymentAttempt attempt = attempts.save(PaymentAttempt.blik(Ids.generate("att"), intent.getId()));
+                switch (result) {
+                    case AcquirerClient.BlikResult.Pending pending -> {
+                        attempt.awaitingBank(pending.acquirerRef());
+                        intent.requireAction();
+                        publish("PaymentRequiresAction", intent);
+                    }
+                    case AcquirerClient.BlikResult.Declined declined -> {
+                        attempt.failed(declined.code());
+                        intent.fail(declined.code(), declined.message());
+                        publish("PaymentFailed", intent);
+                    }
+                    default -> throw new IllegalStateException("unreachable");
+                }
+                intents.save(intent);
+                return null;
+            });
+        } catch (OptimisticLockingFailureException e) {
+            throw ApiException.conflict("payment_not_confirmable", "This payment is already being processed", null);
+        }
+    }
+
+    /** Called by the acquirer once the customer answered in their banking app. Safe to receive twice. */
+    @Transactional
+    public void completeBlik(String acquirerRef, boolean approved, String declineCode, String message) {
+        PaymentAttempt attempt = attempts.findFirstByAcquirerRef(acquirerRef).orElse(null);
+        if (attempt == null || !"blik".equals(attempt.getMethodType())) {
+            log.warn("A BLIK answer names the unknown request {}", acquirerRef);
+            return;
+        }
+        PaymentIntent intent = intents.lockById(attempt.getPaymentIntentId()).orElseThrow();
+        if (intent.getStatus() != PaymentStatus.REQUIRES_ACTION) {
+            return;
+        }
+        if (approved) {
+            intent.resumeProcessing();
+            approve(intent, attempt, acquirerRef);
+        } else {
+            String code = declineCode == null || declineCode.isBlank() ? "blik_rejected" : declineCode;
+            attempt.failed(code);
+            intent.fail(code, message == null || message.isBlank() ? "The payment was not confirmed in your banking app."
+                    : message);
+            publish("PaymentFailed", intent);
+        }
     }
 
     /** One try to take the money: moves to processing, asks the card network, records the answer. */
@@ -479,6 +573,10 @@ public class PaymentService {
         var attempt = new PaymentAttempt(Ids.generate("att"), intent.getId(), card.brand(), card.last4(),
                 card.expMonth(), card.expYear(), card.fingerprint(), card.cardType(), card.cardRegion())
                 .withToken(token);
+        if (card.walletType() != null) {
+            attempt.viaWallet(card.walletType());
+            intent.useMethod(card.walletType());
+        }
         attempts.save(attempt);
         intents.save(intent);
         return attempt.getId();
@@ -509,7 +607,9 @@ public class PaymentService {
 
     /** The issuer approved: take the money now, or only hold it when the merchant will capture later. */
     private void approve(PaymentIntent intent, PaymentAttempt attempt, String acquirerRef) {
-        if (intent.getSetupFutureUsage() != null && intent.getCustomerId() != null && attempt.getAcquirerToken() != null) {
+        // A wallet's device token belongs to that wallet; it is not a card the merchant can charge later.
+        if (intent.getSetupFutureUsage() != null && intent.getCustomerId() != null && attempt.getAcquirerToken() != null
+                && attempt.isCard()) {
             // The customer agreed to save this card for later payments (subscriptions, repeat orders).
             var card = new CardInfo(attempt.getAcquirerToken(), attempt.getCardBrand(), attempt.getCardLast4(),
                     attempt.getCardExpMonth(), attempt.getCardExpYear(), attempt.getCardFingerprint(),

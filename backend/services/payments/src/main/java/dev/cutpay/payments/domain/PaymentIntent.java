@@ -209,6 +209,11 @@ public class PaymentIntent {
         failureMessage = null;
     }
 
+    /** How the customer is paying: {@code card}, {@code apple_pay}, {@code google_pay} or {@code blik}. */
+    public void useMethod(String type) {
+        paymentMethodType = type;
+    }
+
     public String getPaymentMethodType() {
         return paymentMethodType;
     }

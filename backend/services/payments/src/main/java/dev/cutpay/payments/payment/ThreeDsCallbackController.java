@@ -27,6 +27,14 @@ class ThreeDsCallbackController {
         this.setups = setups;
     }
 
+    /** A BLIK request was answered in the customer's banking app. */
+    @PostMapping("/internal/blik/callback")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void blikCallback(@Valid @RequestBody Callback callback) {
+        payments.completeBlik(callback.acquirerRef(), "approved".equals(callback.status()), callback.declineCode(),
+                callback.message());
+    }
+
     /** The reference belongs either to a payment or to a card being saved. */
     @PostMapping("/internal/3ds/callback")
     @ResponseStatus(HttpStatus.NO_CONTENT)

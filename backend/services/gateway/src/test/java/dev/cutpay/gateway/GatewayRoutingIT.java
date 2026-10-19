@@ -80,6 +80,11 @@ class GatewayRoutingIT {
         client.get().uri("/checkout/sessions/pay_x_secret_y").exchange().expectStatus().isOk();
         client.post().uri("/vault/tokenize").exchange().expectStatus().isOk();
         client.post().uri("/vault/3ds/challenge/auth_1/complete").exchange().expectStatus().isOk();
+        client.get().uri("/vault/wallet/cards").exchange().expectStatus().isOk();
+        client.post().uri("/vault/wallet/authenticate").exchange().expectStatus().isOk();
+        client.post().uri("/vault/blik/requests/blik_1/approve").exchange().expectStatus().isOk();
+        // Charging a BLIK code and anything else on the acquirer is for payments only.
+        client.post().uri("/vault/blik/charge").exchange().expectStatus().isNotFound();
 
         client.get().uri("/v1/payment_intents").exchange().expectStatus().isUnauthorized();
         client.post().uri("/v1/refunds").exchange().expectStatus().isUnauthorized();

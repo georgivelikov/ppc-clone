@@ -59,7 +59,20 @@ public final class PaymentDtos {
     public record CaptureRequest(@Min(value = 1, message = "Amount must be positive") Long amountToCapture) {
     }
 
-    public record ConfirmRequest(@NotBlank String token, @Size(max = 254) String email) {
+    /**
+     * {@code method} is {@code card} (the default; a wallet is a card token handed out by the wallet) or {@code blik},
+     * which takes a six digit {@code blik_code} instead of a token.
+     */
+    public record ConfirmRequest(@Size(max = 200) String token, @Size(max = 254) String email, @Size(max = 20) String method,
+                                 @Size(max = 6) String blikCode) {
+
+        public ConfirmRequest(String token, String email) {
+            this(token, email, null, null);
+        }
+
+        public boolean isBlik() {
+            return "blik".equals(method);
+        }
     }
 
     public record CheckoutSessionCreated(String paymentId, String clientSecret, String url) {

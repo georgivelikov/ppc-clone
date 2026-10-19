@@ -119,6 +119,11 @@ class PaymentController {
         return payments.session(clientSecret);
     }
 
+    @GetMapping("/checkout/sessions/{clientSecret}/methods")
+    java.util.Map<String, List<String>> methods(@PathVariable String clientSecret) {
+        return java.util.Map.of("methods", payments.methods(clientSecret));
+    }
+
     @PostMapping("/checkout/sessions/{clientSecret}/confirm")
     SessionView confirm(@PathVariable String clientSecret, @Valid @RequestBody ConfirmRequest request) {
         return payments.confirm(clientSecret, request);

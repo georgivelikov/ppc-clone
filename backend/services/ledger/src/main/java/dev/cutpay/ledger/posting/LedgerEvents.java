@@ -20,7 +20,15 @@ public final class LedgerEvents {
      */
     public record PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
                                    String paymentId, long amount, String currency, String cardType,
-                                   String cardRegion, List<Transfer> transfers, Long bnplFee) {
+                                   String cardRegion, List<Transfer> transfers, Long bnplFee, String methodType) {
+
+        /** A buy-now-pay-later payment, or a card payment when {@code bnplFee} is null. */
+        public PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
+                                String paymentId, long amount, String currency, String cardType,
+                                String cardRegion, List<Transfer> transfers, Long bnplFee) {
+            this(eventId, occurredAt, merchantId, livemode, paymentId, amount, currency, cardType, cardRegion, transfers,
+                    bnplFee, bnplFee == null ? "card" : "bnpl");
+        }
 
         /** A card payment, possibly split. */
         public PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
@@ -33,6 +41,11 @@ public final class LedgerEvents {
         public PaymentSucceeded(String eventId, Instant occurredAt, String merchantId, boolean livemode,
                                 String paymentId, long amount, String currency, String cardType, String cardRegion) {
             this(eventId, occurredAt, merchantId, livemode, paymentId, amount, currency, cardType, cardRegion, List.of(), null);
+        }
+
+        /** A BLIK payment has its own price; wallets are priced like the card behind them. */
+        public boolean isBlik() {
+            return "blik".equals(methodType);
         }
 
         public boolean isBnpl() {
