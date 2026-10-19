@@ -35,6 +35,7 @@ vi.mock("./api", () => ({
       ],
     }),
     createFxQuote: vi.fn(),
+    getSecurity: vi.fn().mockResolvedValue({ object: "security", email_verified: true, totp_enabled: false, recovery_codes_left: 0 }),
     listConnectedAccounts: vi.fn().mockResolvedValue({ object: "list", data: [], has_more: false }),
   },
   onSessionExpired: vi.fn(),

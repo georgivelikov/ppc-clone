@@ -18,7 +18,9 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate } from "react-router";
+import { api } from "../api";
 import { useAuth, useSession } from "../auth/AuthProvider";
 import { TestModeProvider, useTestMode } from "./testMode";
 
@@ -92,6 +94,26 @@ function TestModeToggle() {
   );
 }
 
+/** Until the address is confirmed, a thin reminder with a way to ask for the link again. */
+function VerifyBanner() {
+  const { t } = useTranslation();
+  const security = useQuery({ queryKey: ["security"], queryFn: () => api.getSecurity() });
+  const resend = useMutation({ mutationFn: () => api.resendVerification() });
+  if (!security.data || security.data.email_verified) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-3 bg-canvas px-4 py-1.5 text-sm print:hidden" role="status" data-testid="verify-banner">
+      <span>{t("shell.verifyBanner")}</span>
+      {resend.isSuccess ? (
+        <span className="text-muted">{t("shell.verifySent")}</span>
+      ) : (
+        <button type="button" onClick={() => resend.mutate()} className="font-medium text-brand-700 hover:underline">
+          {t("shell.verifyResend")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Shell() {
   const { t } = useTranslation();
   const { merchant, user } = useSession();
@@ -119,6 +141,7 @@ function Shell() {
             {t("shell.testBanner")}
           </div>
         )}
+        <VerifyBanner />
         <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 print:hidden md:px-8">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold" data-testid="merchant-name">

@@ -81,6 +81,13 @@ class RolePolicyTest {
     }
 
     @Test
+    void ownSecurityAndEmailChoicesAreOpenToEveryMember() {
+        assertThat(can("viewer", HttpMethod.POST, "/v1/security/totp/setup")).isTrue();
+        assertThat(can("support", HttpMethod.PUT, "/v1/notification_preferences")).isTrue();
+        assertThat(can("viewer", HttpMethod.GET, "/v1/notifications")).isFalse(); // the log is for the team's managers
+    }
+
+    @Test
     void sessionRoutesAreOpenToEveryMember() {
         assertThat(can("viewer", HttpMethod.GET, "/me")).isTrue();
         assertThat(can("support", HttpMethod.POST, "/auth/logout")).isTrue();

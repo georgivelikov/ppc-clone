@@ -24,13 +24,15 @@ public final class AuthDtos {
     public record LoginRequest(
             @NotBlank @Email String email,
             @NotBlank String password,
-            String merchantId) {
+            String merchantId,
+            String totpCode) {
     }
 
-    public record UserView(String id, String email, String fullName) {
+    public record UserView(String id, String email, String fullName, boolean emailVerified, boolean totpEnabled) {
 
         static UserView of(User user) {
-            return new UserView(user.getId(), user.getEmail(), user.getFullName());
+            return new UserView(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null,
+                    user.isTotpEnabled());
         }
     }
 

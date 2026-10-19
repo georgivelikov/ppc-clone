@@ -1,0 +1,46 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: notifications
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notifications
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: notifications
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  notifications:
+    # Mailpit catches everything locally: SMTP on 1025, a web inbox on http://localhost:8025.
+    smtp-host: localhost
+    smtp-port: 1025
+    from: Cutpay <no-reply@cutpay.test>
+    dashboard-url: http://localhost:5173
+    retry-poll-interval: PT10S
+    max-attempts: 5
+    retry-base-delay: PT30S

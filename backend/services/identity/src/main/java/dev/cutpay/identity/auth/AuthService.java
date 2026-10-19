@@ -15,6 +15,7 @@ import dev.cutpay.identity.domain.Repositories.MerchantRepository;
 import dev.cutpay.identity.domain.Repositories.UserRepository;
 import dev.cutpay.identity.domain.User;
 import dev.cutpay.identity.security.JwtService;
+import dev.cutpay.identity.security.SecurityService;
 import dev.cutpay.money.SupportedCurrencies;
 import dev.cutpay.web.ApiException;
 import dev.cutpay.web.Ids;
@@ -40,10 +41,11 @@ public class AuthService {
     private final JwtService jwt;
     private final RefreshTokenService refreshTokens;
     private final OutboxWriter outbox;
+    private final SecurityService security;
 
     public AuthService(UserRepository users, MerchantRepository merchants, MembershipRepository memberships,
                        PasswordEncoder passwordEncoder, JwtService jwt, RefreshTokenService refreshTokens,
-                       OutboxWriter outbox) {
+                       OutboxWriter outbox, SecurityService security) {
         this.users = users;
         this.merchants = merchants;
         this.memberships = memberships;
@@ -51,6 +53,7 @@ public class AuthService {
         this.jwt = jwt;
         this.refreshTokens = refreshTokens;
         this.outbox = outbox;
+        this.security = security;
         this.dummyHash = passwordEncoder.encode("not-a-real-password");
     }
 
@@ -81,9 +84,12 @@ public class AuthService {
                 "legal_name", merchant.getLegalName(),
                 "country", merchant.getCountry(),
                 "default_currency", merchant.getDefaultCurrency(),
-                "owner_user_id", user.getId()));
+                "owner_user_id", user.getId(),
+                "owner_email", user.getEmail(),
+                "owner_name", user.getFullName()));
+        security.sendVerification(user, merchant.getId());
 
-        return startSession(user, merchant, membership);
+        return startSession(user, merchant, membership, null);
     }
 
     @Transactional
@@ -101,9 +107,12 @@ public class AuthService {
                         "This account is not a member of any business"))
                 : all.stream().filter(m -> m.getMerchantId().equals(request.merchantId())).findFirst()
                         .orElseThrow(() -> ApiException.forbidden("not_a_member", "You are not a member of that business"));
+        if (user.isTotpEnabled()) {
+            security.requireSecondFactor(user, request.totpCode());
+        }
         user.recordLogin();
         Merchant merchant = merchants.findById(membership.getMerchantId()).orElseThrow();
-        return startSession(user, merchant, membership);
+        return startSession(user, merchant, membership, null);
     }
 
     // noRollbackFor: on token reuse, consume() revokes all of the user's sessions and we then reject the
@@ -112,11 +121,12 @@ public class AuthService {
     public Session refresh(String rawRefreshToken) {
         var token = refreshTokens.consume(rawRefreshToken)
                 .orElseThrow(() -> ApiException.unauthorized("invalid_refresh_token", "Please sign in again"));
+        String session = token.getFamilyId();
         User user = users.findById(token.getUserId()).orElseThrow();
         Membership membership = memberships.findByUserIdAndMerchantId(user.getId(), token.getMerchantId())
                 .orElseThrow(() -> ApiException.unauthorized("invalid_refresh_token", "Please sign in again"));
         Merchant merchant = merchants.findById(membership.getMerchantId()).orElseThrow();
-        return startSession(user, merchant, membership);
+        return startSession(user, merchant, membership, session);
     }
 
     @Transactional
@@ -130,7 +140,7 @@ public class AuthService {
         User user = users.findById(userId).orElseThrow();
         Membership membership = memberships.findByUserIdAndMerchantId(userId, merchantId).orElseThrow();
         user.recordLogin();
-        return startSession(user, merchants.findById(merchantId).orElseThrow(), membership);
+        return startSession(user, merchants.findById(merchantId).orElseThrow(), membership, null);
     }
 
     @Transactional(readOnly = true)
@@ -142,12 +152,18 @@ public class AuthService {
         return new MeResponse(UserView.of(user), views);
     }
 
-    private Session startSession(User user, Merchant merchant, Membership membership) {
+    private Session startSession(User user, Merchant merchant, Membership membership, String sessionId) {
         String role = membership.getRole().name().toLowerCase(Locale.ROOT);
-        var token = jwt.issue(user.getId(), user.getEmail(), merchant.getId(), role);
-        String refresh = refreshTokens.create(user.getId(), merchant.getId());
+        var refresh = refreshTokens.create(user.getId(), merchant.getId(), sessionId, userAgent());
+        var token = jwt.issue(user.getId(), user.getEmail(), merchant.getId(), role, refresh.familyId());
         var response = new AuthResponse(token.value(), "Bearer", token.expiresInSeconds(), UserView.of(user),
                 MerchantView.of(merchant), role);
-        return new Session(response, refresh);
+        return new Session(response, refresh.raw());
+    }
+
+    private static String userAgent() {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        return attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet
+                ? servlet.getRequest().getHeader("User-Agent") : null;
     }
 }

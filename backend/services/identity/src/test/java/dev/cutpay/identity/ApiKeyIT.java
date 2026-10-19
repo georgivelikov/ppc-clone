@@ -100,8 +100,19 @@ class ApiKeyIT {
     }
 
     @Test
-    void liveKeysProduceLiveTokens() throws Exception {
+    void liveKeysNeedTwoFactorAndThenProduceLiveTokens() throws Exception {
         String token = signup();
+        mvc.perform(post("/v1/api_keys").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Prod\",\"type\":\"secret\",\"livemode\":true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("two_factor_required"));
+        String secretKey = json.readTree(mvc.perform(post("/v1/security/totp/setup").header("Authorization", "Bearer " + token))
+                .andReturn().getResponse().getContentAsString()).get("secret").asString();
+        mvc.perform(post("/v1/security/totp/enable").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + dev.cutpay.identity.security.Totp.code(secretKey, java.time.Instant.now()) + "\"}"))
+                .andExpect(status().isOk());
         String secret = createKey(token, "{\"name\":\"Prod\",\"type\":\"secret\",\"livemode\":true}")
                 .get("secret").asString();
         assertThat(secret).startsWith("sk_live_");

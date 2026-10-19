@@ -28,6 +28,15 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "totp_secret")
+    private String totpSecret;
+
+    @Column(name = "totp_enabled_at")
+    private Instant totpEnabledAt;
+
     protected User() {
     }
 
@@ -57,6 +66,43 @@ public class User {
 
     public Instant getLastLoginAt() {
         return lastLoginAt;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void markEmailVerified() {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = Instant.now();
+        }
+    }
+
+    public String getTotpSecret() {
+        return totpSecret;
+    }
+
+    public boolean isTotpEnabled() {
+        return totpEnabledAt != null;
+    }
+
+    /** Starts setup: the secret is kept but not yet asked for at sign-in. */
+    public void beginTotp(String secret) {
+        this.totpSecret = secret;
+        this.totpEnabledAt = null;
+    }
+
+    public void enableTotp() {
+        this.totpEnabledAt = Instant.now();
+    }
+
+    public void disableTotp() {
+        this.totpSecret = null;
+        this.totpEnabledAt = null;
+    }
+
+    public void changePasswordHash(String hash) {
+        this.passwordHash = hash;
     }
 
     public void recordLogin() {

@@ -50,6 +50,13 @@ import type {
 } from "./customers";
 import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
 import type {
+  NotificationEntry,
+  NotificationPreferences,
+  SecurityOverview,
+  Session,
+  TotpSetup,
+} from "./security";
+import type {
   AcceptInviteInput,
   AssignableRole,
   AuditEvent,
@@ -562,6 +569,65 @@ export class ApiClient {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
   }
 
+  // --- sign-in security ---------------------------------------------------
+
+  forgotPassword(email: string): Promise<void> {
+    return this.request("POST", "/auth/password/forgot", { email }, { auth: false });
+  }
+
+  resetPassword(token: string, password: string): Promise<void> {
+    return this.request("POST", "/auth/password/reset", { token, password }, { auth: false });
+  }
+
+  verifyEmail(token: string): Promise<void> {
+    return this.request("POST", "/auth/email/verify", { token }, { auth: false });
+  }
+
+  getSecurity(): Promise<SecurityOverview> {
+    return this.request("GET", "/v1/security");
+  }
+
+  resendVerification(): Promise<void> {
+    return this.request("POST", "/v1/security/email/resend");
+  }
+
+  startTotp(): Promise<TotpSetup> {
+    return this.request("POST", "/v1/security/totp/setup");
+  }
+
+  /** Returns the recovery codes, which are shown only this once. */
+  async enableTotp(code: string): Promise<string[]> {
+    return (await this.request<{ recovery_codes: string[] }>("POST", "/v1/security/totp/enable", { code })).recovery_codes;
+  }
+
+  disableTotp(password: string, code: string): Promise<void> {
+    return this.request("POST", "/v1/security/totp/disable", { password, code });
+  }
+
+  changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.request("POST", "/v1/security/password", { current_password: currentPassword, new_password: newPassword });
+  }
+
+  async listSessions(): Promise<Session[]> {
+    return (await this.request<{ data: Session[] }>("GET", "/v1/security/sessions")).data;
+  }
+
+  endSession(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/security/sessions/${encodeURIComponent(id)}`);
+  }
+
+  getNotificationPreferences(): Promise<NotificationPreferences> {
+    return this.request("GET", "/v1/notification_preferences");
+  }
+
+  setNotificationPreference(template: string, enabled: boolean): Promise<NotificationPreferences> {
+    return this.request("PUT", "/v1/notification_preferences", { template, enabled });
+  }
+
+  async listNotifications(limit = 50): Promise<NotificationEntry[]> {
+    return (await this.request<{ data: NotificationEntry[] }>("GET", `/v1/notifications${toQuery({ limit })}`)).data;
+  }
+
   // --- team ---------------------------------------------------------------
 
   listTeamMembers(): Promise<ListOf<TeamMember>> {
@@ -785,7 +851,7 @@ export class ApiClient {
 
   private async request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
     const response = await this.send(method, path, body, options);
-    if (response.status === 204) return undefined as T;
+    if (response.status === 204 || response.headers.get("content-length") === "0") return undefined as T;
     return (await response.json()) as T;
   }
 

@@ -5,6 +5,7 @@ import dev.cutpay.identity.auth.AuthDtos.LoginRequest;
 import dev.cutpay.identity.auth.AuthDtos.MeResponse;
 import dev.cutpay.identity.auth.AuthDtos.SignupRequest;
 import dev.cutpay.identity.security.AuthProperties;
+import dev.cutpay.identity.security.SecurityService;
 import dev.cutpay.identity.team.TeamService;
 import dev.cutpay.web.ApiException;
 import jakarta.validation.Valid;
@@ -30,14 +31,45 @@ public class AuthController {
     private final AuthService auth;
     private final AuthProperties properties;
     private final TeamService team;
+    private final SecurityService security;
 
-    public AuthController(AuthService auth, AuthProperties properties, TeamService team) {
+    public AuthController(AuthService auth, AuthProperties properties, TeamService team, SecurityService security) {
+        this.security = security;
         this.auth = auth;
         this.properties = properties;
         this.team = team;
     }
 
     public record AcceptInviteRequest(String fullName, String password) {
+    }
+
+    public record ForgotRequest(@jakarta.validation.constraints.NotBlank String email) {
+    }
+
+    public record ResetRequest(@jakarta.validation.constraints.NotBlank String token,
+                               @jakarta.validation.constraints.NotBlank String password) {
+    }
+
+    public record TokenRequest(@jakarta.validation.constraints.NotBlank String token) {
+    }
+
+    /** Always 202, whether or not the address has an account. */
+    @PostMapping("/auth/password/forgot")
+    ResponseEntity<Void> forgot(@Valid @RequestBody ForgotRequest request) {
+        security.requestPasswordReset(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/auth/password/reset")
+    ResponseEntity<Void> reset(@Valid @RequestBody ResetRequest request) {
+        security.resetPassword(request.token(), request.password());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/auth/email/verify")
+    ResponseEntity<Void> verify(@Valid @RequestBody TokenRequest request) {
+        security.verifyEmail(request.token());
+        return ResponseEntity.noContent().build();
     }
 
     /** What the invitation page shows before the person decides. */

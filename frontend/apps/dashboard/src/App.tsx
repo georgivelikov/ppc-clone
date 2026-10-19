@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router";
 import { GuestOnly, RequireAuth } from "./auth/guards";
 import { AcceptInvitePage } from "./auth/AcceptInvitePage";
 import { LoginPage } from "./auth/LoginPage";
+import { ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from "./auth/RecoveryPages";
 import { SignupPage } from "./auth/SignupPage";
 import { AppShell } from "./layout/AppShell";
 import { HomePage } from "./pages/HomePage";
@@ -34,7 +35,9 @@ import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
 import { PayoutSettingsPage } from "./pages/PayoutSettingsPage";
 import { PaymentMethodsPage } from "./pages/PaymentMethodsPage";
-import { SecurityPage } from "./pages/SecurityPage";
+import { AccountSecurityPage } from "./pages/AccountSecurityPage";
+import { ActivityPage } from "./pages/SecurityPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { PayoutsPage } from "./pages/PayoutsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -47,6 +50,11 @@ export function App() {
     <Suspense fallback={<p className="p-8 text-sm text-muted">Loading…</p>}>
       <Routes>
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route element={<GuestOnly />}>
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+        </Route>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
@@ -87,7 +95,9 @@ export function App() {
             <Route path="settings/payouts" element={<PayoutSettingsPage />} />
             <Route path="settings/methods" element={<PaymentMethodsPage />} />
             <Route path="settings/team" element={<TeamPage />} />
-            <Route path="settings/security" element={<SecurityPage />} />
+            <Route path="settings/notifications" element={<NotificationsPage />} />
+            <Route path="settings/security" element={<AccountSecurityPage />} />
+            <Route path="settings/activity" element={<ActivityPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

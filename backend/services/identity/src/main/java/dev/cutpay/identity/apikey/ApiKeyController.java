@@ -2,6 +2,7 @@ package dev.cutpay.identity.apikey;
 
 import dev.cutpay.identity.apikey.ApiKeyService.Created;
 import dev.cutpay.identity.audit.AuditLog;
+import dev.cutpay.identity.security.SecurityService;
 import dev.cutpay.identity.domain.ApiKey;
 import dev.cutpay.identity.domain.ApiKey.Type;
 import dev.cutpay.web.ApiException;
@@ -35,8 +36,10 @@ public class ApiKeyController {
 
     private final ApiKeyService service;
     private final AuditLog audit;
+    private final SecurityService security;
 
-    public ApiKeyController(ApiKeyService service, AuditLog audit) {
+    public ApiKeyController(ApiKeyService service, AuditLog audit, SecurityService security) {
+        this.security = security;
         this.service = service;
         this.audit = audit;
     }
@@ -79,6 +82,12 @@ public class ApiKeyController {
     @Transactional
     ApiKeyView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateApiKeyRequest request) {
         requireTeamMember(jwt);
+        // Live keys move real money: owners and admins need two-factor sign-in before they can create one.
+        if (Boolean.TRUE.equals(request.livemode()) && Set.of("owner", "admin").contains(jwt.getClaimAsString("role"))
+                && !security.isLiveReady(jwt.getSubject())) {
+            throw ApiException.forbidden("two_factor_required",
+                    "Turn on two-factor sign-in (Settings, Security) before creating live API keys");
+        }
         Type type;
         try {
             type = Type.valueOf(request.type().toUpperCase(Locale.ROOT));

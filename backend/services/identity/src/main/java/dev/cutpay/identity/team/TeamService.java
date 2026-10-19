@@ -6,6 +6,7 @@ import dev.cutpay.identity.domain.Membership;
 import dev.cutpay.identity.domain.Repositories.MembershipRepository;
 import dev.cutpay.identity.domain.Repositories.UserRepository;
 import dev.cutpay.identity.domain.User;
+import dev.cutpay.identity.security.Mailer;
 import dev.cutpay.web.ApiException;
 import dev.cutpay.web.Ids;
 import java.nio.charset.StandardCharsets;
@@ -38,15 +39,17 @@ public class TeamService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLog audit;
     private final OutboxWriter outbox;
+    private final Mailer mailer;
 
     public TeamService(JdbcClient jdbc, UserRepository users, MembershipRepository memberships,
-                       PasswordEncoder passwordEncoder, AuditLog audit, OutboxWriter outbox) {
+                       PasswordEncoder passwordEncoder, AuditLog audit, OutboxWriter outbox, Mailer mailer) {
         this.jdbc = jdbc;
         this.users = users;
         this.memberships = memberships;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.outbox = outbox;
+        this.mailer = mailer;
     }
 
     public record Member(String userId, String email, String fullName, String role, Instant joinedAt,
@@ -137,6 +140,11 @@ public class TeamService {
                 .param("now", java.sql.Timestamp.from(now)).param("expires", java.sql.Timestamp.from(now.plus(INVITE_TTL)))
                 .update();
         audit.record(merchantId, actor, "team.invite_sent", "invitation", id, address + " as " + wanted);
+        String businessName = jdbc.sql("SELECT display_name FROM merchants WHERE id = :m").param("m", merchantId)
+                .query(String.class).single();
+        mailer.send(merchantId, address, "team_invite", Map.of("inviter", actor.getClaimAsString("email"),
+                "merchant_name", businessName, "role", wanted,
+                "invite_url", mailer.dashboardUrl() + "/accept-invite?token=" + token));
         return new Created(new Invite(id, address, wanted, actor.getClaimAsString("email"), now,
                 now.plus(INVITE_TTL), "pending"), token);
     }
@@ -177,6 +185,9 @@ public class TeamService {
         // Tokens already issued still carry the old role until they expire; end the sessions so it takes effect.
         endSessions(userId, merchantId);
         audit.record(merchantId, actor, "team.role_changed", "user", userId, current + " to " + wanted);
+        User changed = users.findById(userId).orElseThrow();
+        outbox.write("merchant.events", "TeamRoleChanged", merchantId, merchantId, null, Map.of("merchant_id", merchantId,
+                "user_id", userId, "email", changed.getEmail(), "full_name", changed.getFullName(), "role", wanted));
         return members(merchantId).stream().filter(m -> m.userId().equals(userId)).findFirst().orElseThrow();
     }
 
@@ -195,6 +206,8 @@ public class TeamService {
         memberships.delete(target);
         endSessions(userId, merchantId);
         audit.record(merchantId, actor, "team.member_removed", "user", userId, current);
+        outbox.write("merchant.events", "TeamMemberRemoved", merchantId, merchantId, null,
+                Map.of("merchant_id", merchantId, "user_id", userId));
     }
 
     @Transactional(readOnly = true)
@@ -237,7 +250,8 @@ public class TeamService {
         audit.record(merchantId, user.getId(), user.getEmail(), "team.invite_accepted", "invitation",
                 (String) row.get("id"), (String) row.get("role"));
         outbox.write("merchant.events", "TeamMemberJoined", merchantId, merchantId, null,
-                Map.of("merchant_id", merchantId, "user_id", user.getId(), "role", row.get("role")));
+                Map.of("merchant_id", merchantId, "user_id", user.getId(), "email", user.getEmail(),
+                        "full_name", user.getFullName(), "role", row.get("role")));
         return new Accepted(user.getId(), merchantId);
     }
 

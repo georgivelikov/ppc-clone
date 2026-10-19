@@ -21,7 +21,10 @@
     "testMode": "Test mode",
     "testBanner": "You are viewing test data. No real money is involved.",
     "signOut": "Sign out",
-    "language": "Language"
+    "language": "Language",
+    "verifyBanner": "Please confirm your email address. We sent you a link.",
+    "verifyResend": "Send it again",
+    "verifySent": "Sent."
   },
   "settingsTabs": {
     "label": "Settings",
@@ -29,7 +32,9 @@
     "payouts": "Payouts",
     "methods": "Payment methods",
     "team": "Team",
-    "security": "Activity"
+    "notifications": "Emails",
+    "security": "Security",
+    "activity": "Activity"
   },
   "home": {
     "welcome": "Welcome, {{name}}",

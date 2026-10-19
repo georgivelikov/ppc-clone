@@ -737,6 +737,7 @@ public class PaymentService {
         payload.put("presentment_amount", intent.getAmount());
         payload.put("presentment_currency", intent.getCurrency());
         payload.put("customer_email", intent.getCustomerEmail());
+        payload.put("locale", intent.getLocale());
         payload.put("failure_code", intent.getFailureCode());
         payload.put("channel", intent.getChannel());
         payload.put("off_session", intent.isOffSession());

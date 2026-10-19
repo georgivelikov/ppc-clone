@@ -17,10 +17,14 @@ const ACTIONS: Record<string, string> = {
   "api_key.rolled": "Rolled an API key",
   "api_key.revoked": "Revoked an API key",
   "merchant.updated": "Edited the business profile",
+  "security.password_changed": "Changed a password",
+  "security.totp_enabled": "Turned on two-factor sign-in",
+  "security.totp_disabled": "Turned off two-factor sign-in",
+  "security.session_ended": "Signed a device out",
 };
 
 /** The record of who did what, newest first. */
-export function SecurityPage() {
+export function ActivityPage() {
   const { role } = useSession();
   const allowed = role === "owner" || role === "admin";
   const events = useInfiniteQuery({

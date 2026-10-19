@@ -8,6 +8,8 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  email_verified?: boolean;
+  totp_enabled?: boolean;
 }
 
 export interface Merchant {
@@ -51,6 +53,8 @@ export interface LoginInput {
   email: string;
   password: string;
   merchant_id?: string;
+  /** A code from the authenticator app, or a recovery code, when two-factor sign-in is on. */
+  totp_code?: string;
 }
 
 export interface UpdateMerchantInput {

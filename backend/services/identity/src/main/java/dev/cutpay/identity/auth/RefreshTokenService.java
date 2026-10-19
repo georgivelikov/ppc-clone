@@ -30,14 +30,24 @@ public class RefreshTokenService {
         this.properties = properties;
     }
 
-    /** Creates a token and returns the raw value, which is never stored. */
-    public String create(String userId, String merchantId) {
+    /** The raw value for the cookie (never stored) and the session it belongs to. */
+    public record Created(String raw, String familyId) {
+    }
+
+    /**
+     * Creates a token and returns the raw value. A rotation passes the family of the token it replaces, so a
+     * session keeps one identity for as long as it lives; a sign-in passes {@code null} and starts a new one.
+     */
+    public Created create(String userId, String merchantId, String familyId, String userAgent) {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        repository.save(new RefreshToken(Ids.generate("rt"), userId, merchantId, hash(raw),
-                Instant.now().plus(properties.refreshTokenTtl())));
-        return raw;
+        String id = Ids.generate("rt");
+        String family = familyId == null ? id : familyId;
+        repository.save(new RefreshToken(id, userId, merchantId, hash(raw),
+                Instant.now().plus(properties.refreshTokenTtl()), family,
+                userAgent == null ? null : userAgent.substring(0, Math.min(200, userAgent.length()))));
+        return new Created(raw, family);
     }
 
     /**
@@ -50,14 +60,18 @@ public class RefreshTokenService {
             return Optional.empty();
         }
         RefreshToken token = found.get();
-        if (token.isRevoked()) {
+        if (token.isRotated()) {
+            // Already spent by a refresh: either the thief or the owner is replaying it.
             repository.revokeAllForUser(token.getUserId());
             return Optional.empty();
+        }
+        if (token.isRevoked()) {
+            return Optional.empty(); // signed out or ended from the security page: just refused
         }
         if (token.getExpiresAt().isBefore(Instant.now())) {
             return Optional.empty();
         }
-        token.revoke();
+        token.rotate();
         return Optional.of(token);
     }
 

@@ -27,4 +27,5 @@ include(
     "services:billing",
     "services:bnpl",
     "services:bnpl-sim",
+    "services:notifications",
 )

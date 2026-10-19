@@ -26,6 +26,11 @@ public class JwtService {
     }
 
     public IssuedToken issue(String userId, String email, String merchantId, String role) {
+        return issue(userId, email, merchantId, role, null);
+    }
+
+    /** {@code sessionId} names the sign-in the token belongs to, so the security page can mark the current one. */
+    public IssuedToken issue(String userId, String email, String merchantId, String role, String sessionId) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(properties.accessTokenTtl());
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -36,6 +41,7 @@ public class JwtService {
                 .claim("email", email)
                 .claim("mid", merchantId)
                 .claim("role", role)
+                .claim("sid", sessionId)
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

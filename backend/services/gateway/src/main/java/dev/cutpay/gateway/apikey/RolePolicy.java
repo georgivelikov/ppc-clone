@@ -25,6 +25,7 @@ final class RolePolicy {
             Map.entry("/v1/logs", "logs"),
             Map.entry("/v1/team", "team"),
             Map.entry("/v1/audit_events", "team"),
+            Map.entry("/v1/notifications", "team"),
             Map.entry("/v1/terminal", "payments"),
             Map.entry("/v1/qr", "payments"));
 
@@ -54,7 +55,9 @@ final class RolePolicy {
         if (API.equals(role) || EVERYTHING.contains(role)) {
             return true;
         }
-        if (path.equals("/me") || path.equals("/auth") || path.startsWith("/auth/")) {
+        // A person's own sign-in security and email choices are theirs whatever the role.
+        if (path.equals("/me") || path.equals("/auth") || path.startsWith("/auth/") || path.equals("/v1/security")
+                || path.startsWith("/v1/security/") || path.equals("/v1/notification_preferences")) {
             return true;
         }
         String resource = resourceOf(path);
