@@ -35,6 +35,7 @@ vi.mock("./api", () => ({
       ],
     }),
     createFxQuote: vi.fn(),
+    getMerchant: vi.fn().mockResolvedValue({ id: "mer_1", display_name: "Rose Cafe", legal_name: "Rose Cafe", country: "BG", default_currency: "EUR", status: "active" }),
     getSecurity: vi.fn().mockResolvedValue({ object: "security", email_verified: true, totp_enabled: false, recovery_codes_left: 0 }),
     listConnectedAccounts: vi.fn().mockResolvedValue({ object: "list", data: [], has_more: false }),
   },

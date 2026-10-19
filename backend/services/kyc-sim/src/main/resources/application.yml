@@ -1,0 +1,23 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: kyc-sim
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  kyc-sim:
+    # How long identity verification takes before it has an answer (a real provider takes minutes).
+    verification-delay: PT3S

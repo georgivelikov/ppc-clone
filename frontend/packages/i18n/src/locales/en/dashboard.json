@@ -23,6 +23,14 @@
     "testBanner": "You are viewing test data. No real money is involved.",
     "signOut": "Sign out",
     "language": "Language",
+    "onboarding": {
+      "pending_kyc": "Finish your application to take live payments.",
+      "in_review": "Your application is being reviewed.",
+      "needs_more_info": "We need more information to approve your application.",
+      "rejected": "Your application was not approved.",
+      "suspended": "This account is suspended.",
+      "link": "Open the application"
+    },
     "verifyBanner": "Please confirm your email address. We sent you a link.",
     "verifyResend": "Send it again",
     "verifySent": "Sent."

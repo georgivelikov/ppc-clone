@@ -12,7 +12,9 @@ import java.time.Instant;
 @Table(name = "merchants")
 public class Merchant {
 
-    public enum Status { PENDING_KYC, ACTIVE, SUSPENDED }
+    /** Until ACTIVE a business works in test mode only. IN_REVIEW waits for the checks (or a person at Cutpay); NEEDS_MORE_INFO
+     * and PENDING_KYC can be edited and submitted. */
+    public enum Status { PENDING_KYC, IN_REVIEW, NEEDS_MORE_INFO, ACTIVE, REJECTED, SUSPENDED }
 
     @Id
     private String id;
@@ -79,6 +81,10 @@ public class Merchant {
 
     public Status getStatus() {
         return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
     }
 
     public Instant getCreatedAt() {

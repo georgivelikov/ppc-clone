@@ -44,6 +44,9 @@ class ApiKeyIT {
     }
 
     @Autowired
+    org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
+    @Autowired
     MockMvc mvc;
 
     @Autowired
@@ -102,6 +105,8 @@ class ApiKeyIT {
     @Test
     void liveKeysNeedTwoFactorAndThenProduceLiveTokens() throws Exception {
         String token = signup();
+        // Live mode opens when the business is approved; here that is arranged directly.
+        jdbc.sql("UPDATE merchants SET status = 'ACTIVE'").update();
         mvc.perform(post("/v1/api_keys").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Prod\",\"type\":\"secret\",\"livemode\":true}"))

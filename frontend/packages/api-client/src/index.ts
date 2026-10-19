@@ -9,6 +9,7 @@ export * from "./connected";
 export * from "./bnpl";
 export * from "./disputes";
 export * from "./fx";
+export * from "./onboarding";
 export * from "./paymentMethods";
 export * from "./security";
 export * from "./team";

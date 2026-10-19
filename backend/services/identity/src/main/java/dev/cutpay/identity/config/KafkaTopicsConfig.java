@@ -21,6 +21,11 @@ public class KafkaTopicsConfig {
     }
 
     @Bean
+    NewTopic onboardingEvents() {
+        return TopicBuilder.name(dev.cutpay.identity.onboarding.OnboardingService.TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
     NewTopic auditEvents() {
         return TopicBuilder.name(dev.cutpay.identity.audit.AuditLog.TOPIC).partitions(3).replicas(1).build();
     }

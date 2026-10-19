@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { NavLink, Outlet, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { api } from "../api";
 import { useAuth, useSession } from "../auth/AuthProvider";
 import { TestModeProvider, useTestMode } from "./testMode";
@@ -96,6 +96,31 @@ function TestModeToggle() {
   );
 }
 
+/** Until the business is approved, a reminder with the way to finish (or read) the application. */
+function ApplicationBanner() {
+  const { t } = useTranslation();
+  const { merchant } = useSession();
+  const current = useQuery({
+    queryKey: ["merchant"],
+    queryFn: () => api.getMerchant(),
+    initialData: merchant,
+    // While the checks run, look again soon so the banner follows the decision.
+    refetchInterval: (q) => (q.state.data?.status === "in_review" ? 3_000 : false),
+  });
+  const status = current.data.status;
+  if (status === "active") return null;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-3 bg-brand-50 px-4 py-1.5 text-sm text-brand-700 print:hidden" data-testid="application-banner">
+      <span>{t(`shell.onboarding.${status}`)}</span>
+      {status !== "suspended" && (
+        <Link to="/onboarding" className="font-medium underline">
+          {t("shell.onboarding.link")}
+        </Link>
+      )}
+    </div>
+  );
+}
+
 /** Until the address is confirmed, a thin reminder with a way to ask for the link again. */
 function VerifyBanner() {
   const { t } = useTranslation();
@@ -143,6 +168,7 @@ function Shell() {
             {t("shell.testBanner")}
           </div>
         )}
+        <ApplicationBanner />
         <VerifyBanner />
         <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 print:hidden md:px-8">
           <div className="min-w-0">

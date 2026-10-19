@@ -24,6 +24,7 @@ final class RolePolicy {
             Map.entry("/v1/merchant", "merchant"),
             Map.entry("/v1/logs", "logs"),
             Map.entry("/v1/team", "team"),
+            Map.entry("/v1/onboarding", "team"),
             Map.entry("/v1/audit_events", "team"),
             Map.entry("/v1/notifications", "team"),
             Map.entry("/v1/terminal", "payments"),

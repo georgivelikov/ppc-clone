@@ -51,6 +51,14 @@ import type {
 import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
 import type { Dispute, DisputeList, DisputeListParams } from "./disputes";
 import type {
+  Application,
+  ApplicationDocument,
+  BusinessType,
+  DocumentKind,
+  PersonInput,
+  RegisteredCompany,
+} from "./onboarding";
+import type {
   NotificationEntry,
   NotificationPreferences,
   SecurityOverview,
@@ -568,6 +576,57 @@ export class ApiClient {
   /** Daily card volume and fees per currency; days without payments are included as zeros. */
   balanceSummary(days = 14, livemode = false): Promise<BalanceSummary> {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
+  }
+
+  // --- onboarding ---------------------------------------------------------
+
+  getApplication(): Promise<Application> {
+    return this.request("GET", "/v1/onboarding");
+  }
+
+  /** What the register says about a number, without saving anything. */
+  lookupCompany(registrationNumber: string): Promise<RegisteredCompany> {
+    return this.request("GET", `/v1/onboarding/company${toQuery({ registration_number: registrationNumber })}`);
+  }
+
+  saveBusiness(input: { business_type: BusinessType; industry: string; registration_number?: string }): Promise<Application> {
+    return this.request("PUT", "/v1/onboarding/business", input);
+  }
+
+  saveProfile(input: { website?: string; description: string; expected_monthly_volume: number }): Promise<Application> {
+    return this.request("PUT", "/v1/onboarding/profile", input);
+  }
+
+  saveBank(input: { iban: string; account_holder: string }): Promise<Application> {
+    return this.request("PUT", "/v1/onboarding/bank", input);
+  }
+
+  addPerson(input: PersonInput): Promise<Application> {
+    return this.request("POST", "/v1/onboarding/persons", input);
+  }
+
+  updatePerson(id: string, input: PersonInput): Promise<Application> {
+    return this.request("PUT", `/v1/onboarding/persons/${encodeURIComponent(id)}`, input);
+  }
+
+  removePerson(id: string): Promise<Application> {
+    return this.request("DELETE", `/v1/onboarding/persons/${encodeURIComponent(id)}`);
+  }
+
+  uploadApplicationDocument(type: DocumentKind, file: File, personId?: string): Promise<ApplicationDocument> {
+    const form = new FormData();
+    form.append("type", type);
+    if (personId) form.append("person_id", personId);
+    form.append("file", file);
+    return this.request("POST", "/v1/onboarding/documents", form);
+  }
+
+  removeApplicationDocument(id: string): Promise<Application> {
+    return this.request("DELETE", `/v1/onboarding/documents/${encodeURIComponent(id)}`);
+  }
+
+  submitApplication(input: { accepted_terms: boolean; signed_name: string }): Promise<Application> {
+    return this.request("POST", "/v1/onboarding/submit", input);
   }
 
   // --- disputes -----------------------------------------------------------

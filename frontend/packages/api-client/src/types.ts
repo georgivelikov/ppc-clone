@@ -18,7 +18,7 @@ export interface Merchant {
   legal_name: string;
   country: string;
   default_currency: string;
-  status: "pending_kyc" | "active" | "suspended";
+  status: "pending_kyc" | "in_review" | "needs_more_info" | "active" | "rejected" | "suspended";
 }
 
 export interface AuthResponse {

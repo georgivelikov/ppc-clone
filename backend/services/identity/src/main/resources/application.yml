@@ -2,6 +2,10 @@ server:
   port: 8081
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: identity
   datasource:
@@ -30,6 +34,10 @@ management:
         enabled: true
 
 cutpay:
+  kyc:
+    # The pretend identity-verification provider and company registry.
+    url: http://localhost:8093
+    poll-interval: PT3S
   auth:
     access-token-ttl: PT15M
     refresh-token-ttl: P30D

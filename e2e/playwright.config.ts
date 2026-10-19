@@ -34,6 +34,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      command: `${gradle} :services:kyc-sim:bootRun`,
+      cwd: "../backend",
+      url: "http://localhost:8093/actuator/health",
+      timeout: 240_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
       command: `${gradle} :services:notifications:bootRun`,
       cwd: "../backend",
       url: "http://localhost:8092/actuator/health",

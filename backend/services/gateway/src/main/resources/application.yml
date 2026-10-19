@@ -43,7 +43,7 @@ spring:
             - id: identity-api
               uri: ${cutpay.upstreams.identity}
               predicates:
-                - Path=/me,/v1/team,/v1/team/**,/v1/audit_events,/v1/security,/v1/security/**,/v1/merchant,/v1/api_keys,/v1/api_keys/**,/v1/connected_accounts,/v1/connected_accounts/**,/.well-known/**
+                - Path=/me,/v1/onboarding,/v1/onboarding/**,/v1/team,/v1/team/**,/v1/audit_events,/v1/security,/v1/security/**,/v1/merchant,/v1/api_keys,/v1/api_keys/**,/v1/connected_accounts,/v1/connected_accounts/**,/.well-known/**
             - id: notifications-api
               uri: ${cutpay.upstreams.notifications}
               predicates:

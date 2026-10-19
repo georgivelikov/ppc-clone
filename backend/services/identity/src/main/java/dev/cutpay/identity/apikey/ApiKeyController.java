@@ -2,6 +2,8 @@ package dev.cutpay.identity.apikey;
 
 import dev.cutpay.identity.apikey.ApiKeyService.Created;
 import dev.cutpay.identity.audit.AuditLog;
+import dev.cutpay.identity.domain.Merchant;
+import dev.cutpay.identity.domain.Repositories.MerchantRepository;
 import dev.cutpay.identity.security.SecurityService;
 import dev.cutpay.identity.domain.ApiKey;
 import dev.cutpay.identity.domain.ApiKey.Type;
@@ -37,8 +39,10 @@ public class ApiKeyController {
     private final ApiKeyService service;
     private final AuditLog audit;
     private final SecurityService security;
+    private final MerchantRepository merchants;
 
-    public ApiKeyController(ApiKeyService service, AuditLog audit, SecurityService security) {
+    public ApiKeyController(ApiKeyService service, AuditLog audit, SecurityService security, MerchantRepository merchants) {
+        this.merchants = merchants;
         this.security = security;
         this.service = service;
         this.audit = audit;
@@ -82,6 +86,11 @@ public class ApiKeyController {
     @Transactional
     ApiKeyView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateApiKeyRequest request) {
         requireTeamMember(jwt);
+        // Until the business is approved it works in test mode only.
+        if (Boolean.TRUE.equals(request.livemode())
+                && merchants.findById(merchant(jwt)).map(m -> m.getStatus() != Merchant.Status.ACTIVE).orElse(true)) {
+            throw ApiException.forbidden("merchant_not_active", "Live mode opens when your business is approved (Onboarding)");
+        }
         // Live keys move real money: owners and admins need two-factor sign-in before they can create one.
         if (Boolean.TRUE.equals(request.livemode()) && Set.of("owner", "admin").contains(jwt.getClaimAsString("role"))
                 && !security.isLiveReady(jwt.getSubject())) {
