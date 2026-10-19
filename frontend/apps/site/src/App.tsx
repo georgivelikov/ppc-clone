@@ -8,6 +8,7 @@ import { GettingStartedPage } from "./pages/docs/GettingStartedPage";
 import { TestCardsPage } from "./pages/docs/TestCardsPage";
 import { BillingPage } from "./pages/docs/BillingPage";
 import { InstalmentsPage } from "./pages/docs/InstalmentsPage";
+import { MethodsPage } from "./pages/docs/MethodsPage";
 import { PaymentLinksPage } from "./pages/docs/PaymentLinksPage";
 import { WebhooksGuidePage } from "./pages/docs/WebhooksGuidePage";
 import { FaqPage } from "./pages/FaqPage";
@@ -101,6 +102,7 @@ export function App() {
           <Route path="payment-links" element={<PaymentLinksPage />} />
           <Route path="billing" element={<BillingPage />} />
           <Route path="instalments" element={<InstalmentsPage />} />
+          <Route path="methods" element={<MethodsPage />} />
           <Route path="webhooks" element={<WebhooksGuidePage />} />
           <Route
             path="api/*"

@@ -43,7 +43,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 4 | [Links, QR & Virtual POS](docs/plans/phase-04-links-qr-pos.md) — payment links, QR codes, charge-with-QR, virtual terminal | ✅ Built |
 | 5 | [Billing](docs/plans/phase-05-billing.md) — saved cards, pre-auth, subscriptions, invoices, split payments | ✅ Built |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine, circuit breakers | ✅ Built |
-| 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ⏳ Planned |
+| 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ✅ Built |
 | 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ⏳ Planned |
 | 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | ⏳ Planned |
 
@@ -163,6 +163,12 @@ To scan a code with a phone on the same network, serve the checkout on your comp
 - At the checkout a **Pay in instalments** tab appears when a provider can finance the price: SplitNow, Lendo, KreditKo or PayLaterEU, four pretend providers with their own limits, fees and ways of answering ([ADR 0017](docs/adr/0017-bnpl-provider-simulator.md)). The page at `http://localhost:8089` switches one off, slows it down or makes it hang.
 - **Instalments** in the dashboard sets which providers you offer and how the best one is chosen (the customer, cheapest, fastest, most likely to approve, or a weighted mix), and shows how each has done and whether its circuit is open. A payment says who financed it and why that provider was chosen ([ADR 0018](docs/adr/0018-bnpl-aggregation-and-routing.md)).
 - You are paid the price less the provider fee as soon as it approves ([ADR 0019](docs/adr/0019-bnpl-applications-and-settlement-of-the-payment.md)); the provider settles a day later and refunds go through it ([ADR 0020](docs/adr/0020-bnpl-settlement-and-refunds.md)). A provider that is down drops out of the offers and comes back by itself ([ADR 0021](docs/adr/0021-bnpl-resilience-cascade-and-learning.md)).
+
+## Wallets, BLIK, currencies and languages
+
+- The checkout offers **Wallet** (a pretend Apple Pay and Google Pay: pick a stored test card, confirm "on the device"; no 3-D Secure) and, for payments in PLN, **BLIK** (type `777123`, then approve in the pretend bank app at `/vault/sim/blik-app`; `000000` is declined). Which methods a payment offers is one rule list, and Settings, Payment methods switches wallets and BLIK off ([ADR 0022](docs/adr/0022-wallets-and-blik.md)).
+- Money stays in the currency it was paid in. **Balances** shows every currency, converts available money with a quote that holds a rate for 15 minutes, and can convert other currencies by itself when they become available. A conversion costs 1% over the (simulated) market rate and is posted so that the books balance in every currency ([ADR 0023](docs/adr/0023-fx-conversions-in-the-ledger.md)).
+- The checkout speaks English, Bulgarian, Romanian, Polish, Hungarian and Greek (`?locale=pl`, or the `locale` of the payment, or the browser's language), and writes prices the way each does; in Bulgarian a euro price also shows leva. The dashboard is in English and Bulgarian. `pnpm i18n:check` finds missing translations ([ADR 0024](docs/adr/0024-localisation.md)).
 
 Billing, ledger and payouts run on simulated clocks. To watch a trial end and the next month renew:
 

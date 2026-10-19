@@ -135,6 +135,15 @@ class FxFlowIT {
         return mvc.perform(post("/v1/balance/convert").with(asMerchant()).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
+    @Test
+    void aQuoteSaysHowLongItLastsOnTheServersOwnClock() throws Exception {
+        ((SimulatedClock) clock).advance(Duration.ofDays(30)); // a browser's clock would be a month off
+        String body = mvc.perform(post("/v1/fx/quotes").with(asMerchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from_currency\":\"RON\",\"to_currency\":\"EUR\",\"amount\":1000}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.expires_in").value(900)).andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(body).get("expires_at").asString()).isNotBlank();
+    }
+
     private String quote(String from, String to, long amount) throws Exception {
         String body = mvc.perform(post("/v1/fx/quotes").with(asMerchant()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"from_currency\":\"%s\",\"to_currency\":\"%s\",\"amount\":%d}".formatted(from, to, amount)))

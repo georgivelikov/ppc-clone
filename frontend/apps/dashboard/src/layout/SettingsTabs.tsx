@@ -1,16 +1,18 @@
+import { useTranslation } from "@cutpay/i18n";
 import { cn } from "@cutpay/ui";
 import { NavLink } from "react-router";
 
 const TABS = [
-  { label: "Business profile", to: "/settings", end: true },
-  { label: "Payouts", to: "/settings/payouts", end: false },
-  { label: "Payment methods", to: "/settings/methods", end: false },
+  { key: "profile", to: "/settings", end: true },
+  { key: "payouts", to: "/settings/payouts", end: false },
+  { key: "methods", to: "/settings/methods", end: false },
 ];
 
 /** Switches between the settings pages. */
 export function SettingsTabs() {
+  const { t } = useTranslation();
   return (
-    <nav aria-label="Settings" className="flex gap-1 border-b border-border">
+    <nav aria-label={t("settingsTabs.label")} className="flex gap-1 border-b border-border">
       {TABS.map((tab) => (
         <NavLink
           key={tab.to}
@@ -23,7 +25,7 @@ export function SettingsTabs() {
             )
           }
         >
-          {tab.label}
+          {t(`settingsTabs.${tab.key}`)}
         </NavLink>
       ))}
     </nav>

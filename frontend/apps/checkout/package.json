@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@cutpay/checkout-js": "workspace:*",
+    "@cutpay/i18n": "workspace:*",
     "@cutpay/ui": "workspace:*",
     "@hookform/resolvers": "^5.9.2",
     "@tanstack/react-query": "^5.104.3",

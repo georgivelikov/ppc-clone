@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { FEE_PLANS } from "./lib/pricing";
 import { PROVIDERS } from "./pages/docs/InstalmentsPage";
+import { BLIK, FX, LOCALES } from "./pages/docs/MethodsPage";
 import { FEE_CARDS, TEST_CARDS } from "./pages/docs/TestCardsPage";
 
 const root = resolve(import.meta.dirname, "../../../..");
@@ -143,6 +144,35 @@ describe("the docs agree with the platform", () => {
       const source = read(`backend/services/bnpl-sim/src/main/java/dev/cutpay/bnplsim/${feeSources[provider.code]}.java`);
       expect(source, provider.name).toMatch(new RegExp(`FEE_BPS = ${provider.feeBps};`));
     }
+  });
+
+  it("promises the BLIK codes, fee and currency the platform really has", () => {
+    const simulator = read("backend/services/acquirer-sim/src/main/java/dev/cutpay/acquirer/BlikController.java");
+    expect(simulator).toContain(`APPROVED_CODE = "${BLIK.approves}"`);
+    expect(simulator).toContain(`DECLINED_CODE = "${BLIK.declines}"`);
+    expect(simulator).toContain(`"${BLIK.currency}".equals(request.currency())`);
+    expect(read("backend/services/ledger/src/main/java/dev/cutpay/ledger/fees/PricingPlan.java")).toContain(
+      `BLIK = new Rate(${BLIK.bps}, ${BLIK.fixed})`,
+    );
+    expect(read("backend/services/payments/src/main/java/dev/cutpay/payments/payment/PaymentMethodRules.java")).toContain(
+      `"${BLIK.currency}".equals(currency)`,
+    );
+  });
+
+  it("promises the currency markup, the quote validity and the lev rate the platform really uses", () => {
+    expect(read("backend/services/ledger/src/main/java/dev/cutpay/ledger/fx/FxService.java")).toContain(
+      `QUOTE_VALIDITY = Duration.ofMinutes(${FX.quoteMinutes})`,
+    );
+    expect(read("backend/services/ledger/src/main/resources/db/migration/V5__fx.sql")).toContain(`fx_markup_bps         INT         NOT NULL DEFAULT ${FX.markupBps}`);
+    expect(read("frontend/packages/i18n/src/format.ts")).toContain(`BGN_PER_EUR = ${FX.bgnPerEur}`);
+  });
+
+  it("lists the languages the checkout is translated into", () => {
+    expect(read("frontend/packages/i18n/src/locale.ts")).toContain(`LOCALES = [${LOCALES.map((l) => `"${l}"`).join(", ")}]`);
+    const payments = read("backend/services/payments/src/main/java/dev/cutpay/payments/payment/PaymentDtos.java");
+    expect(payments).toContain(`regexp = "${LOCALES.join("|")}"`);
+    const documented = (spec.components.schemas.CreatePaymentIntent as Json).properties.locale.enum as string[];
+    expect([...documented].sort()).toEqual([...LOCALES].sort());
   });
 
   it("uses fee-tier cards that really have those BINs", () => {

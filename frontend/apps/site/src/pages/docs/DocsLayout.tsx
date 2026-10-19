@@ -7,6 +7,7 @@ const PAGES = [
   { label: "Payment links", to: "/docs/payment-links", end: false },
   { label: "Billing", to: "/docs/billing", end: false },
   { label: "Instalments", to: "/docs/instalments", end: false },
+  { label: "Methods and currencies", to: "/docs/methods", end: false },
   { label: "Webhooks", to: "/docs/webhooks", end: false },
   { label: "API reference", to: "/docs/api", end: false },
 ];

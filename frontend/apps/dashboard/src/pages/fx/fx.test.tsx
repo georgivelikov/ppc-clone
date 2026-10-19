@@ -65,6 +65,7 @@ function quote(secondsFromNow: number): FxQuote {
     rate: 0.201207243461,
     markup_bps: 100,
     expires_at: new Date(Date.now() + secondsFromNow * 1000).toISOString(),
+    expires_in: secondsFromNow,
     livemode: false,
   };
 }
@@ -184,7 +185,8 @@ describe("currency settings", () => {
     });
     wrap(<CurrencySettingsCard />);
     const form = await screen.findByRole("form", { name: "Currency settings" });
-    expect(await within(form).findByRole("checkbox", { name: "EUR" })).toBeChecked();
+    // The settings arrive after the form is drawn.
+    await vi.waitFor(() => expect(within(form).getByRole("checkbox", { name: "EUR" })).toBeChecked());
     expect(within(form).getByTestId("fx-markup")).toHaveTextContent("1% over the market rate");
 
     await userEvent.click(within(form).getByRole("checkbox", { name: "PLN" }));
@@ -199,7 +201,8 @@ describe("currency settings", () => {
   it("will not save without a currency", async () => {
     wrap(<CurrencySettingsCard />);
     const form = await screen.findByRole("form", { name: "Currency settings" });
-    await userEvent.click(await within(form).findByRole("checkbox", { name: "EUR" }));
+    await vi.waitFor(() => expect(within(form).getByRole("checkbox", { name: "EUR" })).toBeChecked());
+    await userEvent.click(within(form).getByRole("checkbox", { name: "EUR" }));
     expect(within(form).getByRole("button", { name: "Save currencies" })).toBeDisabled();
   });
 });

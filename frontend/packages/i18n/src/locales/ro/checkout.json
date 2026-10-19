@@ -1,0 +1,174 @@
+{
+  "shell": {
+    "disclaimer": "Proiect educațional. Nu se procesează plăți reale — nu introduceți niciodată un număr real de card.",
+    "language": "Limbă"
+  },
+  "page": {
+    "loading": "Se încarcă plata…",
+    "notFound": {
+      "title": "Linkul de plată nu a fost găsit",
+      "text": "Acest link de plată nu este valid."
+    },
+    "error": {
+      "title": "Ceva nu a funcționat",
+      "text": "Nu am putut încărca această plată. Vă rugăm să încercați din nou."
+    },
+    "merchant": "Comerciant"
+  },
+  "methods": {
+    "label": "Metodă de plată",
+    "card": "Card",
+    "wallet": "Portofel",
+    "blik": "BLIK",
+    "instalments": "Plată în rate"
+  },
+  "card": {
+    "title": "Plată cu cardul",
+    "formLabel": "Detaliile plății",
+    "email": "E-mail",
+    "number": "Număr card",
+    "expiry": "Expirare",
+    "cvc": "CVC",
+    "pay": "Plătește {{amount}}",
+    "saveNotice": "Cardul dvs. va fi salvat pentru plăți viitoare către {{merchant}}.",
+    "thisMerchant": "acest comerciant",
+    "testCard": "Card de test: 4242 4242 4242 4242, orice dată viitoare, orice CVC.",
+    "errors": {
+      "emailRequired": "Introduceți adresa de e-mail",
+      "emailInvalid": "Introduceți o adresă de e-mail validă",
+      "number": "Introduceți un număr de card valid",
+      "expiry": "Introduceți o dată de expirare validă",
+      "cvc": "Introduceți codul de securitate"
+    },
+    "failed": "Nu am putut procesa plata. Vă rugăm să încercați din nou."
+  },
+  "wallet": {
+    "title": "Plată cu portofelul",
+    "intro": "Plătiți cu un card pe care îl păstrați în telefon, fără să tastați numărul.",
+    "payWith": "Plătește cu {{wallet}}",
+    "sheetLabel": "{{wallet}} (simulat)",
+    "disclaimer": "Un portofel simulat, pentru încercări. Nu este Apple sau Google și nu este implicat niciun card real.",
+    "card": "Card",
+    "loadingCards": "Se încarcă cardurile…",
+    "unavailable": "Portofelul nu este disponibil momentan.",
+    "email": "E-mail",
+    "emailInvalid": "Introduceți o adresă de e-mail validă",
+    "confirm": "Confirmă cu Face ID sau PIN",
+    "close": "Închide"
+  },
+  "blik": {
+    "title": "Plată cu BLIK",
+    "email": "E-mail",
+    "emailInvalid": "Introduceți o adresă de e-mail validă",
+    "code": "Cod BLIK",
+    "codeHint": "Deschideți aplicația bancară și generați un cod BLIK.",
+    "pay": "Plătește {{amount}}",
+    "testCode": "Cod de test: 777123 plătește, 000000 este refuzat.",
+    "codeRequired": "Introduceți codul din șase cifre din aplicația bancară",
+    "codeInvalid": "Codul nu este valid sau a expirat. Generați unul nou în aplicație.",
+    "waiting": {
+      "title": "Confirmați în aplicația bancară",
+      "text": "Am trimis o cerere băncii dvs. Deschideți aplicația bancară și aprobați plata. Pagina se actualizează singură.",
+      "tryIt": "Încercați? <appLink>Deschideți aplicația bancară simulată</appLink> pentru a aproba sau respinge. Dacă nu faceți nimic, plata este aprobată după câteva secunde."
+    }
+  },
+  "threeDs": {
+    "title": "Confirmați cu banca dvs.",
+    "text": "Banca dvs. trebuie să verifice această plată. Introduceți codul unic <strong>1234</strong>.",
+    "code": "Cod unic",
+    "approve": "Aprobă",
+    "fail": "Autentificare eșuată",
+    "unreachable": "Nu am putut contacta banca dvs. Vă rugăm să încercați din nou."
+  },
+  "outcome": {
+    "held": {
+      "title": "Plată autorizată",
+      "text": "{{amount}} sunt rezervați pe cardul dvs. {{merchant}} va încasa plata mai târziu; este posibil să o vedeți ca „în așteptare”."
+    },
+    "paid": {
+      "title": "Plată reușită",
+      "text": "{{amount}} au fost plătiți către {{merchant}}."
+    },
+    "processing": {
+      "title": "Se procesează plata",
+      "text": "Poate dura câteva secunde. Vă rugăm să nu închideți pagina."
+    },
+    "canceled": {
+      "title": "Plată anulată",
+      "text": "Această plată a fost anulată de comerciant. Nu ați fost taxat."
+    },
+    "failed": {
+      "title": "Plata a eșuat",
+      "text": "Plata nu a putut fi finalizată.",
+      "note": "Nu ați fost taxat. Cereți comerciantului un nou link de plată pentru a încerca din nou."
+    },
+    "return": "Înapoi la {{merchant}}",
+    "merchantLower": "comerciantul",
+    "merchantReturn": "comerciant"
+  },
+  "bnpl": {
+    "title": "Plată în rate",
+    "unreachable": "{{names}} nu poate fi contactat în acest moment.",
+    "choose": "Alegeți un plan",
+    "best": {
+      "title": "Cea mai bună opțiune",
+      "text": "Alegem furnizorul cu cele mai mari șanse să aprobe, la un preț bun."
+    },
+    "fallback": "Dacă primul furnizor nu poate ajuta, încearcă următorii cei mai buni",
+    "apply": "Solicită {{amount}} în rate",
+    "footnote": "Decide furnizorul. {{merchant}} este plătit când vă aprobă.",
+    "merchantFallback": "Comerciantul",
+    "fields": {
+      "email": "E-mail",
+      "birthdate": "Data nașterii",
+      "national_id": "Cod numeric personal",
+      "monthly_income": "Venit lunar (după taxe)"
+    },
+    "errors": {
+      "email": "Introduceți o adresă de e-mail validă",
+      "birthdate": "Introduceți data nașterii",
+      "nationalId": "Introduceți numărul (6 până la 16 litere sau cifre)",
+      "income": "Introduceți venitul lunar"
+    },
+    "applyFailed": "Nu am putut trimite cererea. Vă rugăm să încercați din nou.",
+    "approved": {
+      "title": "Aprobat de {{provider}}",
+      "text": "Se finalizează plata…"
+    },
+    "waiting": {
+      "title": "Se așteaptă {{provider}}",
+      "keepOpen": "Vă rugăm să țineți pagina deschisă.",
+      "cancel": "Anulează cererea"
+    },
+    "failedTitle": "Nu a mers",
+    "chooseAnother": "Alegeți altă opțiune",
+    "tried": "Am întrebat {{list}}.",
+    "triedSeparator": ", apoi ",
+    "interval": {
+      "days_one": "în fiecare zi",
+      "days_few": "la fiecare {{count}} zile",
+      "days_other": "la fiecare {{count}} de zile",
+      "weeks_one": "în fiecare săptămână",
+      "weeks_few": "la fiecare {{count}} săptămâni",
+      "weeks_other": "la fiecare {{count}} de săptămâni",
+      "months_one": "în fiecare lună",
+      "months_few": "la fiecare {{count}} luni",
+      "months_other": "la fiecare {{count}} de luni"
+    },
+    "plan": {
+      "single_one": "{{amount}} peste {{count}} zi",
+      "single_few": "{{amount}} peste {{count}} zile",
+      "single_other": "{{amount}} peste {{count}} de zile",
+      "many_one": "{{count}} rată de {{amount}} {{interval}}",
+      "many_few": "{{count}} rate de {{amount}} {{interval}}",
+      "many_other": "{{count}} de rate de {{amount}} {{interval}}",
+      "about_one": "{{count}} rată de aproximativ {{amount}} {{interval}}",
+      "about_few": "{{count}} rate de aproximativ {{amount}} {{interval}}",
+      "about_other": "{{count}} de rate de aproximativ {{amount}} {{interval}}"
+    },
+    "cost": {
+      "none": "Fără dobândă · total {{total}}",
+      "interest": "{{interest}} dobândă ({{apr}}% DAE) · total {{total}}"
+    }
+  }
+}

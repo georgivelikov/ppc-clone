@@ -64,6 +64,10 @@ tags:
     description: Customers pay in parts with buy-now-pay-later providers; you are paid up front.
   - name: Payment links
     description: Get paid without a website, with a shareable link or a QR code.
+  - name: Payment methods
+    description: "Which ways of paying your checkout offers: cards, wallets and BLIK."
+  - name: Currencies
+    description: Exchange rates, locked quotes, conversions between your balances and what happens to money in other currencies.
   - name: Refunds
     description: Return money to a customer.
   - name: Balance
@@ -1700,7 +1704,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [payment, refund, payout, transfer, transfer_reversal]
+            enum: [payment, refund, payout, transfer, transfer_reversal, conversion]
         - name: source
           in: query
           description: A payment id (also matches its refunds), refund id or payout id.
@@ -1713,6 +1717,204 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceTransactionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/payment_method_settings:
+    get:
+      tags: [Payment methods]
+      operationId: getPaymentMethodSettings
+      summary: Which ways of paying your checkout offers
+      description: |
+        Everything is on until you switch it off. Cards cannot be switched off, so a checkout always has a way to pay.
+        A method that does not fit a payment is left out of that checkout anyway: BLIK is for payments in PLN that are
+        taken at once. Instalments are set up under `/v1/bnpl/settings`.
+      responses:
+        "200":
+          description: Every method you can switch, with whether it is on.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethodSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Payment methods]
+      operationId: updatePaymentMethodSettings
+      summary: Switch payment methods on or off
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePaymentMethodSettings"
+      responses:
+        "200":
+          description: The settings after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethodSettings"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/fx/rates:
+    get:
+      tags: [Currencies]
+      operationId: getFxRates
+      summary: Current exchange rates
+      description: |
+        What one unit of the base currency buys of every other currency we support. The rates are simulated: they start
+        from fixed values and move a little every minute, within 10% of where they began.
+      parameters:
+        - name: base
+          in: query
+          schema:
+            type: string
+            default: EUR
+      responses:
+        "200":
+          description: The rates, with the time of the newest one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxRates"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/fx/quotes:
+    post:
+      tags: [Currencies]
+      operationId: createFxQuote
+      summary: Lock a rate for 15 minutes
+      description: |
+        Works out what a conversion would give you, with the platform's markup, and promises it for 15 minutes. A quote
+        is for one conversion of exactly its amount; use it with `POST /v1/balance/convert`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFxQuote"
+      responses:
+        "201":
+          description: The quote.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxQuote"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/balance/convert:
+    post:
+      tags: [Currencies]
+      operationId: convertBalance
+      summary: Convert available money into another currency
+      description: |
+        Moves available money from one currency to another. Without a `quote_id` the current rate is used. The market
+        value is rounded to the nearest minor unit and what you receive is rounded down, so you are never paid more than
+        the market value; the difference is the platform's markup. Pending money cannot be converted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvertBalance"
+      responses:
+        "201":
+          description: The conversion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxConversion"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The quote does not exist or is not yours.
+        "409":
+          description: Not enough available balance, or the quote was used or has expired.
+  /v1/fx/conversions:
+    get:
+      tags: [Currencies]
+      operationId: listFxConversions
+      summary: List conversions
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartingAfter"
+      responses:
+        "200":
+          description: A page of conversions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxConversionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/fx/report:
+    get:
+      tags: [Currencies]
+      operationId: getFxReport
+      summary: What conversions brought in, and what the markup took
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        "200":
+          description: Totals per currency received.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxReport"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/currency_settings:
+    get:
+      tags: [Currencies]
+      operationId: getCurrencySettings
+      summary: Which currencies you keep, and whether the others are converted
+      responses:
+        "200":
+          description: Your settlement currencies and conversion settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrencySettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Currencies]
+      operationId: updateCurrencySettings
+      summary: Change the currencies you keep and automatic conversion
+      description: |
+        With `auto_convert` on, money in a currency you do not keep is converted into the first of your settlement
+        currencies when it becomes available (not while it is pending), at the rate of that moment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCurrencySettings"
+      responses:
+        "200":
+          description: The saved settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrencySettings"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /v1/payouts:
@@ -2573,6 +2775,12 @@ components:
           format: int64
           minimum: 0
           description: What the platform keeps of the payment. The single destination receives everything else.
+        locale:
+          type: string
+          enum: [en, bg, ro, pl, hu, el]
+          description: |
+            The language the hosted checkout opens in. A language in the link (`?locale=`) or one the customer chose
+            themselves comes first; without any, the browser's language is used.
     Address:
       type: object
       properties:
@@ -3850,8 +4058,10 @@ components:
           description: Charged to a saved card without the customer present.
         payment_method_type:
           type: string
-          enum: [card, bnpl]
-          description: How the payment was settled; `bnpl` when a provider financed it in instalments.
+          enum: [card, apple_pay, google_pay, blik, bnpl]
+          description: |
+            How the payment was settled. `apple_pay` and `google_pay` are cards presented by a wallet (no 3-D Secure, priced
+            like the card); `blik` is a Polish bank-app payment; `bnpl` means a provider financed it in instalments.
         bnpl:
           type: [object, "null"]
           description: Who financed a payment settled in instalments, and what they kept.
@@ -4230,6 +4440,229 @@ components:
           format: int64
         currency:
           type: string
+    PaymentMethodSettings:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          const: payment_method_settings
+        data:
+          type: array
+          items:
+            type: object
+            required: [method, enabled, locked]
+            properties:
+              method:
+                type: string
+                enum: [card, apple_pay, google_pay, blik]
+              enabled:
+                type: boolean
+              locked:
+                type: boolean
+                description: Cards cannot be switched off.
+    UpdatePaymentMethodSettings:
+      type: object
+      required: [methods]
+      properties:
+        methods:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [method, enabled]
+            properties:
+              method:
+                type: string
+                enum: [card, apple_pay, google_pay, blik]
+              enabled:
+                type: boolean
+    FxRates:
+      type: object
+      required: [object, base, as_of, rates]
+      properties:
+        object:
+          type: string
+          const: fx_rates
+        base:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        rates:
+          type: object
+          description: What one unit of the base currency buys, by currency code.
+          additionalProperties:
+            type: number
+    CreateFxQuote:
+      type: object
+      required: [from_currency, to_currency, amount]
+      properties:
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: "In the smallest unit of `from_currency`."
+    ConvertBalance:
+      allOf:
+        - $ref: "#/components/schemas/CreateFxQuote"
+        - type: object
+          properties:
+            quote_id:
+              type: string
+              description: Convert at the quoted rate. A quote is for one conversion of exactly its amount.
+    FxQuote:
+      type: object
+      required: [id, object, from_currency, to_currency, from_amount, mid_amount, to_amount, markup_amount, rate, markup_bps, expires_at, expires_in, livemode]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: fx_quote
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        from_amount:
+          type: integer
+          format: int64
+        mid_amount:
+          type: integer
+          format: int64
+          description: What the amount is worth at the market rate, in the target currency.
+        to_amount:
+          type: integer
+          format: int64
+          description: What you receive.
+        markup_amount:
+          type: integer
+          format: int64
+          description: "`mid_amount` less `to_amount`."
+        rate:
+          type: number
+        markup_bps:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        expires_in:
+          type: integer
+          description: How many seconds the quote lasts from the moment it was made, by the server's clock.
+        livemode:
+          type: boolean
+    FxConversion:
+      type: object
+      required: [id, object, from_currency, to_currency, from_amount, mid_amount, to_amount, markup_amount, rate, markup_bps, kind, created]
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: fx_conversion
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        from_amount:
+          type: integer
+          format: int64
+        mid_amount:
+          type: integer
+          format: int64
+        to_amount:
+          type: integer
+          format: int64
+        markup_amount:
+          type: integer
+          format: int64
+        rate:
+          type: number
+        markup_bps:
+          type: integer
+        kind:
+          type: string
+          enum: [manual, auto]
+        quote_id:
+          type: [string, "null"]
+        source_id:
+          type: [string, "null"]
+          description: The payment whose funds were converted, for an automatic conversion.
+        created:
+          type: string
+          format: date-time
+    FxConversionList:
+      type: object
+      required: [object, data, has_more]
+      properties:
+        object:
+          type: string
+          const: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxConversion"
+        has_more:
+          type: boolean
+    FxReport:
+      type: object
+      required: [object, days, data]
+      properties:
+        object:
+          type: string
+          const: fx_report
+        days:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            required: [currency, conversions, received, markup]
+            properties:
+              currency:
+                type: string
+                description: The currency received.
+              conversions:
+                type: integer
+              received:
+                type: integer
+                format: int64
+              markup:
+                type: integer
+                format: int64
+    CurrencySettings:
+      type: object
+      required: [object, settlement_currencies, auto_convert, fx_markup_bps]
+      properties:
+        object:
+          type: string
+          const: currency_settings
+        settlement_currencies:
+          type: array
+          items:
+            type: string
+        auto_convert:
+          type: boolean
+        fx_markup_bps:
+          type: integer
+          description: The platform's margin on a conversion, in basis points. Set by the platform.
+    UpdateCurrencySettings:
+      type: object
+      required: [settlement_currencies]
+      properties:
+        settlement_currencies:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: string
+        auto_convert:
+          type: boolean
+          default: false
     Balance:
       type: object
       required: [object, livemode, pending, available, reserved]
@@ -4262,7 +4695,7 @@ components:
           const: balance_transaction
         type:
           type: string
-          enum: [payment, refund, payout, transfer, transfer_reversal]
+          enum: [payment, refund, payout, transfer, transfer_reversal, conversion]
         source_id:
           type: string
         parent_id:

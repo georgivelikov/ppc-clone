@@ -1,0 +1,211 @@
+{
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "payments": "Payments",
+    "balances": "Balances",
+    "payouts": "Payouts",
+    "links": "Links",
+    "terminal": "Terminal",
+    "customers": "Customers",
+    "products": "Products",
+    "subscriptions": "Subscriptions",
+    "instalments": "Instalments",
+    "invoices": "Invoices",
+    "connectedAccounts": "Connected accounts",
+    "developers": "Developers",
+    "settings": "Settings",
+    "soon": "Soon"
+  },
+  "shell": {
+    "testMode": "Test mode",
+    "testBanner": "You are viewing test data. No real money is involved.",
+    "signOut": "Sign out",
+    "language": "Language"
+  },
+  "settingsTabs": {
+    "label": "Settings",
+    "profile": "Business profile",
+    "payouts": "Payouts",
+    "methods": "Payment methods"
+  },
+  "home": {
+    "welcome": "Welcome, {{name}}",
+    "intro": "{{business}} is set up in {{country}} and settles in {{currency}}.",
+    "todayVolume": "Today's volume",
+    "paymentsToday": "Payments today",
+    "nextPayout": "Next payout",
+    "none": "None yet",
+    "recurring": "Recurring revenue",
+    "mrr": "Monthly recurring revenue",
+    "subscribers": "Subscribers",
+    "churn": "Churn, last 30 days",
+    "gettingStarted": "Getting started",
+    "steps": {
+      "first": {
+        "title": "Take your first payment",
+        "text": "Create a test payment on the Payments page and pay it with 4242 4242 4242 4242."
+      },
+      "balance": {
+        "title": "See your balance",
+        "text": "Check Balances for fees and what is pending, and Payouts for what reaches your bank."
+      },
+      "connect": {
+        "title": "Connect your website",
+        "text": "Create API keys and a webhook endpoint under Developers, then add the checkout SDK to your site."
+      }
+    }
+  },
+  "status": {
+    "requires_payment_method": "Incomplete",
+    "processing": "Processing",
+    "requires_action": "Needs authentication",
+    "requires_capture": "Uncaptured",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "canceled": "Canceled",
+    "partially_refunded": "Partially refunded",
+    "refunded": "Refunded"
+  },
+  "payments": {
+    "title": "Payments",
+    "create": "Create test payment",
+    "searchLabel": "Search payments",
+    "searchPlaceholder": "Search by ID or email",
+    "filterLabel": "Filter by status",
+    "allStatuses": "All statuses",
+    "uncaptured": "Uncaptured only",
+    "cols": {
+      "amount": "Amount",
+      "status": "Status",
+      "description": "Description",
+      "customer": "Customer",
+      "date": "Date"
+    },
+    "loading": "Loading payments…",
+    "loadFailed": "Could not load payments.",
+    "noMatch": "No payments match these filters.",
+    "empty": "No payments yet. Create a test payment to get started.",
+    "loadMore": "Load more"
+  },
+  "balances": {
+    "title": "Balances",
+    "loadFailed": "Could not load your balance.",
+    "available": "Available",
+    "availableHint": "Ready to be paid out to your bank account.",
+    "pending": "Pending",
+    "pendingHint": "Recent payments, available after the settlement delay.",
+    "other": "Other currencies",
+    "availableAmount": "{{amount}} available",
+    "pendingAmount": "{{amount}} pending",
+    "convert": "Convert",
+    "convertCurrency": "Convert {{currency}}",
+    "convertCurrencyMore": "Convert {{currency}}…",
+    "chartTitle": "Volume and fees, last {{days}} days",
+    "chartFailed": "Could not load the chart.",
+    "chartEmpty": "No card payments in this period.",
+    "chartLabel": "Daily card volume and fees in {{currency}} for the last {{days}} days",
+    "cardVolume": "Card volume",
+    "fees": "Fees",
+    "transactions": "Transactions",
+    "cols": {
+      "date": "Date",
+      "type": "Type",
+      "description": "Description",
+      "gross": "Gross",
+      "fee": "Fee",
+      "net": "Net",
+      "availableOn": "Available on"
+    },
+    "loadingTransactions": "Loading transactions…",
+    "transactionsFailed": "Could not load transactions.",
+    "noTransactions": "No transactions yet. They appear here once a payment succeeds.",
+    "loadMore": "Load more",
+    "types": {
+      "payment": "Payment",
+      "refund": "Refund",
+      "payout": "Payout",
+      "payout_failure": "Payout failed",
+      "transfer": "Transfer",
+      "transfer_reversal": "Transfer taken back",
+      "conversion": "Conversion"
+    }
+  },
+  "fx": {
+    "convertTitle": "Convert {{currency}}",
+    "converted": "Converted",
+    "became": "{{from}} became <strong>{{to}}</strong>.",
+    "resultNote": "The market value was {{mid}}; the markup of {{markup}} ({{percent}}%) is kept by Cutpay.",
+    "done": "Done",
+    "formLabel": "Convert money",
+    "amount": "Amount to convert",
+    "into": "Into",
+    "available": "Available: {{amount}}",
+    "receive": "You receive <strong>{{amount}}</strong>",
+    "marketRate": "Market rate",
+    "worth": "Worth at the market rate",
+    "markup": "Markup ({{percent}}%)",
+    "held": "This rate is held for {{time}}.",
+    "expired": "This quote has expired.",
+    "cancel": "Cancel",
+    "convert": "Convert",
+    "getQuote": "Get a quote",
+    "getNewQuote": "Get a new quote",
+    "invalidAmount": "Enter a valid amount, e.g. 12.50",
+    "onlyAvailable": "Only {{amount}} is available",
+    "failed": "Something went wrong. Please try again.",
+    "report": {
+      "title": "Currency conversions, last {{days}} days",
+      "loadFailed": "Could not load the report.",
+      "totals": "Conversion totals",
+      "receivedIn": "Received in",
+      "conversions": "Conversions",
+      "received": "Received",
+      "markupPaid": "Markup paid",
+      "latest": "Latest conversions",
+      "at": "at {{rate}}",
+      "automatic": "automatic"
+    },
+    "settings": {
+      "title": "Currencies",
+      "intro": "Money arrives in the currency the customer paid in. Choose the currencies you want to keep, and what happens to the rest.",
+      "formLabel": "Currency settings",
+      "keepIn": "Keep money in",
+      "auto": "Convert other currencies automatically",
+      "into": "into",
+      "convertInto": "Convert into",
+      "markup": "A conversion costs {{percent}}% over the market rate. Money is converted when it becomes available, not while it is pending.",
+      "save": "Save currencies",
+      "saved": "Saved",
+      "saveFailed": "Could not save.",
+      "loadFailed": "Could not load your currency settings."
+    }
+  },
+  "methods": {
+    "title": "Payment methods",
+    "intro": "Choose what your customers can pay with at the checkout.",
+    "loadFailed": "Could not load your payment methods.",
+    "saveFailed": "Could not save that change.",
+    "on": "On",
+    "off": "Off",
+    "accept": "Accept {{method}}",
+    "ownersOnly": "Only owners and admins can change these.",
+    "instalments": "Pay in instalments is set up on the <instalmentsLink>Instalments</instalmentsLink> page.",
+    "card": {
+      "name": "Cards",
+      "about": "Visa, Mastercard and Amex. Always on, so a checkout always has a way to pay."
+    },
+    "apple_pay": {
+      "name": "Apple Pay",
+      "about": "A pretend wallet. The customer confirms on their device, so there is no 3-D Secure step. Priced like the card behind it."
+    },
+    "google_pay": {
+      "name": "Google Pay",
+      "about": "A pretend wallet. The customer confirms on their device, so there is no 3-D Secure step. Priced like the card behind it."
+    },
+    "blik": {
+      "name": "BLIK",
+      "about": "Polish bank-app payments, in złoty only. The customer confirms in their banking app. 1.29% + PLN 0.25."
+    }
+  }
+}

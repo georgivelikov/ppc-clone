@@ -1,4 +1,5 @@
-import { Alert, Button, FieldError, Input, Label, formatMoney } from "@cutpay/ui";
+import { useLocaleFormat, useTranslation } from "@cutpay/i18n";
+import { Alert, Button, FieldError, Input, Label } from "@cutpay/ui";
 import { useState, type FormEvent } from "react";
 import { CheckoutApiError, confirmBlik, type Session } from "./api";
 
@@ -13,6 +14,8 @@ interface Props {
  * then asks them to confirm in the app, which the page waits for (see BlikWaiting).
  */
 export function BlikPanel({ secret, session, onUpdate }: Props) {
+  const { t } = useTranslation();
+  const { money } = useLocaleFormat();
   const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
   const [problems, setProblems] = useState<{ code?: string; email?: string }>({});
@@ -22,8 +25,8 @@ export function BlikPanel({ secret, session, onUpdate }: Props) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     const found: { code?: string; email?: string } = {};
-    if (!/^[0-9]{6}$/.test(code)) found.code = "Enter the six digit code from your banking app";
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) found.email = "Enter a valid email";
+    if (!/^[0-9]{6}$/.test(code)) found.code = t("blik.codeRequired");
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) found.email = t("blik.emailInvalid");
     setProblems(found);
     if (found.code || found.email) return;
     setError(null);
@@ -32,20 +35,20 @@ export function BlikPanel({ secret, session, onUpdate }: Props) {
       onUpdate(await confirmBlik(secret, code, email.trim()));
     } catch (e) {
       if (e instanceof CheckoutApiError && e.code === "invalid_blik_code") {
-        setProblems({ code: "That code is not valid or has expired. Generate a new one in your app." });
+        setProblems({ code: t("blik.codeInvalid") });
       } else {
-        setError(e instanceof CheckoutApiError && e.status < 500 ? e.message : "We could not process your payment. Please try again.");
+        setError(e instanceof CheckoutApiError && e.status < 500 ? e.message : t("card.failed"));
       }
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4" aria-label="Pay with BLIK">
-      <h1 className="text-xl font-semibold">Pay with BLIK</h1>
+    <form onSubmit={submit} noValidate className="space-y-4" aria-label={t("blik.title")}>
+      <h1 className="text-xl font-semibold">{t("blik.title")}</h1>
       {error && <Alert>{error}</Alert>}
       <div>
-        <Label htmlFor="blik-email">Email</Label>
+        <Label htmlFor="blik-email">{t("blik.email")}</Label>
         <Input
           id="blik-email"
           type="email"
@@ -57,7 +60,7 @@ export function BlikPanel({ secret, session, onUpdate }: Props) {
         <FieldError>{problems.email}</FieldError>
       </div>
       <div>
-        <Label htmlFor="blik-code">BLIK code</Label>
+        <Label htmlFor="blik-code">{t("blik.code")}</Label>
         <Input
           id="blik-code"
           inputMode="numeric"
@@ -71,13 +74,13 @@ export function BlikPanel({ secret, session, onUpdate }: Props) {
         />
         <FieldError>{problems.code}</FieldError>
         <p id="blik-hint" className="mt-1 text-xs text-muted">
-          Open your banking app and generate a BLIK code.
+          {t("blik.codeHint")}
         </p>
       </div>
       <Button type="submit" className="w-full" loading={busy}>
-        Pay {formatMoney(session.amount, session.currency)}
+        {t("blik.pay", { amount: money(session.amount, session.currency) })}
       </Button>
-      <p className="text-center text-xs text-muted">Test code: 777123 pays, 000000 is declined.</p>
+      <p className="text-center text-xs text-muted">{t("blik.testCode")}</p>
     </form>
   );
 }

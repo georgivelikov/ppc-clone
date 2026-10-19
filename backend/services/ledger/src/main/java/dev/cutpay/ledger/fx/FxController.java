@@ -40,7 +40,7 @@ class FxController {
 
     record QuoteView(String id, String object, String fromCurrency, String toCurrency, long fromAmount, long midAmount,
                      long toAmount, long markupAmount, BigDecimal rate, int markupBps, Instant expiresAt,
-                     boolean livemode) {
+                     long expiresIn, boolean livemode) {
     }
 
     record ConvertRequest(@NotBlank String fromCurrency, @NotBlank String toCurrency, @Min(1) long amount, String quoteId) {
@@ -92,7 +92,7 @@ class FxController {
         boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         FxService.Quote q = fx.quote(merchant(jwt), livemode, request.fromCurrency(), request.toCurrency(), request.amount());
         return new QuoteView(q.id(), "fx_quote", q.fromCurrency(), q.toCurrency(), q.fromAmount(), q.midAmount(), q.toAmount(),
-                q.markupAmount(), q.rate(), q.markupBps(), q.expiresAt(), q.livemode());
+                q.markupAmount(), q.rate(), q.markupBps(), q.expiresAt(), q.expiresIn(), q.livemode());
     }
 
     /** Moves available money from one currency to another. */

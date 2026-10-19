@@ -1,4 +1,5 @@
 import type { PaymentStatus } from "@cutpay/api-client";
+import { useTranslation } from "@cutpay/i18n";
 import { Badge } from "@cutpay/ui";
 
 const TONE: Record<PaymentStatus, "neutral" | "success" | "warning" | "danger"> = {
@@ -13,18 +14,10 @@ const TONE: Record<PaymentStatus, "neutral" | "success" | "warning" | "danger"> 
   refunded: "neutral",
 };
 
-export const STATUS_LABEL: Record<PaymentStatus, string> = {
-  requires_payment_method: "Incomplete",
-  processing: "Processing",
-  requires_action: "Needs authentication",
-  requires_capture: "Uncaptured",
-  succeeded: "Succeeded",
-  failed: "Failed",
-  canceled: "Canceled",
-  partially_refunded: "Partially refunded",
-  refunded: "Refunded",
-};
+/** The statuses, in the order the filter lists them. The words for them are in the messages: `status.<status>`. */
+export const PAYMENT_STATUSES = Object.keys(TONE) as PaymentStatus[];
 
 export function StatusBadge({ status }: { status: PaymentStatus }) {
-  return <Badge tone={TONE[status]}>{STATUS_LABEL[status]}</Badge>;
+  const { t } = useTranslation();
+  return <Badge tone={TONE[status]}>{t(`status.${status}`)}</Badge>;
 }

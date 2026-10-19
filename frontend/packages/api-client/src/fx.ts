@@ -23,6 +23,8 @@ export interface FxQuote {
   rate: number;
   markup_bps: number;
   expires_at: string;
+  /** How many seconds the quote lasts from the moment it was made, by the server's clock. */
+  expires_in: number;
   livemode: boolean;
 }
 

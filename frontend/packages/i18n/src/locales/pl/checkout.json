@@ -1,0 +1,180 @@
+{
+  "shell": {
+    "disclaimer": "Projekt edukacyjny. Żadne prawdziwe płatności nie są przetwarzane — nigdy nie wpisuj prawdziwego numeru karty.",
+    "language": "Język"
+  },
+  "page": {
+    "loading": "Ładowanie płatności…",
+    "notFound": {
+      "title": "Nie znaleziono linku do płatności",
+      "text": "Ten link do płatności jest nieprawidłowy."
+    },
+    "error": {
+      "title": "Coś poszło nie tak",
+      "text": "Nie udało się wczytać tej płatności. Spróbuj ponownie."
+    },
+    "merchant": "Sprzedawca"
+  },
+  "methods": {
+    "label": "Metoda płatności",
+    "card": "Karta",
+    "wallet": "Portfel",
+    "blik": "BLIK",
+    "instalments": "Płatność w ratach"
+  },
+  "card": {
+    "title": "Płatność kartą",
+    "formLabel": "Dane płatności",
+    "email": "E-mail",
+    "number": "Numer karty",
+    "expiry": "Ważność",
+    "cvc": "CVC",
+    "pay": "Zapłać {{amount}}",
+    "saveNotice": "Twoja karta zostanie zapisana do przyszłych płatności dla: {{merchant}}.",
+    "thisMerchant": "tego sprzedawcy",
+    "testCard": "Karta testowa: 4242 4242 4242 4242, dowolna przyszła data, dowolny CVC.",
+    "errors": {
+      "emailRequired": "Podaj adres e-mail",
+      "emailInvalid": "Podaj prawidłowy adres e-mail",
+      "number": "Podaj prawidłowy numer karty",
+      "expiry": "Podaj prawidłową datę ważności",
+      "cvc": "Podaj kod bezpieczeństwa"
+    },
+    "failed": "Nie udało się przetworzyć płatności. Spróbuj ponownie."
+  },
+  "wallet": {
+    "title": "Płatność portfelem",
+    "intro": "Zapłać kartą zapisaną w telefonie, bez wpisywania numeru.",
+    "payWith": "Zapłać z {{wallet}}",
+    "sheetLabel": "{{wallet}} (symulacja)",
+    "disclaimer": "Symulowany portfel do wypróbowania. To nie jest Apple ani Google i nie używa prawdziwej karty.",
+    "card": "Karta",
+    "loadingCards": "Ładowanie kart…",
+    "unavailable": "Portfel jest teraz niedostępny.",
+    "email": "E-mail",
+    "emailInvalid": "Podaj prawidłowy adres e-mail",
+    "confirm": "Potwierdź przez Face ID lub PIN",
+    "close": "Zamknij"
+  },
+  "blik": {
+    "title": "Płatność BLIK",
+    "email": "E-mail",
+    "emailInvalid": "Podaj prawidłowy adres e-mail",
+    "code": "Kod BLIK",
+    "codeHint": "Otwórz aplikację bankową i wygeneruj kod BLIK.",
+    "pay": "Zapłać {{amount}}",
+    "testCode": "Kod testowy: 777123 płaci, 000000 jest odrzucany.",
+    "codeRequired": "Wpisz sześciocyfrowy kod z aplikacji bankowej",
+    "codeInvalid": "Ten kod jest nieprawidłowy lub wygasł. Wygeneruj nowy w aplikacji.",
+    "waiting": {
+      "title": "Potwierdź w aplikacji bankowej",
+      "text": "Wysłaliśmy prośbę do Twojego banku. Otwórz aplikację bankową i zatwierdź płatność. Ta strona odświeża się sama.",
+      "tryIt": "Próbujesz? <appLink>Otwórz symulowaną aplikację bankową</appLink>, aby zatwierdzić lub odrzucić. Jeśli nic nie zrobisz, płatność zostanie zatwierdzona po kilku sekundach."
+    }
+  },
+  "threeDs": {
+    "title": "Potwierdź w swoim banku",
+    "text": "Twój bank musi zweryfikować tę płatność. Wpisz jednorazowy kod <strong>1234</strong>.",
+    "code": "Kod jednorazowy",
+    "approve": "Zatwierdź",
+    "fail": "Nieudane uwierzytelnienie",
+    "unreachable": "Nie udało się połączyć z Twoim bankiem. Spróbuj ponownie."
+  },
+  "outcome": {
+    "held": {
+      "title": "Płatność autoryzowana",
+      "text": "{{amount}} jest zarezerwowane na Twojej karcie. Pobranie środków przez: {{merchant}} nastąpi później; płatność może być widoczna jako oczekująca."
+    },
+    "paid": {
+      "title": "Płatność udana",
+      "text": "Zapłacono {{amount}}. Odbiorca: {{merchant}}."
+    },
+    "processing": {
+      "title": "Przetwarzamy płatność",
+      "text": "To może potrwać kilka sekund. Nie zamykaj tej strony."
+    },
+    "canceled": {
+      "title": "Płatność anulowana",
+      "text": "Ta płatność została anulowana przez sprzedawcę. Nie pobrano z Twojego konta żadnych środków."
+    },
+    "failed": {
+      "title": "Płatność nie powiodła się",
+      "text": "Nie udało się dokończyć płatności.",
+      "note": "Nie pobrano opłaty. Poproś sprzedawcę o nowy link do płatności, aby spróbować ponownie."
+    },
+    "return": "Wróć do: {{merchant}}",
+    "merchantLower": "sprzedawca",
+    "merchantReturn": "sprzedawcy"
+  },
+  "bnpl": {
+    "title": "Płatność w ratach",
+    "unreachable": "Brak połączenia z: {{names}}. Spróbuj za chwilę.",
+    "choose": "Wybierz plan",
+    "best": {
+      "title": "Najlepsza opcja",
+      "text": "Wybieramy dostawcę z największą szansą na zgodę, w dobrej cenie."
+    },
+    "fallback": "Jeśli pierwszy dostawca nie może pomóc, spróbuj następnych najlepszych",
+    "apply": "Złóż wniosek o {{amount}} w ratach",
+    "footnote": "Decyduje dostawca. Sprzedawca ({{merchant}}) otrzymuje zapłatę, gdy Cię zaakceptuje.",
+    "merchantFallback": "sprzedawca",
+    "fields": {
+      "email": "E-mail",
+      "birthdate": "Data urodzenia",
+      "national_id": "Numer PESEL lub dokumentu",
+      "monthly_income": "Miesięczny dochód (netto)"
+    },
+    "errors": {
+      "email": "Podaj prawidłowy adres e-mail",
+      "birthdate": "Podaj datę urodzenia",
+      "nationalId": "Podaj numer (od 6 do 16 liter lub cyfr)",
+      "income": "Podaj miesięczny dochód"
+    },
+    "applyFailed": "Nie udało się wysłać wniosku. Spróbuj ponownie.",
+    "approved": {
+      "title": "Zaakceptowano przez: {{provider}}",
+      "text": "Kończymy płatność…"
+    },
+    "waiting": {
+      "title": "Czekamy na: {{provider}}",
+      "keepOpen": "Nie zamykaj tej strony.",
+      "cancel": "Anuluj wniosek"
+    },
+    "failedTitle": "Nie udało się",
+    "chooseAnother": "Wybierz inną opcję",
+    "tried": "Zapytaliśmy: {{list}}.",
+    "triedSeparator": ", potem ",
+    "interval": {
+      "days_one": "codziennie",
+      "days_few": "co {{count}} dni",
+      "days_many": "co {{count}} dni",
+      "days_other": "co {{count}} dni",
+      "weeks_one": "co tydzień",
+      "weeks_few": "co {{count}} tygodnie",
+      "weeks_many": "co {{count}} tygodni",
+      "weeks_other": "co {{count}} tygodnia",
+      "months_one": "co miesiąc",
+      "months_few": "co {{count}} miesiące",
+      "months_many": "co {{count}} miesięcy",
+      "months_other": "co {{count}} miesiąca"
+    },
+    "plan": {
+      "single_one": "{{amount}} za {{count}} dzień",
+      "single_few": "{{amount}} za {{count}} dni",
+      "single_many": "{{amount}} za {{count}} dni",
+      "single_other": "{{amount}} za {{count}} dnia",
+      "many_one": "{{count}} rata po {{amount}} {{interval}}",
+      "many_few": "{{count}} raty po {{amount}} {{interval}}",
+      "many_many": "{{count}} rat po {{amount}} {{interval}}",
+      "many_other": "{{count}} raty po {{amount}} {{interval}}",
+      "about_one": "{{count}} rata po około {{amount}} {{interval}}",
+      "about_few": "{{count}} raty po około {{amount}} {{interval}}",
+      "about_many": "{{count}} rat po około {{amount}} {{interval}}",
+      "about_other": "{{count}} raty po około {{amount}} {{interval}}"
+    },
+    "cost": {
+      "none": "Bez odsetek · razem {{total}}",
+      "interest": "{{interest}} odsetek ({{apr}}% RRSO) · razem {{total}}"
+    }
+  }
+}

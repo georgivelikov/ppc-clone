@@ -29,6 +29,8 @@ export interface Session {
   next_action: NextAction | null;
   /** The merchant will keep the card for future payments (subscriptions, repeat orders). */
   save_card?: boolean;
+  /** The language the merchant asked this checkout to open in, if any. */
+  locale?: string | null;
 }
 
 export interface CardInput {

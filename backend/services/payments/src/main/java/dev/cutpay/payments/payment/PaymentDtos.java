@@ -34,7 +34,9 @@ public final class PaymentDtos {
             @Pattern(regexp = "off_session", message = "Setup future usage can only be off_session")
             String setupFutureUsage,
             @Valid List<TransferInput> transferData,
-            @Min(value = 0, message = "Application fee cannot be negative") Long applicationFeeAmount) {
+            @Min(value = 0, message = "Application fee cannot be negative") Long applicationFeeAmount,
+            @Pattern(regexp = "en|bg|ro|pl|hu|el", message = "Locale must be one of en, bg, ro, pl, hu, el")
+            String locale) {
 
         /** A payment for a saved customer, charged straight away to a saved card. */
         public boolean chargesSavedCard() {
@@ -44,7 +46,7 @@ public final class PaymentDtos {
         public CreatePaymentRequest withMerchantName(String name) {
             return new CreatePaymentRequest(amount, currency, description, customerEmail, metadata, returnUrl, name,
                     captureMethod, customer, paymentMethod, offSession, setupFutureUsage, transferData,
-                    applicationFeeAmount);
+                    applicationFeeAmount, locale);
         }
     }
 
@@ -156,7 +158,7 @@ public final class PaymentDtos {
     /** What the hosted checkout is allowed to see. */
     public record SessionView(String id, String status, long amount, String currency, String description,
                               String merchantName, String returnUrl, String failureCode, String failureMessage,
-                              NextAction nextAction, boolean saveCard) {
+                              NextAction nextAction, boolean saveCard, String locale) {
     }
 
     public record VolumeView(String currency, long count, long volume) {

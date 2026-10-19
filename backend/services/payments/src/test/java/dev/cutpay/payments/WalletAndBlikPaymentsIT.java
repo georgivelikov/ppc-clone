@@ -243,6 +243,16 @@ class WalletAndBlikPaymentsIT {
     }
 
     @Test
+    void aMerchantCanAskForTheCheckoutToOpenInALanguage() throws Exception {
+        String created = create("PLN", ",\"locale\":\"pl\"");
+        mvc.perform(get("/checkout/sessions/" + field(created, "client_secret"))).andExpect(jsonPath("$.locale").value("pl"));
+        mvc.perform(get("/checkout/sessions/" + field(create("PLN", ""), "client_secret"))).andExpect(jsonPath("$.locale").isEmpty());
+        mvc.perform(post("/v1/payment_intents").with(merchant()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":10000,\"currency\":\"PLN\",\"locale\":\"de\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void anAnswerForARequestNobodyKnowsIsIgnored() throws Exception {
         blikAnswer("blik_nobody", "approved", "");
     }

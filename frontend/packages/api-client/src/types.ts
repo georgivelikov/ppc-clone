@@ -171,6 +171,8 @@ export interface CreatePaymentInput {
   transfer_data?: TransferData[];
   /** What the platform keeps, for a single destination without an amount. */
   application_fee_amount?: number;
+  /** The language the hosted checkout opens in, unless the customer chooses another: en, bg, ro, pl, hu or el. */
+  locale?: "en" | "bg" | "ro" | "pl" | "hu" | "el";
 }
 
 export interface CheckoutSessionCreated {

@@ -1,0 +1,168 @@
+{
+  "shell": {
+    "disclaimer": "Educational project. No real payments are processed — never enter a real card number.",
+    "language": "Language"
+  },
+  "page": {
+    "loading": "Loading payment…",
+    "notFound": {
+      "title": "Payment link not found",
+      "text": "This payment link is not valid."
+    },
+    "error": {
+      "title": "Something went wrong",
+      "text": "We could not load this payment. Please try again."
+    },
+    "merchant": "Merchant"
+  },
+  "methods": {
+    "label": "Payment method",
+    "card": "Card",
+    "wallet": "Wallet",
+    "blik": "BLIK",
+    "instalments": "Pay in instalments"
+  },
+  "card": {
+    "title": "Pay by card",
+    "formLabel": "Payment details",
+    "email": "Email",
+    "number": "Card number",
+    "expiry": "Expiry",
+    "cvc": "CVC",
+    "pay": "Pay {{amount}}",
+    "saveNotice": "Your card will be saved for future payments with {{merchant}}.",
+    "thisMerchant": "this merchant",
+    "testCard": "Test card: 4242 4242 4242 4242, any future date, any CVC.",
+    "errors": {
+      "emailRequired": "Enter your email",
+      "emailInvalid": "Enter a valid email",
+      "number": "Enter a valid card number",
+      "expiry": "Enter a valid expiry date",
+      "cvc": "Enter the security code"
+    },
+    "failed": "We could not process your payment. Please try again."
+  },
+  "wallet": {
+    "title": "Pay with a wallet",
+    "intro": "Pay with a card you keep in your phone, without typing the number.",
+    "payWith": "Pay with {{wallet}}",
+    "sheetLabel": "{{wallet}} (pretend)",
+    "disclaimer": "A pretend wallet for trying things out. It is not Apple or Google, and no real card is involved.",
+    "card": "Card",
+    "loadingCards": "Loading cards…",
+    "unavailable": "The wallet is not available right now.",
+    "email": "Email",
+    "emailInvalid": "Enter a valid email",
+    "confirm": "Confirm with Face ID or PIN",
+    "close": "Close"
+  },
+  "blik": {
+    "title": "Pay with BLIK",
+    "email": "Email",
+    "emailInvalid": "Enter a valid email",
+    "code": "BLIK code",
+    "codeHint": "Open your banking app and generate a BLIK code.",
+    "pay": "Pay {{amount}}",
+    "testCode": "Test code: 777123 pays, 000000 is declined.",
+    "codeRequired": "Enter the six digit code from your banking app",
+    "codeInvalid": "That code is not valid or has expired. Generate a new one in your app.",
+    "waiting": {
+      "title": "Confirm in your banking app",
+      "text": "We sent a request to your bank. Open your banking app and approve the payment. This page updates by itself.",
+      "tryIt": "Trying it out? <appLink>Open the pretend bank app</appLink> to approve or reject it. If you do nothing, it is approved after a few seconds."
+    }
+  },
+  "threeDs": {
+    "title": "Confirm with your bank",
+    "text": "Your bank needs to verify this payment. Enter the one-time code <strong>1234</strong>.",
+    "code": "One-time code",
+    "approve": "Approve",
+    "fail": "Fail authentication",
+    "unreachable": "We could not reach your bank. Please try again."
+  },
+  "outcome": {
+    "held": {
+      "title": "Payment authorised",
+      "text": "{{amount}} is reserved on your card. {{merchant}} will take the payment later; you may see it as pending."
+    },
+    "paid": {
+      "title": "Payment successful",
+      "text": "{{amount}} was paid to {{merchant}}."
+    },
+    "processing": {
+      "title": "Processing your payment",
+      "text": "This can take a few seconds. Please do not close this page."
+    },
+    "canceled": {
+      "title": "Payment canceled",
+      "text": "This payment was canceled by the merchant. You have not been charged."
+    },
+    "failed": {
+      "title": "Payment failed",
+      "text": "Your payment could not be completed.",
+      "note": "You have not been charged. Ask the merchant for a new payment link to try again."
+    },
+    "return": "Return to {{merchant}}",
+    "merchantLower": "the merchant",
+    "merchantReturn": "merchant"
+  },
+  "bnpl": {
+    "title": "Pay in instalments",
+    "unreachable": "{{names}} can not be reached right now.",
+    "choose": "Choose a plan",
+    "best": {
+      "title": "Best option",
+      "text": "We pick the provider most likely to say yes, at a good price."
+    },
+    "fallback": "If the first provider cannot help, try the next best ones",
+    "apply": "Apply for {{amount}} in instalments",
+    "footnote": "The provider decides. {{merchant}} is paid when it approves you.",
+    "merchantFallback": "The merchant",
+    "fields": {
+      "email": "Email",
+      "birthdate": "Date of birth",
+      "national_id": "National ID number",
+      "monthly_income": "Monthly income (after tax)"
+    },
+    "errors": {
+      "email": "Enter a valid email",
+      "birthdate": "Enter your date of birth",
+      "nationalId": "Enter your ID number (6 to 16 letters or digits)",
+      "income": "Enter your monthly income"
+    },
+    "applyFailed": "We could not send your application. Please try again.",
+    "approved": {
+      "title": "Approved by {{provider}}",
+      "text": "Finishing your payment…"
+    },
+    "waiting": {
+      "title": "Waiting for {{provider}}",
+      "keepOpen": "Please keep this page open.",
+      "cancel": "Cancel the application"
+    },
+    "failedTitle": "That did not work out",
+    "chooseAnother": "Choose another option",
+    "tried": "We asked {{list}}.",
+    "triedSeparator": ", then ",
+    "interval": {
+      "days_one": "every day",
+      "days_other": "every {{count}} days",
+      "weeks_one": "every week",
+      "weeks_other": "every {{count}} weeks",
+      "months_one": "every month",
+      "months_other": "every {{count}} months"
+    },
+    "plan": {
+      "single_one": "{{amount}} in {{count}} day",
+      "single_other": "{{amount}} in {{count}} days",
+      "many_one": "{{count}} payment of {{amount}} {{interval}}",
+      "many_other": "{{count}} payments of {{amount}} {{interval}}",
+      "about_one": "{{count}} payment of about {{amount}} {{interval}}",
+      "about_other": "{{count}} payments of about {{amount}} {{interval}}"
+    },
+    "cost": {
+      "none": "No interest · total {{total}}",
+      "interest": "{{interest}} interest ({{apr}}% APR) · total {{total}}"
+    }
+  }
+}

@@ -129,6 +129,7 @@ public class PaymentService {
                 money, request.description(), email, request.metadata(), request.returnUrl(), channel,
                 request.captureMethod() == null ? PaymentIntent.CAPTURE_AUTOMATIC : request.captureMethod());
         intent.forCustomer(customerId, methodId, request.chargesSavedCard(), request.setupFutureUsage());
+        intent.setLocale(request.locale());
         List<PaymentTransfer> planned = planTransfers(merchantId, livemode, id, money.minor(), money.currency().getCurrencyCode(),
                 request);
         if (!planned.isEmpty() && request.applicationFeeAmount() != null) {
@@ -450,7 +451,7 @@ public class PaymentService {
         }
         return new SessionView(intent.getId(), intent.getStatus().wire(), intent.getAmount(), intent.getCurrency(),
                 intent.getDescription(), intent.getMerchantName(), intent.getReturnUrl(), intent.getFailureCode(),
-                intent.getFailureMessage(), next, intent.getSetupFutureUsage() != null);
+                intent.getFailureMessage(), next, intent.getSetupFutureUsage() != null, intent.getLocale());
     }
 
     /**

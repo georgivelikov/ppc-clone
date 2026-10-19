@@ -1,0 +1,168 @@
+{
+  "shell": {
+    "disclaimer": "Oktatási projekt. Valódi fizetés nem történik — soha ne adjon meg valódi kártyaszámot.",
+    "language": "Nyelv"
+  },
+  "page": {
+    "loading": "Fizetés betöltése…",
+    "notFound": {
+      "title": "A fizetési link nem található",
+      "text": "Ez a fizetési link érvénytelen."
+    },
+    "error": {
+      "title": "Hiba történt",
+      "text": "Nem sikerült betölteni a fizetést. Kérjük, próbálja újra."
+    },
+    "merchant": "Kereskedő"
+  },
+  "methods": {
+    "label": "Fizetési mód",
+    "card": "Kártya",
+    "wallet": "Tárca",
+    "blik": "BLIK",
+    "instalments": "Fizetés részletekben"
+  },
+  "card": {
+    "title": "Fizetés kártyával",
+    "formLabel": "Fizetési adatok",
+    "email": "E-mail",
+    "number": "Kártyaszám",
+    "expiry": "Lejárat",
+    "cvc": "CVC",
+    "pay": "Fizetés: {{amount}}",
+    "saveNotice": "Kártyáját elmentjük a jövőbeli fizetésekhez ennél a kereskedőnél: {{merchant}}.",
+    "thisMerchant": "ez a kereskedő",
+    "testCard": "Teszt kártya: 4242 4242 4242 4242, bármely jövőbeli dátum, bármely CVC.",
+    "errors": {
+      "emailRequired": "Adja meg az e-mail-címét",
+      "emailInvalid": "Adjon meg érvényes e-mail-címet",
+      "number": "Adjon meg érvényes kártyaszámot",
+      "expiry": "Adjon meg érvényes lejárati dátumot",
+      "cvc": "Adja meg a biztonsági kódot"
+    },
+    "failed": "Nem sikerült feldolgozni a fizetést. Kérjük, próbálja újra."
+  },
+  "wallet": {
+    "title": "Fizetés tárcával",
+    "intro": "Fizessen a telefonján tárolt kártyával, a szám beírása nélkül.",
+    "payWith": "Fizetés: {{wallet}}",
+    "sheetLabel": "{{wallet}} (szimulált)",
+    "disclaimer": "Szimulált tárca kipróbáláshoz. Nem az Apple vagy a Google, és nincs benne valódi kártya.",
+    "card": "Kártya",
+    "loadingCards": "Kártyák betöltése…",
+    "unavailable": "A tárca jelenleg nem érhető el.",
+    "email": "E-mail",
+    "emailInvalid": "Adjon meg érvényes e-mail-címet",
+    "confirm": "Megerősítés Face ID-val vagy PIN-nel",
+    "close": "Bezárás"
+  },
+  "blik": {
+    "title": "Fizetés BLIK-kel",
+    "email": "E-mail",
+    "emailInvalid": "Adjon meg érvényes e-mail-címet",
+    "code": "BLIK-kód",
+    "codeHint": "Nyissa meg a banki alkalmazást, és generáljon BLIK-kódot.",
+    "pay": "Fizetés: {{amount}}",
+    "testCode": "Tesztkód: a 777123 fizet, a 000000 elutasításra kerül.",
+    "codeRequired": "Adja meg a banki alkalmazásból a hatjegyű kódot",
+    "codeInvalid": "Ez a kód érvénytelen vagy lejárt. Generáljon újat az alkalmazásban.",
+    "waiting": {
+      "title": "Erősítse meg a banki alkalmazásban",
+      "text": "Kérést küldtünk a bankjának. Nyissa meg a banki alkalmazást, és hagyja jóvá a fizetést. Az oldal magától frissül.",
+      "tryIt": "Kipróbálja? <appLink>Nyissa meg a szimulált banki alkalmazást</appLink> a jóváhagyáshoz vagy elutasításhoz. Ha nem tesz semmit, néhány másodperc múlva jóváhagyásra kerül."
+    }
+  },
+  "threeDs": {
+    "title": "Erősítse meg a bankjánál",
+    "text": "A banknak ellenőriznie kell ezt a fizetést. Adja meg az egyszeri kódot: <strong>1234</strong>.",
+    "code": "Egyszeri kód",
+    "approve": "Jóváhagyás",
+    "fail": "Sikertelen hitelesítés",
+    "unreachable": "Nem sikerült elérni a bankját. Kérjük, próbálja újra."
+  },
+  "outcome": {
+    "held": {
+      "title": "Fizetés engedélyezve",
+      "text": "{{amount}} le van foglalva a kártyáján. Az összeget később vonja le: {{merchant}}; függőben lévőként láthatja."
+    },
+    "paid": {
+      "title": "Sikeres fizetés",
+      "text": "{{amount}} kifizetve. Címzett: {{merchant}}."
+    },
+    "processing": {
+      "title": "Fizetés feldolgozása",
+      "text": "Ez eltarthat néhány másodpercig. Kérjük, ne zárja be az oldalt."
+    },
+    "canceled": {
+      "title": "Fizetés törölve",
+      "text": "A kereskedő törölte ezt a fizetést. Nem terheltük meg."
+    },
+    "failed": {
+      "title": "A fizetés sikertelen",
+      "text": "A fizetést nem sikerült befejezni.",
+      "note": "Nem terheltük meg. Kérjen új fizetési linket a kereskedőtől az újrapróbálkozáshoz."
+    },
+    "return": "Vissza ide: {{merchant}}",
+    "merchantLower": "a kereskedő",
+    "merchantReturn": "a kereskedő"
+  },
+  "bnpl": {
+    "title": "Fizetés részletekben",
+    "unreachable": "{{names}} jelenleg nem érhető el.",
+    "choose": "Válasszon tervet",
+    "best": {
+      "title": "Legjobb lehetőség",
+      "text": "Azt a szolgáltatót választjuk, amelyik a legnagyobb eséllyel hagyja jóvá, jó áron."
+    },
+    "fallback": "Ha az első szolgáltató nem tud segíteni, próbálja a következő legjobbakat",
+    "apply": "Igénylés: {{amount}} részletekben",
+    "footnote": "A szolgáltató dönt. A pénzt akkor kapja meg {{merchant}}, amikor jóváhagyják a kérelmét.",
+    "merchantFallback": "a kereskedő",
+    "fields": {
+      "email": "E-mail",
+      "birthdate": "Születési dátum",
+      "national_id": "Személyi azonosító szám",
+      "monthly_income": "Havi jövedelem (adózás után)"
+    },
+    "errors": {
+      "email": "Adjon meg érvényes e-mail-címet",
+      "birthdate": "Adja meg a születési dátumát",
+      "nationalId": "Adja meg az azonosítóját (6–16 betű vagy szám)",
+      "income": "Adja meg a havi jövedelmét"
+    },
+    "applyFailed": "Nem sikerült elküldeni a kérelmet. Kérjük, próbálja újra.",
+    "approved": {
+      "title": "{{provider}} jóváhagyta",
+      "text": "Befejezzük a fizetést…"
+    },
+    "waiting": {
+      "title": "Várakozás: {{provider}}",
+      "keepOpen": "Kérjük, tartsa nyitva az oldalt.",
+      "cancel": "Kérelem visszavonása"
+    },
+    "failedTitle": "Ez nem sikerült",
+    "chooseAnother": "Válasszon másik lehetőséget",
+    "tried": "Megkérdeztük: {{list}}.",
+    "triedSeparator": ", majd ",
+    "interval": {
+      "days_one": "naponta",
+      "days_other": "{{count}} naponta",
+      "weeks_one": "hetente",
+      "weeks_other": "{{count}} hetente",
+      "months_one": "havonta",
+      "months_other": "{{count}} havonta"
+    },
+    "plan": {
+      "single_one": "{{amount}} {{count}} nap múlva",
+      "single_other": "{{amount}} {{count}} nap múlva",
+      "many_one": "{{count}} részlet, egyenként {{amount}}, {{interval}}",
+      "many_other": "{{count}} részlet, egyenként {{amount}}, {{interval}}",
+      "about_one": "{{count}} részlet, egyenként kb. {{amount}}, {{interval}}",
+      "about_other": "{{count}} részlet, egyenként kb. {{amount}}, {{interval}}"
+    },
+    "cost": {
+      "none": "Kamatmentes · összesen {{total}}",
+      "interest": "{{interest}} kamat ({{apr}}% THM) · összesen {{total}}"
+    }
+  }
+}

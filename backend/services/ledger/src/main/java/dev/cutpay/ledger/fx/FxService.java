@@ -61,7 +61,8 @@ public class FxService {
     }
 
     public record Quote(String id, String fromCurrency, String toCurrency, long fromAmount, long midAmount, long toAmount,
-                        long markupAmount, BigDecimal rate, int markupBps, Instant expiresAt, boolean livemode) {
+                        long markupAmount, BigDecimal rate, int markupBps, Instant expiresAt, long expiresIn,
+                        boolean livemode) {
     }
 
     public record Conversion(String id, String fromCurrency, String toCurrency, long fromAmount, long midAmount,
@@ -163,7 +164,7 @@ public class FxService {
                 .param("rate", rate).param("bps", markupBps).param("expires", Sql.ts(expires)).param("now", Sql.ts(now))
                 .update();
         return new Quote(id, source, target, amount, math.mid(), math.merchant(), math.markup(), rate, markupBps, expires,
-                livemode);
+                QUOTE_VALIDITY.toSeconds(), livemode);
     }
 
     // --- conversions -------------------------------------------------------------------------------

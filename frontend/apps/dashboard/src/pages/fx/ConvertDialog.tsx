@@ -1,5 +1,6 @@
 import { ApiError, type FxConversion, type FxQuote } from "@cutpay/api-client";
-import { Alert, Button, FieldError, Input, Label, formatMoney, toMajorString, toMinorUnits } from "@cutpay/ui";
+import { Trans, useLocaleFormat, useTranslation } from "@cutpay/i18n";
+import { Alert, Button, FieldError, Input, Label, toMajorString, toMinorUnits } from "@cutpay/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../../api";
@@ -16,16 +17,22 @@ interface Props {
   onClose: () => void;
 }
 
-/** Counts down to a moment, once a second; zero when it has passed. */
-function useSecondsLeft(until: string | undefined): number {
+/**
+ * Counts down a quote's life, once a second; zero when it has passed. The server says how long the quote lasts rather than
+ * when it ends, so the count does not depend on the browser's clock agreeing with the server's.
+ */
+function useSecondsLeft(total: number | undefined, quoteId: string | undefined): number {
+  const [startedAt, setStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!until) return;
-    setNow(Date.now());
+    if (quoteId === undefined) return;
+    const start = Date.now();
+    setStartedAt(start);
+    setNow(start);
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [until]);
-  return until ? Math.max(0, Math.ceil((new Date(until).getTime() - now) / 1000)) : 0;
+  }, [quoteId]);
+  return total === undefined ? 0 : Math.max(0, total - Math.floor((now - startedAt) / 1000));
 }
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -35,6 +42,8 @@ const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds
  * result spelled out (what it is worth, the markup, what arrives); then the merchant confirms, and that exact rate is used.
  */
 export function ConvertDialog({ from, available, preferred, onClose }: Props) {
+  const { t } = useTranslation();
+  const { money: formatMoney, number, locale } = useLocaleFormat();
   const { testMode } = useTestMode();
   const queryClient = useQueryClient();
   const targets = CURRENCIES.filter((code) => code !== from);
@@ -45,7 +54,7 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
   const [done, setDone] = useState<FxConversion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const secondsLeft = useSecondsLeft(quote?.expires_at);
+  const secondsLeft = useSecondsLeft(quote?.expires_in, quote?.id);
   const expired = quote !== null && secondsLeft === 0;
 
   async function getQuote(event: FormEvent) {
@@ -53,11 +62,11 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
     setError(null);
     const minor = toMinorUnits(amount, from);
     if (minor === null) {
-      setAmountError("Enter a valid amount, e.g. 12.50");
+      setAmountError(t("fx.invalidAmount"));
       return;
     }
     if (minor > available) {
-      setAmountError(`Only ${formatMoney(available, from)} is available`);
+      setAmountError(t("fx.onlyAvailable", { amount: formatMoney(available, from) }));
       return;
     }
     setAmountError(undefined);
@@ -65,7 +74,7 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
     try {
       setQuote(await api.createFxQuote({ from_currency: from, to_currency: to, amount: minor }, !testMode));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
+      setError(e instanceof ApiError ? e.message : t("fx.failed"));
     } finally {
       setBusy(false);
     }
@@ -87,8 +96,8 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
       void queryClient.invalidateQueries({ queryKey: ["fx-report"] });
       void queryClient.invalidateQueries({ queryKey: ["fx-conversions"] });
     } catch (e) {
-      if (e instanceof ApiError && e.code === "quote_expired") setQuote((q) => (q ? { ...q, expires_at: new Date(0).toISOString() } : q));
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
+      if (e instanceof ApiError && e.code === "quote_expired") setQuote((q) => (q ? { ...q, expires_in: 0 } : q));
+      setError(e instanceof ApiError ? e.message : t("fx.failed"));
     } finally {
       setBusy(false);
     }
@@ -96,28 +105,35 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
 
   if (done) {
     return (
-      <Dialog title="Converted" onClose={onClose}>
+      <Dialog title={t("fx.converted")} onClose={onClose}>
         <p className="text-sm" data-testid="conversion-result">
-          {formatMoney(done.from_amount, done.from_currency)} became <strong>{formatMoney(done.to_amount, done.to_currency)}</strong>.
+          <Trans
+            i18nKey="fx.became"
+            values={{ from: formatMoney(done.from_amount, done.from_currency), to: formatMoney(done.to_amount, done.to_currency) }}
+            components={{ strong: <strong /> }}
+          />
         </p>
         <p className="mt-2 text-sm text-muted">
-          The market value was {formatMoney(done.mid_amount, done.to_currency)}; the markup of {formatMoney(done.markup_amount, done.to_currency)} (
-          {done.markup_bps / 100}%) is kept by Cutpay.
+          {t("fx.resultNote", {
+            mid: formatMoney(done.mid_amount, done.to_currency),
+            markup: formatMoney(done.markup_amount, done.to_currency),
+            percent: number(done.markup_bps / 100),
+          })}
         </p>
         <div className="mt-4 flex justify-end">
-          <Button onClick={onClose}>Done</Button>
+          <Button onClick={onClose}>{t("fx.done")}</Button>
         </div>
       </Dialog>
     );
   }
 
   return (
-    <Dialog title={`Convert ${from}`} onClose={onClose}>
+    <Dialog title={t("fx.convertTitle", { currency: from })} onClose={onClose}>
       {error && <Alert className="mb-3">{error}</Alert>}
-      <form onSubmit={getQuote} noValidate className="space-y-4" aria-label="Convert money">
+      <form onSubmit={getQuote} noValidate className="space-y-4" aria-label={t("fx.formLabel")}>
         <div className="grid grid-cols-[1fr_6rem] gap-3">
           <div>
-            <Label htmlFor="convert-amount">Amount to convert</Label>
+            <Label htmlFor="convert-amount">{t("fx.amount")}</Label>
             <Input
               id="convert-amount"
               inputMode="decimal"
@@ -129,7 +145,7 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
             <FieldError>{amountError}</FieldError>
           </div>
           <div>
-            <Label htmlFor="convert-to">Into</Label>
+            <Label htmlFor="convert-to">{t("fx.into")}</Label>
             <select
               id="convert-to"
               value={to}
@@ -143,46 +159,50 @@ export function ConvertDialog({ from, available, preferred, onClose }: Props) {
             </select>
           </div>
         </div>
-        <p className="text-xs text-muted">Available: {formatMoney(available, from)}</p>
+        <p className="text-xs text-muted">{t("fx.available", { amount: formatMoney(available, from) })}</p>
 
         {quote && (
           <div className="rounded-lg border border-border p-3 text-sm" data-testid="quote">
             <p>
-              You receive <strong data-testid="quote-receive">{formatMoney(quote.to_amount, quote.to_currency)}</strong>
+              <Trans
+                i18nKey="fx.receive"
+                values={{ amount: formatMoney(quote.to_amount, quote.to_currency) }}
+                components={{ strong: <strong data-testid="quote-receive" /> }}
+              />
             </p>
             <dl className="mt-2 space-y-1 text-xs text-muted">
               <div className="flex justify-between">
-                <dt>Market rate</dt>
+                <dt>{t("fx.marketRate")}</dt>
                 <dd>
-                  1 {quote.from_currency} = {formatRate(quote.rate)} {quote.to_currency}
+                  1 {quote.from_currency} = {formatRate(quote.rate, locale)} {quote.to_currency}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt>Worth at the market rate</dt>
+                <dt>{t("fx.worth")}</dt>
                 <dd>{formatMoney(quote.mid_amount, quote.to_currency)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt>Markup ({quote.markup_bps / 100}%)</dt>
+                <dt>{t("fx.markup", { percent: number(quote.markup_bps / 100) })}</dt>
                 <dd>−{formatMoney(quote.markup_amount, quote.to_currency)}</dd>
               </div>
             </dl>
             <p className={`mt-2 text-xs ${expired ? "text-danger" : "text-muted"}`} role="timer" data-testid="quote-timer">
-              {expired ? "This quote has expired." : `This rate is held for ${clock(secondsLeft)}.`}
+              {expired ? t("fx.expired") : t("fx.held", { time: clock(secondsLeft) })}
             </p>
           </div>
         )}
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t("fx.cancel")}
           </Button>
           {quote && !expired ? (
             <Button type="button" loading={busy} onClick={() => void convert()}>
-              Convert
+              {t("fx.convert")}
             </Button>
           ) : (
             <Button type="submit" loading={busy}>
-              {expired ? "Get a new quote" : "Get a quote"}
+              {expired ? t("fx.getNewQuote") : t("fx.getQuote")}
             </Button>
           )}
         </div>

@@ -117,6 +117,10 @@ public class PaymentIntent {
     @Column(name = "bnpl_fee")
     private Long bnplFee;
 
+    /** The language the merchant asked the checkout to open in, when the customer has not chosen one. */
+    @Column(name = "locale")
+    private String locale;
+
     @Version
     private long version;
 
@@ -212,6 +216,14 @@ public class PaymentIntent {
     /** How the customer is paying: {@code card}, {@code apple_pay}, {@code google_pay} or {@code blik}. */
     public void useMethod(String type) {
         paymentMethodType = type;
+    }
+
+    public void setLocale(String locale) {
+        this.locale = locale;
+    }
+
+    public String getLocale() {
+        return locale;
     }
 
     public String getPaymentMethodType() {

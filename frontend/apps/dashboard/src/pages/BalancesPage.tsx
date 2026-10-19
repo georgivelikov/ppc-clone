@@ -1,5 +1,6 @@
-import type { BalanceTransaction, BalanceTransactionType, MoneyAmount } from "@cutpay/api-client";
-import { Button, Card, formatMoney, toMajorString } from "@cutpay/ui";
+import type { BalanceTransaction, MoneyAmount } from "@cutpay/api-client";
+import { useLocaleFormat, useTranslation } from "@cutpay/i18n";
+import { Button, Card, toMajorString } from "@cutpay/ui";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -13,16 +14,6 @@ import { FxReportCard } from "./fx/FxReportCard";
 
 const PAGE_SIZE = 20;
 const SUMMARY_DAYS = 14;
-
-const TYPE_LABEL: Record<BalanceTransactionType, string> = {
-  payment: "Payment",
-  refund: "Refund",
-  payout: "Payout",
-  payout_failure: "Payout failed",
-  transfer: "Transfer",
-  transfer_reversal: "Transfer taken back",
-  conversion: "Conversion",
-};
 
 function amountIn(amounts: MoneyAmount[] | undefined, currency: string): number {
   return amounts?.find((entry) => entry.currency === currency)?.amount ?? 0;
@@ -40,7 +31,8 @@ function otherCurrencies(lists: (MoneyAmount[] | undefined)[], main: string): st
 }
 
 function Amount({ minor, currency }: { minor: number; currency: string }) {
-  return <span className={minor < 0 ? "text-danger" : undefined}>{formatMoney(minor, currency)}</span>;
+  const { money } = useLocaleFormat();
+  return <span className={minor < 0 ? "text-danger" : undefined}>{money(minor, currency)}</span>;
 }
 
 function BalanceCard({ title, hint, minor, currency, testId }: {
@@ -62,13 +54,15 @@ function BalanceCard({ title, hint, minor, currency, testId }: {
 }
 
 function TransactionRow({ txn }: { txn: BalanceTransaction }) {
+  const { t } = useTranslation();
+  const { money, date, dateTime } = useLocaleFormat();
   const target = txn.type === "payment" ? `/payments/${txn.source_id}` : txn.parent_id ? `/payments/${txn.parent_id}` : null;
   const payout = txn.type === "payout" || txn.type === "payout_failure" ? `/payouts/${txn.source_id}` : null;
   const link = target ?? payout;
   return (
     <tr className="border-b border-border last:border-0 hover:bg-canvas">
-      <td className="px-4 py-3 whitespace-nowrap text-muted">{new Date(txn.created).toLocaleString()}</td>
-      <td className="px-4 py-3">{TYPE_LABEL[txn.type]}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-muted">{dateTime(txn.created)}</td>
+      <td className="px-4 py-3">{t(`balances.types.${txn.type}`)}</td>
       <td className="max-w-56 truncate px-4 py-3">
         {link ? (
           <Link to={link} className="hover:underline">
@@ -82,19 +76,21 @@ function TransactionRow({ txn }: { txn: BalanceTransaction }) {
         <Amount minor={txn.gross} currency={txn.currency} />
       </td>
       <td className="px-4 py-3 text-right text-muted">
-        {txn.fee === 0 ? "—" : formatMoney(-txn.fee, txn.currency)}
+        {txn.fee === 0 ? "—" : money(-txn.fee, txn.currency)}
       </td>
       <td className="px-4 py-3 text-right font-medium">
         <Amount minor={txn.net} currency={txn.currency} />
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-muted">
-        {txn.available_on ? new Date(txn.available_on).toLocaleDateString() : "—"}
+        {txn.available_on ? date(txn.available_on) : "—"}
       </td>
     </tr>
   );
 }
 
 export function BalancesPage() {
+  const { t } = useTranslation();
+  const { money } = useLocaleFormat();
   const { merchant } = useSession();
   const { testMode } = useTestMode();
   const livemode = !testMode;
@@ -128,20 +124,20 @@ export function BalancesPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="text-2xl font-semibold">Balances</h1>
+      <h1 className="text-2xl font-semibold">{t("balances.title")}</h1>
 
-      {balance.isError && <p className="text-sm text-danger">Could not load your balance.</p>}
+      {balance.isError && <p className="text-sm text-danger">{t("balances.loadFailed")}</p>}
       <div className="grid gap-4 md:grid-cols-2">
         <BalanceCard
-          title="Available"
-          hint="Ready to be paid out to your bank account."
+          title={t("balances.available")}
+          hint={t("balances.availableHint")}
           minor={amountIn(balance.data?.available, currency)}
           currency={currency}
           testId="balance-available"
         />
         <BalanceCard
-          title="Pending"
-          hint="Recent payments, available after the settlement delay."
+          title={t("balances.pending")}
+          hint={t("balances.pendingHint")}
           minor={amountIn(balance.data?.pending, currency)}
           currency={currency}
           testId="balance-pending"
@@ -149,19 +145,19 @@ export function BalancesPage() {
       </div>
       {others.length > 0 && (
         <Card>
-          <h2 className="font-semibold">Other currencies</h2>
+          <h2 className="font-semibold">{t("balances.other")}</h2>
           <ul className="mt-2 divide-y divide-border text-sm">
             {others.map((code) => (
               <li key={code} className="flex items-center justify-between gap-3 py-2" data-testid={`balance-${code}`}>
                 <span className="text-muted">{code}</span>
                 <span className="flex items-center gap-3">
                   <span>
-                    <Amount minor={amountIn(balance.data?.available, code)} currency={code} /> available ·{" "}
-                    <Amount minor={amountIn(balance.data?.pending, code)} currency={code} /> pending
+                    {t("balances.availableAmount", { amount: money(amountIn(balance.data?.available, code), code) })} ·{" "}
+                    {t("balances.pendingAmount", { amount: money(amountIn(balance.data?.pending, code), code) })}
                   </span>
                   {convertible(code) && (
-                    <Button variant="secondary" size="sm" onClick={() => setConverting(code)} aria-label={`Convert ${code}`}>
-                      Convert
+                    <Button variant="secondary" size="sm" onClick={() => setConverting(code)} aria-label={t("balances.convertCurrency", { currency: code })}>
+                      {t("balances.convert")}
                     </Button>
                   )}
                 </span>
@@ -172,8 +168,8 @@ export function BalancesPage() {
       )}
       {convertible(currency) && (
         <div className="flex justify-end">
-          <Button variant="secondary" size="sm" onClick={() => setConverting(currency)} aria-label={`Convert ${currency}`}>
-            Convert {currency}…
+          <Button variant="secondary" size="sm" onClick={() => setConverting(currency)} aria-label={t("balances.convertCurrency", { currency })}>
+            {t("balances.convertCurrencyMore", { currency })}
           </Button>
         </div>
       )}
@@ -190,14 +186,14 @@ export function BalancesPage() {
       <CurrencySettingsCard />
 
       <Card>
-        <h2 className="font-semibold">Volume and fees, last {SUMMARY_DAYS} days</h2>
-        {summary.isError && <p className="mt-2 text-sm text-danger">Could not load the chart.</p>}
+        <h2 className="font-semibold">{t("balances.chartTitle", { days: SUMMARY_DAYS })}</h2>
+        {summary.isError && <p className="mt-2 text-sm text-danger">{t("balances.chartFailed")}</p>}
         {summary.isSuccess && !hasVolume ? (
-          <p className="mt-4 text-sm text-muted">No card payments in this period.</p>
+          <p className="mt-4 text-sm text-muted">{t("balances.chartEmpty")}</p>
         ) : (
           <div
             role="img"
-            aria-label={`Daily card volume and fees in ${currency} for the last ${SUMMARY_DAYS} days`}
+            aria-label={t("balances.chartLabel", { currency, days: SUMMARY_DAYS })}
             className="mt-4 h-60"
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -205,10 +201,10 @@ export function BalancesPage() {
                 <CartesianGrid vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="var(--color-muted)" />
                 <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted)" width={56} />
-                <Tooltip formatter={(value) => formatMoney(Math.round(Number(value) * 100), currency)} />
+                <Tooltip formatter={(value) => money(Math.round(Number(value) * 100), currency)} />
                 <Legend />
-                <Bar dataKey="volume" name="Card volume" fill="var(--color-brand-500)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="fees" name="Fees" fill="var(--color-warning)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="volume" name={t("balances.cardVolume")} fill="var(--color-brand-500)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="fees" name={t("balances.fees")} fill="var(--color-warning)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -216,18 +212,18 @@ export function BalancesPage() {
       </Card>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Transactions</h2>
+        <h2 className="text-lg font-semibold">{t("balances.transactions")}</h2>
         <Card className="overflow-x-auto p-0">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border text-xs text-muted uppercase">
               <tr>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Description</th>
-                <th className="px-4 py-3 text-right font-medium">Gross</th>
-                <th className="px-4 py-3 text-right font-medium">Fee</th>
-                <th className="px-4 py-3 text-right font-medium">Net</th>
-                <th className="px-4 py-3 font-medium">Available on</th>
+                <th className="px-4 py-3 font-medium">{t("balances.cols.date")}</th>
+                <th className="px-4 py-3 font-medium">{t("balances.cols.type")}</th>
+                <th className="px-4 py-3 font-medium">{t("balances.cols.description")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("balances.cols.gross")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("balances.cols.fee")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("balances.cols.net")}</th>
+                <th className="px-4 py-3 font-medium">{t("balances.cols.availableOn")}</th>
               </tr>
             </thead>
             <tbody>
@@ -236,11 +232,11 @@ export function BalancesPage() {
               ))}
             </tbody>
           </table>
-          {transactions.isPending && <p className="px-4 py-6 text-sm text-muted">Loading transactions…</p>}
-          {transactions.isError && <p className="px-4 py-6 text-sm text-danger">Could not load transactions.</p>}
+          {transactions.isPending && <p className="px-4 py-6 text-sm text-muted">{t("balances.loadingTransactions")}</p>}
+          {transactions.isError && <p className="px-4 py-6 text-sm text-danger">{t("balances.transactionsFailed")}</p>}
           {transactions.isSuccess && rows.length === 0 && (
             <p className="px-4 py-10 text-center text-sm text-muted">
-              No transactions yet. They appear here once a payment succeeds.
+              {t("balances.noTransactions")}
             </p>
           )}
         </Card>
@@ -251,7 +247,7 @@ export function BalancesPage() {
               loading={transactions.isFetchingNextPage}
               onClick={() => void transactions.fetchNextPage()}
             >
-              Load more
+              {t("balances.loadMore")}
             </Button>
           </div>
         )}

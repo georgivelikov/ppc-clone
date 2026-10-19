@@ -1014,6 +1014,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/payment_method_settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which ways of paying your checkout offers
+         * @description Everything is on until you switch it off. Cards cannot be switched off, so a checkout always has a way to pay.
+         *     A method that does not fit a payment is left out of that checkout anyway: BLIK is for payments in PLN that are
+         *     taken at once. Instalments are set up under `/v1/bnpl/settings`.
+         */
+        get: operations["getPaymentMethodSettings"];
+        /** Switch payment methods on or off */
+        put: operations["updatePaymentMethodSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fx/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current exchange rates
+         * @description What one unit of the base currency buys of every other currency we support. The rates are simulated: they start
+         *     from fixed values and move a little every minute, within 10% of where they began.
+         */
+        get: operations["getFxRates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fx/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a rate for 15 minutes
+         * @description Works out what a conversion would give you, with the platform's markup, and promises it for 15 minutes. A quote
+         *     is for one conversion of exactly its amount; use it with `POST /v1/balance/convert`.
+         */
+        post: operations["createFxQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/balance/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert available money into another currency
+         * @description Moves available money from one currency to another. Without a `quote_id` the current rate is used. The market
+         *     value is rounded to the nearest minor unit and what you receive is rounded down, so you are never paid more than
+         *     the market value; the difference is the platform's markup. Pending money cannot be converted.
+         */
+        post: operations["convertBalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fx/conversions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List conversions */
+        get: operations["listFxConversions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fx/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What conversions brought in, and what the markup took */
+        get: operations["getFxReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/currency_settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which currencies you keep, and whether the others are converted */
+        get: operations["getCurrencySettings"];
+        /**
+         * Change the currencies you keep and automatic conversion
+         * @description With `auto_convert` on, money in a currency you do not keep is converted into the first of your settlement
+         *     currencies when it becomes available (not while it is pending), at the rate of that moment.
+         */
+        put: operations["updateCurrencySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/payouts": {
         parameters: {
             query?: never;
@@ -1400,6 +1543,12 @@ export interface components {
              * @description What the platform keeps of the payment. The single destination receives everything else.
              */
             application_fee_amount?: number;
+            /**
+             * @description The language the hosted checkout opens in. A language in the link (`?locale=`) or one the customer chose
+             *     themselves comes first; without any, the browser's language is used.
+             * @enum {string}
+             */
+            locale?: "en" | "bg" | "ro" | "pl" | "hu" | "el";
         };
         Address: {
             line1?: string | null;
@@ -2140,10 +2289,11 @@ export interface components {
             /** @description Charged to a saved card without the customer present. */
             off_session?: boolean;
             /**
-             * @description How the payment was settled; `bnpl` when a provider financed it in instalments.
+             * @description How the payment was settled. `apple_pay` and `google_pay` are cards presented by a wallet (no 3-D Secure, priced
+             *     like the card); `blik` is a Polish bank-app payment; `bnpl` means a provider financed it in instalments.
              * @enum {string}
              */
-            payment_method_type?: "card" | "bnpl";
+            payment_method_type?: "card" | "apple_pay" | "google_pay" | "blik" | "bnpl";
             /** @description Who financed a payment settled in instalments, and what they kept. */
             bnpl?: {
                 provider?: string;
@@ -2365,6 +2515,136 @@ export interface components {
             amount: number;
             currency: string;
         };
+        PaymentMethodSettings: {
+            /** @constant */
+            object: "payment_method_settings";
+            data: {
+                /** @enum {string} */
+                method: "card" | "apple_pay" | "google_pay" | "blik";
+                enabled: boolean;
+                /** @description Cards cannot be switched off. */
+                locked: boolean;
+            }[];
+        };
+        UpdatePaymentMethodSettings: {
+            methods: {
+                /** @enum {string} */
+                method: "card" | "apple_pay" | "google_pay" | "blik";
+                enabled: boolean;
+            }[];
+        };
+        FxRates: {
+            /** @constant */
+            object: "fx_rates";
+            base: string;
+            /** Format: date-time */
+            as_of: string;
+            /** @description What one unit of the base currency buys, by currency code. */
+            rates: {
+                [key: string]: number;
+            };
+        };
+        CreateFxQuote: {
+            from_currency: string;
+            to_currency: string;
+            /**
+             * Format: int64
+             * @description In the smallest unit of `from_currency`.
+             */
+            amount: number;
+        };
+        ConvertBalance: components["schemas"]["CreateFxQuote"] & {
+            /** @description Convert at the quoted rate. A quote is for one conversion of exactly its amount. */
+            quote_id?: string;
+        };
+        FxQuote: {
+            id: string;
+            /** @constant */
+            object: "fx_quote";
+            from_currency: string;
+            to_currency: string;
+            /** Format: int64 */
+            from_amount: number;
+            /**
+             * Format: int64
+             * @description What the amount is worth at the market rate, in the target currency.
+             */
+            mid_amount: number;
+            /**
+             * Format: int64
+             * @description What you receive.
+             */
+            to_amount: number;
+            /**
+             * Format: int64
+             * @description `mid_amount` less `to_amount`.
+             */
+            markup_amount: number;
+            rate: number;
+            markup_bps: number;
+            /** Format: date-time */
+            expires_at: string;
+            /** @description How many seconds the quote lasts from the moment it was made, by the server's clock. */
+            expires_in: number;
+            livemode: boolean;
+        };
+        FxConversion: {
+            id: string;
+            /** @constant */
+            object: "fx_conversion";
+            from_currency: string;
+            to_currency: string;
+            /** Format: int64 */
+            from_amount: number;
+            /** Format: int64 */
+            mid_amount: number;
+            /** Format: int64 */
+            to_amount: number;
+            /** Format: int64 */
+            markup_amount: number;
+            rate: number;
+            markup_bps: number;
+            /** @enum {string} */
+            kind: "manual" | "auto";
+            quote_id?: string | null;
+            /** @description The payment whose funds were converted, for an automatic conversion. */
+            source_id?: string | null;
+            /** Format: date-time */
+            created: string;
+        };
+        FxConversionList: {
+            /** @constant */
+            object: "list";
+            data: components["schemas"]["FxConversion"][];
+            has_more: boolean;
+        };
+        FxReport: {
+            /** @constant */
+            object: "fx_report";
+            days: number;
+            data: {
+                /** @description The currency received. */
+                currency: string;
+                conversions: number;
+                /** Format: int64 */
+                received: number;
+                /** Format: int64 */
+                markup: number;
+            }[];
+        };
+        CurrencySettings: {
+            /** @constant */
+            object: "currency_settings";
+            settlement_currencies: string[];
+            auto_convert: boolean;
+            /** @description The platform's margin on a conversion, in basis points. Set by the platform. */
+            fx_markup_bps: number;
+        };
+        UpdateCurrencySettings: {
+            settlement_currencies: string[];
+            /** @default false */
+            auto_convert: boolean;
+        };
         Balance: {
             /** @constant */
             object: "balance";
@@ -2378,7 +2658,7 @@ export interface components {
             /** @constant */
             object: "balance_transaction";
             /** @enum {string} */
-            type: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal";
+            type: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal" | "conversion";
             source_id?: string;
             parent_id?: string | null;
             currency: string;
@@ -4429,7 +4709,7 @@ export interface operations {
                 limit?: components["parameters"]["Limit"];
                 /** @description The `id` of the last object of the previous page. */
                 starting_after?: components["parameters"]["StartingAfter"];
-                type?: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal";
+                type?: "payment" | "refund" | "payout" | "transfer" | "transfer_reversal" | "conversion";
                 /** @description A payment id (also matches its refunds), refund id or payout id. */
                 source?: string;
             };
@@ -4448,6 +4728,240 @@ export interface operations {
                     "application/json": components["schemas"]["BalanceTransactionList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getPaymentMethodSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every method you can switch, with whether it is on. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updatePaymentMethodSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePaymentMethodSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodSettings"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getFxRates: {
+        parameters: {
+            query?: {
+                base?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rates, with the time of the newest one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxRates"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createFxQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFxQuote"];
+            };
+        };
+        responses: {
+            /** @description The quote. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxQuote"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    convertBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConvertBalance"];
+            };
+        };
+        responses: {
+            /** @description The conversion. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxConversion"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description The quote does not exist or is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not enough available balance, or the quote was used or has expired. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listFxConversions: {
+        parameters: {
+            query?: {
+                /** @description How many objects to return (1 to 100). */
+                limit?: components["parameters"]["Limit"];
+                /** @description The `id` of the last object of the previous page. */
+                starting_after?: components["parameters"]["StartingAfter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of conversions, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxConversionList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getFxReport: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Totals per currency received. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FxReport"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrencySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your settlement currencies and conversion settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencySettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateCurrencySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCurrencySettings"];
+            };
+        };
+        responses: {
+            /** @description The saved settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrencySettings"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };
