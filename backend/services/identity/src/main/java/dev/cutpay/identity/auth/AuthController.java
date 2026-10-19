@@ -5,6 +5,7 @@ import dev.cutpay.identity.auth.AuthDtos.LoginRequest;
 import dev.cutpay.identity.auth.AuthDtos.MeResponse;
 import dev.cutpay.identity.auth.AuthDtos.SignupRequest;
 import dev.cutpay.identity.security.AuthProperties;
+import dev.cutpay.identity.team.TeamService;
 import dev.cutpay.web.ApiException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,10 +29,27 @@ public class AuthController {
 
     private final AuthService auth;
     private final AuthProperties properties;
+    private final TeamService team;
 
-    public AuthController(AuthService auth, AuthProperties properties) {
+    public AuthController(AuthService auth, AuthProperties properties, TeamService team) {
         this.auth = auth;
         this.properties = properties;
+        this.team = team;
+    }
+
+    public record AcceptInviteRequest(String fullName, String password) {
+    }
+
+    /** What the invitation page shows before the person decides. */
+    @GetMapping("/auth/invites/{token}")
+    TeamService.Preview previewInvite(@PathVariable String token) {
+        return team.preview(token);
+    }
+
+    @PostMapping("/auth/invites/{token}/accept")
+    ResponseEntity<AuthResponse> acceptInvite(@PathVariable String token, @RequestBody AcceptInviteRequest request) {
+        TeamService.Accepted accepted = team.accept(token, request.fullName(), request.password());
+        return withSession(HttpStatus.CREATED, auth.openSession(accepted.userId(), accepted.merchantId()));
     }
 
     @PostMapping("/auth/signup")

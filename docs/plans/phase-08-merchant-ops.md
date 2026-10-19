@@ -76,3 +76,14 @@ New topics: `onboarding.events`, `dispute.events`, `audit.events`, `notification
 - Monthly report CSV totals match ledger.
 - Dropping and rebuilding reporting DB from Kafka replay gives identical numbers.
 - Tests: permission matrix tests, onboarding state machine tests, Playwright `onboarding.spec.ts`, `dispute.spec.ts`, `team.spec.ts`.
+
+## Progress
+The phase is built in slices, each one tested and pushed on its own.
+
+1. **Team, roles, audit trail** (built, [ADR 0025](../adr/0025-team-roles-and-permissions.md)). Roles owner, admin, developer, viewer and support; the permission matrix at the gateway (`RolePolicy`) and the finer rules in identity (`TeamRules`); invitations by link (the link is shown once; email waits for notifications); changing and removing members; `audit_events` and the `audit.events` topic; dashboard Settings, Team and Activity; `team.spec.ts` (viewer cannot refund, support can). Not yet: TOTP, email verification, password reset, session list.
+2. Sign-in security: TOTP, password reset, email verification, sessions.
+3. Disputes.
+4. Onboarding and KYC with `kyc-sim`.
+5. Notifications (Mailpit).
+6. Reporting and the read model.
+7. Back-office.

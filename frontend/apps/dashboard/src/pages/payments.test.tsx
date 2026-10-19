@@ -18,7 +18,7 @@ vi.mock("../api", () => ({
   },
 }));
 vi.mock("../auth/AuthProvider", () => ({
-  useSession: () => ({ merchant: { display_name: "Rose Cafe", default_currency: "EUR" } }),
+  useSession: () => ({ merchant: { display_name: "Rose Cafe", default_currency: "EUR" }, role: "owner" }),
 }));
 
 let testMode = true;

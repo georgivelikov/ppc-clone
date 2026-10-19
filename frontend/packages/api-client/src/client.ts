@@ -50,6 +50,15 @@ import type {
 } from "./customers";
 import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
 import type {
+  AcceptInviteInput,
+  AssignableRole,
+  AuditEvent,
+  InvitePreview,
+  ListOf,
+  TeamInvite,
+  TeamMember,
+} from "./team";
+import type {
   ConvertBalanceInput,
   CreateFxQuoteInput,
   CurrencySettings,
@@ -551,6 +560,48 @@ export class ApiClient {
   /** Daily card volume and fees per currency; days without payments are included as zeros. */
   balanceSummary(days = 14, livemode = false): Promise<BalanceSummary> {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
+  }
+
+  // --- team ---------------------------------------------------------------
+
+  listTeamMembers(): Promise<ListOf<TeamMember>> {
+    return this.request("GET", "/v1/team/members");
+  }
+
+  changeTeamMemberRole(userId: string, role: AssignableRole): Promise<TeamMember> {
+    return this.request("PATCH", `/v1/team/members/${encodeURIComponent(userId)}`, { role });
+  }
+
+  removeTeamMember(userId: string): Promise<void> {
+    return this.request("DELETE", `/v1/team/members/${encodeURIComponent(userId)}`);
+  }
+
+  listTeamInvites(): Promise<ListOf<TeamInvite>> {
+    return this.request("GET", "/v1/team/invites");
+  }
+
+  /** The response is the only one that carries the link to send. */
+  inviteTeamMember(email: string, role: AssignableRole): Promise<TeamInvite> {
+    return this.request("POST", "/v1/team/invites", { email, role });
+  }
+
+  revokeTeamInvite(id: string): Promise<void> {
+    return this.request("DELETE", `/v1/team/invites/${encodeURIComponent(id)}`);
+  }
+
+  listAuditEvents(params: { before?: number; limit?: number } = {}): Promise<ListOf<AuditEvent>> {
+    return this.request("GET", `/v1/audit_events${toQuery(params)}`);
+  }
+
+  previewInvite(token: string): Promise<InvitePreview> {
+    return this.request("GET", `/auth/invites/${encodeURIComponent(token)}`, undefined, { auth: false });
+  }
+
+  /** Joins the team and signs in. */
+  async acceptInvite(token: string, input: AcceptInviteInput): Promise<AuthResponse> {
+    return this.storeSession(
+      await this.request<AuthResponse>("POST", `/auth/invites/${encodeURIComponent(token)}/accept`, input, { auth: false }),
+    );
   }
 
   // --- payment methods ----------------------------------------------------

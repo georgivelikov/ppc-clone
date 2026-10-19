@@ -6,6 +6,8 @@ const TABS = [
   { key: "profile", to: "/settings", end: true },
   { key: "payouts", to: "/settings/payouts", end: false },
   { key: "methods", to: "/settings/methods", end: false },
+  { key: "team", to: "/settings/team", end: false },
+  { key: "security", to: "/settings/security", end: false },
 ];
 
 /** Switches between the settings pages. */

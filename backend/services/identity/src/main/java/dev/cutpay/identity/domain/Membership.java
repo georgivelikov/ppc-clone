@@ -12,7 +12,7 @@ import java.time.Instant;
 @Table(name = "memberships")
 public class Membership {
 
-    public enum Role { OWNER, ADMIN, DEVELOPER, VIEWER }
+    public enum Role { OWNER, ADMIN, DEVELOPER, VIEWER, SUPPORT }
 
     @Id
     private String id;
@@ -55,5 +55,9 @@ public class Membership {
 
     public Role getRole() {
         return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }

@@ -124,6 +124,15 @@ public class AuthService {
         refreshTokens.revoke(rawRefreshToken);
     }
 
+    /** Signs a user in to one business without a password, for flows that have just proved who they are. */
+    @Transactional
+    public Session openSession(String userId, String merchantId) {
+        User user = users.findById(userId).orElseThrow();
+        Membership membership = memberships.findByUserIdAndMerchantId(userId, merchantId).orElseThrow();
+        user.recordLogin();
+        return startSession(user, merchants.findById(merchantId).orElseThrow(), membership);
+    }
+
     @Transactional(readOnly = true)
     public MeResponse me(String userId) {
         User user = users.findById(userId).orElseThrow(() -> ApiException.unauthorized("unknown_user", "Unknown user"));

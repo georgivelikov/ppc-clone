@@ -44,7 +44,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 5 | [Billing](docs/plans/phase-05-billing.md) — saved cards, pre-auth, subscriptions, invoices, split payments | ✅ Built |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine, circuit breakers | ✅ Built |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ✅ Built |
-| 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ⏳ Planned |
+| 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | 🚧 In progress (team and roles built) |
 | 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | ⏳ Planned |
 
 ## Repository layout (target)

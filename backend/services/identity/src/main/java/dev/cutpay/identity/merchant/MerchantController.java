@@ -1,5 +1,6 @@
 package dev.cutpay.identity.merchant;
 
+import dev.cutpay.identity.audit.AuditLog;
 import dev.cutpay.identity.auth.AuthDtos.MerchantView;
 import dev.cutpay.identity.domain.Merchant;
 import dev.cutpay.identity.domain.Repositories.MerchantRepository;
@@ -23,9 +24,11 @@ public class MerchantController {
     private static final Set<String> CAN_EDIT = Set.of("owner", "admin");
 
     private final MerchantRepository merchants;
+    private final AuditLog audit;
 
-    public MerchantController(MerchantRepository merchants) {
+    public MerchantController(MerchantRepository merchants, AuditLog audit) {
         this.merchants = merchants;
+        this.audit = audit;
     }
 
     public record UpdateMerchantRequest(@Size(min = 1, max = 160) String displayName, String defaultCurrency) {
@@ -54,6 +57,8 @@ public class MerchantController {
             }
             merchant.setDefaultCurrency(request.defaultCurrency().toUpperCase(Locale.ROOT));
         }
+        audit.record(merchant.getId(), jwt, "merchant.updated", "merchant", merchant.getId(),
+                request.displayName() != null ? "name" : "default currency");
         return MerchantView.of(merchant);
     }
 

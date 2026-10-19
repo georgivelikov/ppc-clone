@@ -27,7 +27,9 @@
     "label": "Settings",
     "profile": "Business profile",
     "payouts": "Payouts",
-    "methods": "Payment methods"
+    "methods": "Payment methods",
+    "team": "Team",
+    "security": "Activity"
   },
   "home": {
     "welcome": "Welcome, {{name}}",

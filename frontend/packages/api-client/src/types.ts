@@ -2,7 +2,7 @@
 // Phase 3 replaces these hand-written types with ones generated from the OpenAPI spec.
 import type { TransferData } from "./connected";
 
-export type Role = "owner" | "admin" | "developer" | "viewer";
+export type Role = "owner" | "admin" | "developer" | "viewer" | "support";
 
 export interface User {
   id: string;

@@ -1,4 +1,4 @@
-import type { AuthResponse, LoginInput, Merchant, Role, SignupInput, User } from "@cutpay/api-client";
+import type { AcceptInviteInput, AuthResponse, LoginInput, Merchant, Role, SignupInput, User } from "@cutpay/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, onSessionExpired } from "../api";
@@ -12,6 +12,8 @@ interface AuthContextValue {
   state: AuthState;
   login(input: LoginInput): Promise<void>;
   signup(input: SignupInput): Promise<void>;
+  /** Joins a team from an invitation link and signs in. */
+  acceptInvite(token: string, input: AcceptInviteInput): Promise<void>;
   logout(): Promise<void>;
   /** Replaces the cached merchant after the profile was edited. */
   setMerchant(merchant: Merchant): void;
@@ -61,6 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(toAuthenticated(await api.signup(input)));
   }, []);
 
+  const acceptInvite = useCallback(async (token: string, input: AcceptInviteInput) => {
+    setState(toAuthenticated(await api.acceptInvite(token, input)));
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -75,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ state, login, signup, logout, setMerchant }),
-    [state, login, signup, logout, setMerchant],
+    () => ({ state, login, signup, acceptInvite, logout, setMerchant }),
+    [state, login, signup, acceptInvite, logout, setMerchant],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

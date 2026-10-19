@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { GuestOnly, RequireAuth } from "./auth/guards";
+import { AcceptInvitePage } from "./auth/AcceptInvitePage";
 import { LoginPage } from "./auth/LoginPage";
 import { SignupPage } from "./auth/SignupPage";
 import { AppShell } from "./layout/AppShell";
@@ -33,6 +34,8 @@ import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
 import { PayoutSettingsPage } from "./pages/PayoutSettingsPage";
 import { PaymentMethodsPage } from "./pages/PaymentMethodsPage";
+import { SecurityPage } from "./pages/SecurityPage";
+import { TeamPage } from "./pages/TeamPage";
 import { PayoutsPage } from "./pages/PayoutsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
@@ -43,6 +46,7 @@ export function App() {
   return (
     <Suspense fallback={<p className="p-8 text-sm text-muted">Loading…</p>}>
       <Routes>
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
@@ -82,6 +86,8 @@ export function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/payouts" element={<PayoutSettingsPage />} />
             <Route path="settings/methods" element={<PaymentMethodsPage />} />
+            <Route path="settings/team" element={<TeamPage />} />
+            <Route path="settings/security" element={<SecurityPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api";
+import { useSession } from "../auth/AuthProvider";
 import { StatusBadge } from "../components/StatusBadge";
 import { BnplPaymentCard } from "./bnpl/BnplPaymentCard";
 import { CaptureDialog } from "./CaptureDialog";
@@ -92,6 +93,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function PaymentDetailPage() {
   const { id = "" } = useParams();
   const queryClient = useQueryClient();
+  const { role } = useSession();
   const [refunding, setRefunding] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const { data: payment, error, isPending } = useQuery({ queryKey: ["payment", id], queryFn: () => api.getPayment(id) });
@@ -128,7 +130,9 @@ export function PaymentDetailPage() {
   }
 
   const attempt = payment.attempts.at(-1);
+  // Owners, admins and support refund; developers and viewers read.
   const canRefund =
+    ["owner", "admin", "support"].includes(role) &&
     (payment.status === "succeeded" || payment.status === "partially_refunded") &&
     payment.amount > payment.amount_refunded;
   const canCancel = payment.status === "requires_payment_method" || payment.status === "requires_action";

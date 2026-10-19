@@ -1,6 +1,7 @@
 package dev.cutpay.identity.apikey;
 
 import dev.cutpay.identity.apikey.ApiKeyService.Created;
+import dev.cutpay.identity.audit.AuditLog;
 import dev.cutpay.identity.domain.ApiKey;
 import dev.cutpay.identity.domain.ApiKey.Type;
 import dev.cutpay.web.ApiException;
@@ -16,6 +17,7 @@ import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,9 +34,11 @@ public class ApiKeyController {
     private static final long MAX_GRACE_HOURS = 24 * 7;
 
     private final ApiKeyService service;
+    private final AuditLog audit;
 
-    public ApiKeyController(ApiKeyService service) {
+    public ApiKeyController(ApiKeyService service, AuditLog audit) {
         this.service = service;
+        this.audit = audit;
     }
 
     public record CreateApiKeyRequest(@NotBlank @Size(max = 80) String name, @NotNull String type,
@@ -72,6 +76,7 @@ public class ApiKeyController {
     /** The only response that ever contains the secret. */
     @PostMapping("/v1/api_keys")
     @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
     ApiKeyView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateApiKeyRequest request) {
         requireTeamMember(jwt);
         Type type;
@@ -83,11 +88,14 @@ public class ApiKeyController {
         }
         Created created = service.create(merchant(jwt), jwt.getSubject(), request.name().trim(),
                 Boolean.TRUE.equals(request.livemode()), type, request.scopes());
+        audit.record(merchant(jwt), jwt, "api_key.created", "api_key", created.key().getId(),
+                request.name().trim() + " (" + type.name().toLowerCase(Locale.ROOT) + ")");
         return ApiKeyView.of(created.key(), created.secret());
     }
 
     @PostMapping("/v1/api_keys/{id}/roll")
     @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
     ApiKeyView roll(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
                     @RequestBody(required = false) RollRequest request) {
         requireTeamMember(jwt);
@@ -97,14 +105,17 @@ public class ApiKeyController {
                     "grace_hours must be between 0 and " + MAX_GRACE_HOURS, "grace_hours");
         }
         Created created = service.roll(merchant(jwt), id, jwt.getSubject(), Duration.ofHours(hours));
+        audit.record(merchant(jwt), jwt, "api_key.rolled", "api_key", id, "new key " + created.key().getId());
         return ApiKeyView.of(created.key(), created.secret());
     }
 
     @DeleteMapping("/v1/api_keys/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     void revoke(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
         requireTeamMember(jwt);
         service.revoke(merchant(jwt), id);
+        audit.record(merchant(jwt), jwt, "api_key.revoked", "api_key", id, null);
     }
 
     private static void requireTeamMember(Jwt jwt) {

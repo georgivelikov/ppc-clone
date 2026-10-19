@@ -14,4 +14,9 @@ public class KafkaTopicsConfig {
     NewTopic merchantEvents() {
         return TopicBuilder.name(AuthService.MERCHANT_TOPIC).partitions(3).replicas(1).build();
     }
+
+    @Bean
+    NewTopic auditEvents() {
+        return TopicBuilder.name(dev.cutpay.identity.audit.AuditLog.TOPIC).partitions(3).replicas(1).build();
+    }
 }
