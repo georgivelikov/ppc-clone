@@ -13,6 +13,7 @@ import {
   Network,
   Package,
   Repeat,
+  ShieldAlert,
   Settings,
   Users,
   Wallet,
@@ -36,6 +37,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { key: "home", to: "/", icon: Home },
   { key: "payments", to: "/payments", icon: CreditCard },
+  { key: "disputes", to: "/disputes", icon: ShieldAlert },
   { key: "balances", to: "/balances", icon: Wallet },
   { key: "payouts", to: "/payouts", icon: Banknote },
   { key: "links", to: "/links", icon: Link2 },

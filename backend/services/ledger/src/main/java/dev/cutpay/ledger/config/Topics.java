@@ -10,6 +10,7 @@ public final class Topics {
     public static final String BNPL = "bnpl.events";
     public static final String LEDGER_ENTRIES = "ledger.entries";
     public static final String FX = "fx.events";
+    public static final String DISPUTE = "dispute.events";
 
     private Topics() {
     }

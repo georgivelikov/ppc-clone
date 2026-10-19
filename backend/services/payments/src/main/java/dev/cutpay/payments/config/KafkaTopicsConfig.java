@@ -18,6 +18,7 @@ public class KafkaTopicsConfig {
     public static final String PAYMENT_TOPIC = "payment.events";
     public static final String REFUND_TOPIC = "refund.events";
     public static final String CUSTOMER_TOPIC = "customer.events";
+    public static final String DISPUTE_TOPIC = "dispute.events";
     /** Produced by the bnpl service; payments listens to it. */
     public static final String BNPL_TOPIC = "bnpl.events";
 
@@ -29,6 +30,11 @@ public class KafkaTopicsConfig {
     @Bean
     NewTopic refundEvents() {
         return TopicBuilder.name(REFUND_TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic disputeEvents() {
+        return TopicBuilder.name(DISPUTE_TOPIC).partitions(3).replicas(1).build();
     }
 
     @Bean

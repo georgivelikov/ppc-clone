@@ -41,6 +41,9 @@ public class PaymentAttempt {
     @Column(name = "card_region")
     private String cardRegion;
 
+    @Column(name = "dispute_after_days")
+    private Integer disputeAfterDays;
+
     @Column(name = "acquirer_token")
     private String acquirerToken;
 
@@ -105,6 +108,16 @@ public class PaymentAttempt {
     public PaymentAttempt viaWallet(String walletType) {
         this.methodType = walletType;
         return this;
+    }
+
+    /** The cardholder will dispute this payment that many days after it succeeds (a test card). */
+    public PaymentAttempt disputedAfter(Integer days) {
+        this.disputeAfterDays = days;
+        return this;
+    }
+
+    public Integer getDisputeAfterDays() {
+        return disputeAfterDays;
     }
 
     public boolean isCard() {

@@ -45,6 +45,21 @@ class EventMappingTest {
     }
 
     @Test
+    void disputeEventsMapToTheChargeDisputeTypes() {
+        var payload = JSON.readTree("""
+                {"dispute_id":"dp_1","payment_id":"pay_1","amount":10000,"currency":"EUR","fee":1500,"reason":"fraudulent",
+                 "status":"needs_response","evidence_due_by":"2026-10-27T10:00:00Z","evidence_text":"private note"}""");
+        Mapped opened = EventMapper.map("DisputeOpened", payload).orElseThrow();
+        assertThat(opened.type()).isEqualTo("charge.dispute.created");
+        assertThat(opened.object()).containsEntry("id", "dp_1").containsEntry("object", "dispute")
+                .containsEntry("payment_intent", "pay_1").containsEntry("fee", 1500L)
+                .doesNotContainKey("evidence_text"); // what the merchant wrote stays out of the public event
+        assertThat(EventMapper.map("DisputeEvidenceSubmitted", payload).orElseThrow().type()).isEqualTo("charge.dispute.updated");
+        assertThat(EventMapper.map("DisputeClosed", payload).orElseThrow().type()).isEqualTo("charge.dispute.closed");
+        assertThat(EventTypes.ALL).contains("charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed");
+    }
+
+    @Test
     void everyMappedTypeIsAKnownPublicType() {
         var payment = JSON.readTree("{\"payment_id\":\"p\",\"status\":\"s\",\"currency\":\"EUR\"}");
         var refund = JSON.readTree("{\"refund_id\":\"r\",\"payment_id\":\"p\",\"status\":\"s\",\"currency\":\"EUR\"}");

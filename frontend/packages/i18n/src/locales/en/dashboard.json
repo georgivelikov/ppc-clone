@@ -3,6 +3,7 @@
     "label": "Main",
     "home": "Home",
     "payments": "Payments",
+    "disputes": "Disputes",
     "balances": "Balances",
     "payouts": "Payouts",
     "links": "Links",
@@ -135,7 +136,11 @@
       "payout_failure": "Payout failed",
       "transfer": "Transfer",
       "transfer_reversal": "Transfer taken back",
-      "conversion": "Conversion"
+      "conversion": "Conversion",
+      "dispute": "Dispute",
+      "dispute_fee": "Dispute fee",
+      "dispute_reversal": "Dispute won",
+      "dispute_fee_reversal": "Dispute fee returned"
     }
   },
   "fx": {

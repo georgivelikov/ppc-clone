@@ -2,6 +2,8 @@ package dev.cutpay.ledger.events;
 
 import dev.cutpay.ledger.config.Topics;
 import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
+import dev.cutpay.ledger.posting.LedgerEvents.DisputeClosed;
+import dev.cutpay.ledger.posting.LedgerEvents.DisputeOpened;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
@@ -73,6 +75,20 @@ class LedgerEventListener {
         JsonNode payload = event.path("payload");
         ledger.onBnplSettled(new BnplSettled(eventId(event), occurredAt(event), merchantId(event), livemode(event),
                 text(payload, "payment_id"), text(payload, "application_id")));
+    }
+
+    @KafkaListener(topics = Topics.DISPUTE)
+    void onDisputeEvent(String message) {
+        JsonNode event = mapper.readTree(message);
+        JsonNode payload = event.path("payload");
+        switch (type(event)) {
+            case "DisputeOpened" -> ledger.onDisputeOpened(new DisputeOpened(eventId(event), occurredAt(event), merchantId(event),
+                    livemode(event), text(payload, "dispute_id"), text(payload, "payment_id"), payload.path("amount").asLong(),
+                    text(payload, "currency"), payload.path("fee").asLong()));
+            case "DisputeClosed" -> ledger.onDisputeClosed(new DisputeClosed(eventId(event), occurredAt(event), merchantId(event),
+                    livemode(event), text(payload, "dispute_id"), "won".equals(text(payload, "outcome"))));
+            default -> log.trace("Ignoring {}", type(event));
+        }
     }
 
     @KafkaListener(topics = Topics.REFUND)

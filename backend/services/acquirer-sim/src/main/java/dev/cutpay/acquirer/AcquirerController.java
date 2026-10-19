@@ -48,7 +48,7 @@ class AcquirerController {
     }
 
     record TokenizeResponse(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
-                            String cardType, String cardRegion, String walletType) {
+                            String cardType, String cardRegion, String walletType, Integer chargebackAfterDays) {
     }
 
     record VerifyRequest(@NotBlank String token, String channel) {
@@ -112,7 +112,7 @@ class AcquirerController {
         tokens.put(token, new StoredCard(pan, request.expMonth(), expYear, null));
         BinTable.BinInfo bin = BinTable.lookup(pan);
         return new TokenizeResponse(token, TestCards.brand(pan), pan.substring(pan.length() - 4), request.expMonth(),
-                expYear, fingerprint(pan), bin.cardType(), bin.cardRegion(), null);
+                expYear, fingerprint(pan), bin.cardType(), bin.cardRegion(), null, TestCards.chargebackAfterDays(pan));
     }
 
     /** What payments is allowed to know about a card: never the number itself. */
@@ -124,7 +124,8 @@ class AcquirerController {
         }
         BinTable.BinInfo bin = BinTable.lookup(card.pan());
         return new TokenizeResponse(token, TestCards.brand(card.pan()), card.pan().substring(card.pan().length() - 4),
-                card.expMonth(), card.expYear(), fingerprint(card.pan()), bin.cardType(), bin.cardRegion(), card.walletType());
+                card.expMonth(), card.expYear(), fingerprint(card.pan()), bin.cardType(), bin.cardRegion(), card.walletType(),
+                TestCards.chargebackAfterDays(card.pan()));
     }
 
     record WalletCard(String id, String label, String brand, String last4) {

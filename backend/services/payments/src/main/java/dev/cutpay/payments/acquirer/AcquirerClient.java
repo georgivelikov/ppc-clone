@@ -26,11 +26,11 @@ public class AcquirerClient {
 
     /** {@code cardType} / {@code cardRegion} come from the issuer BIN lookup and drive the fee schedule. */
     public record CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
-                           String cardType, String cardRegion, String walletType) {
+                           String cardType, String cardRegion, String walletType, Integer chargebackAfterDays) {
 
         public CardInfo(String token, String brand, String last4, int expMonth, int expYear, String fingerprint,
                         String cardType, String cardRegion) {
-            this(token, brand, last4, expMonth, expYear, fingerprint, cardType, cardRegion, null);
+            this(token, brand, last4, expMonth, expYear, fingerprint, cardType, cardRegion, null, null);
         }
     }
 
@@ -186,6 +186,25 @@ public class AcquirerClient {
         } catch (RuntimeException e) {
             log.warn("Acquirer {} call failed: {}", what, e.toString());
             return new AuthResult.Unavailable(e.getClass().getSimpleName());
+        }
+    }
+
+    /** The card network's decision on a dispute. */
+    public record DisputeVerdict(String outcome, String reason) {
+    }
+
+    record DisputeRequest(String disputeId, String evidence, int files) {
+    }
+
+    /** Empty when the network could not be asked, so the caller tries again later. */
+    public java.util.Optional<DisputeVerdict> evaluateDispute(String disputeId, String evidence, int files) {
+        try {
+            DisputeVerdict verdict = breaker.executeSupplier(() -> http.post().uri("/disputes/evaluate")
+                    .body(new DisputeRequest(disputeId, evidence, files)).retrieve().body(DisputeVerdict.class));
+            return java.util.Optional.ofNullable(verdict);
+        } catch (RuntimeException e) {
+            log.warn("Acquirer dispute call failed: {}", e.toString());
+            return java.util.Optional.empty();
         }
     }
 

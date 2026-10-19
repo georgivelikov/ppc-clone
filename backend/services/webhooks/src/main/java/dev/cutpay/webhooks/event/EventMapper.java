@@ -47,6 +47,9 @@ public final class EventMapper {
             case "PaymentMethodDetached" -> paymentMethod("payment_method.detached", p);
             case "SetupIntentSucceeded" -> setupIntent("setup_intent.succeeded", p);
             case "SetupIntentFailed" -> setupIntent("setup_intent.setup_failed", p);
+            case "DisputeOpened" -> dispute("charge.dispute.created", p);
+            case "DisputeEvidenceSubmitted" -> dispute("charge.dispute.updated", p);
+            case "DisputeClosed" -> dispute("charge.dispute.closed", p);
             case "PaymentLinkCreated" -> link("payment_link.created", p);
             case "PaymentLinkDeactivated" -> link("payment_link.deactivated", p);
             default -> Optional.empty();
@@ -63,6 +66,21 @@ public final class EventMapper {
         optional(object, "customer_email", p);
         optional(object, "failure_code", p);
         optional(object, "card_brand", p);
+        return Optional.of(new Mapped(type, object));
+    }
+
+    private static Optional<Mapped> dispute(String type, JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "dispute_id"));
+        object.put("object", "dispute");
+        object.put("payment_intent", text(p, "payment_id"));
+        object.put("status", text(p, "status"));
+        object.put("amount", p.path("amount").asLong());
+        object.put("currency", text(p, "currency"));
+        object.put("fee", p.path("fee").asLong());
+        object.put("reason", text(p, "reason"));
+        optional(object, "evidence_due_by", p);
+        optional(object, "outcome_reason", p);
         return Optional.of(new Mapped(type, object));
     }
 

@@ -3,6 +3,7 @@
     "label": "Основно меню",
     "home": "Начало",
     "payments": "Плащания",
+    "disputes": "Спорове",
     "balances": "Баланси",
     "payouts": "Изплащания",
     "links": "Връзки",
@@ -135,7 +136,11 @@
       "payout_failure": "Неуспешно изплащане",
       "transfer": "Прехвърляне",
       "transfer_reversal": "Върнато прехвърляне",
-      "conversion": "Обмяна"
+      "conversion": "Обмяна",
+      "dispute": "Спор",
+      "dispute_fee": "Такса за спор",
+      "dispute_reversal": "Спечелен спор",
+      "dispute_fee_reversal": "Върната такса за спор"
     }
   },
   "fx": {

@@ -33,6 +33,14 @@ final class TestCards {
     private TestCards() {
     }
 
+    /** The card whose holder disputes the payment a day after it was made. */
+    static final String DISPUTED_CARD = "4000000000000259";
+
+    /** How many days after a payment the cardholder disputes it, or {@code null} when they never do. */
+    static Integer chargebackAfterDays(String pan) {
+        return DISPUTED_CARD.equals(pan) ? 1 : null;
+    }
+
     static Outcome forPan(String pan) {
         return Optional.ofNullable(BY_PAN.get(pan)).orElse(Outcome.of(Behaviour.APPROVE));
     }

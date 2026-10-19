@@ -21,6 +21,11 @@ public class KafkaConfig {
     }
 
     @Bean
+    NewTopic disputeEvents() {
+        return TopicBuilder.name(Topics.DISPUTE).partitions(3).replicas(1).build();
+    }
+
+    @Bean
     NewTopic fxEvents() {
         return TopicBuilder.name(Topics.FX).partitions(3).replicas(1).build();
     }

@@ -14,6 +14,7 @@ public final class EventTypes {
             "payment_intent.payment_failed", "payment_intent.canceled",
             "refund.created", "charge.refunded", "refund.failed",
             "payout.created", "payout.paid", "payout.failed",
+            "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed",
             "payment_link.created", "payment_link.deactivated",
             "customer.created", "customer.updated", "customer.deleted",
             "payment_method.attached", "payment_method.detached",

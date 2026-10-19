@@ -7,6 +7,7 @@ export * from "./customers";
 export * from "./billing";
 export * from "./connected";
 export * from "./bnpl";
+export * from "./disputes";
 export * from "./fx";
 export * from "./paymentMethods";
 export * from "./security";

@@ -49,6 +49,7 @@ import type {
   UpdateCustomerInput,
 } from "./customers";
 import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
+import type { Dispute, DisputeList, DisputeListParams } from "./disputes";
 import type {
   NotificationEntry,
   NotificationPreferences,
@@ -569,6 +570,36 @@ export class ApiClient {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
   }
 
+  // --- disputes -----------------------------------------------------------
+
+  listDisputes(params: DisputeListParams = {}): Promise<DisputeList> {
+    return this.request("GET", `/v1/disputes${toQuery(params)}`);
+  }
+
+  getDispute(id: string, livemode = false): Promise<Dispute> {
+    return this.request("GET", `/v1/disputes/${encodeURIComponent(id)}${toQuery({ livemode })}`);
+  }
+
+  /** Sends the written evidence (and any files already attached) to be reviewed. It can be sent once. */
+  submitDisputeEvidence(id: string, evidence: string, livemode = false): Promise<Dispute> {
+    return this.request("POST", `/v1/disputes/${encodeURIComponent(id)}/evidence${toQuery({ livemode })}`, { evidence });
+  }
+
+  uploadDisputeFile(id: string, file: File, livemode = false): Promise<void> {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request("POST", `/v1/disputes/${encodeURIComponent(id)}/files${toQuery({ livemode })}`, form);
+  }
+
+  downloadDisputeFile(id: string, fileId: string, livemode = false): Promise<Blob> {
+    return this.fetchBlob(`/v1/disputes/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}${toQuery({ livemode })}`);
+  }
+
+  /** Gives up the dispute: the customer keeps the money. */
+  acceptDispute(id: string, livemode = false): Promise<Dispute> {
+    return this.request("POST", `/v1/disputes/${encodeURIComponent(id)}/accept${toQuery({ livemode })}`);
+  }
+
   // --- sign-in security ---------------------------------------------------
 
   forgotPassword(email: string): Promise<void> {
@@ -864,7 +895,9 @@ export class ApiClient {
   private async send(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<Response> {
     const useAuth = options.auth ?? true;
     const headers: Record<string, string> = { Accept: options.accept ?? "application/json" };
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+    // A form is sent as it is: the browser writes its own Content-Type, with the boundary between the parts.
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+    if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
     if (useAuth && this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     // One key per user action, reused on the automatic retry after a token refresh so it cannot double-submit.
     const idempotencyKey = options.idempotencyKey ?? (options.idempotent ? crypto.randomUUID() : undefined);
@@ -873,7 +906,7 @@ export class ApiClient {
     const response = await this.fetchImpl(this.baseUrl + path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       credentials: "include",
       signal: options.signal,
     });

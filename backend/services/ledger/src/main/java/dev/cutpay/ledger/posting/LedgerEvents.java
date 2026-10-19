@@ -9,6 +9,16 @@ public final class LedgerEvents {
     private LedgerEvents() {
     }
 
+    /** A cardholder disputed a payment: {@code amount} is held and {@code fee} charged. */
+    public record DisputeOpened(String eventId, Instant occurredAt, String merchantId, boolean livemode, String disputeId,
+                                String paymentId, long amount, String currency, long fee) {
+    }
+
+    /** The dispute was decided: {@code won} gives the merchant everything back, otherwise the customer keeps the money. */
+    public record DisputeClosed(String eventId, Instant occurredAt, String merchantId, boolean livemode, String disputeId,
+                                boolean won) {
+    }
+
     /** The part of a payment that goes to a connected account. */
     public record Transfer(String destination, long amount) {
     }

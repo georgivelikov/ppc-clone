@@ -43,9 +43,12 @@ public class RefundService {
     private final BnplClient bnpl;
     private final OutboxWriter outbox;
     private final TransactionTemplate tx;
+    private final org.springframework.jdbc.core.simple.JdbcClient jdbc;
 
     public RefundService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
-                         AcquirerClient acquirer, BnplClient bnpl, OutboxWriter outbox, TransactionTemplate tx) {
+                         AcquirerClient acquirer, BnplClient bnpl, OutboxWriter outbox, TransactionTemplate tx,
+                         org.springframework.jdbc.core.simple.JdbcClient jdbc) {
+        this.jdbc = jdbc;
         this.intents = intents;
         this.attempts = attempts;
         this.refunds = refunds;
@@ -85,6 +88,11 @@ public class RefundService {
                 && intent.getStatus() != dev.cutpay.payments.domain.PaymentStatus.PARTIALLY_REFUNDED) {
             throw ApiException.invalidRequest("payment_not_refundable",
                     "Only succeeded payments with an amount left can be refunded", "payment_intent");
+        }
+        // The money of a disputed payment is already held; refunding it as well would pay the customer twice.
+        if (jdbc.sql("SELECT count(*) FROM disputes WHERE payment_id = :p AND status IN ('needs_response', 'under_review')")
+                .param("p", intent.getId()).query(Integer.class).single() > 0) {
+            throw ApiException.conflict("payment_disputed", "This payment is being disputed, so it cannot be refunded", "payment_intent");
         }
         long amount = request.amount() != null ? request.amount() : intent.refundable();
         if (amount <= 0) {

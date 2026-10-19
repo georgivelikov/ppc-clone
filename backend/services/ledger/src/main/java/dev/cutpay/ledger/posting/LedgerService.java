@@ -2,6 +2,7 @@ package dev.cutpay.ledger.posting;
 
 import static dev.cutpay.ledger.posting.AccountType.BNPL_RECEIVABLE;
 import static dev.cutpay.ledger.posting.AccountType.CUSTOMER_FUNDS;
+import static dev.cutpay.ledger.posting.AccountType.DISPUTES_HELD;
 import static dev.cutpay.ledger.posting.AccountType.MERCHANT_AVAILABLE;
 import static dev.cutpay.ledger.posting.AccountType.MERCHANT_PENDING;
 import static dev.cutpay.ledger.posting.AccountType.MERCHANT_RESERVE;
@@ -17,6 +18,8 @@ import dev.cutpay.ledger.fees.PricingPlan;
 import dev.cutpay.ledger.fees.PricingPlans;
 import dev.cutpay.ledger.fx.FxService;
 import dev.cutpay.ledger.posting.LedgerEvents.BnplSettled;
+import dev.cutpay.ledger.posting.LedgerEvents.DisputeClosed;
+import dev.cutpay.ledger.posting.LedgerEvents.DisputeOpened;
 import dev.cutpay.ledger.posting.LedgerEvents.Payout;
 import dev.cutpay.ledger.posting.LedgerEvents.PaymentSucceeded;
 import dev.cutpay.ledger.posting.LedgerEvents.RefundSucceeded;
@@ -462,6 +465,121 @@ public class LedgerService {
             fx.settleInto(d.merchantId(), d.livemode(), d.currency(), d.remaining(), d.paymentId());
         }
         return due.size();
+    }
+
+    // --- disputes ---------------------------------------------------------------------------------
+
+    /**
+     * A cardholder disputed a payment. The disputed amount leaves the merchant's balance for the disputes account, from
+     * pending funds if the payment has not been released yet, otherwise from available; the fee comes out of available
+     * funds, which may leave them negative until later payments cover it.
+     */
+    @Transactional
+    public void onDisputeOpened(DisputeOpened d) {
+        if (!inbox.firstTime(d.eventId())) {
+            return;
+        }
+        boolean released = jdbc.sql("""
+                        SELECT released_at IS NOT NULL FROM pending_releases
+                         WHERE payment_id = :payment AND merchant_id = :merchant FOR UPDATE
+                        """)
+                .param("payment", d.paymentId()).param("merchant", d.merchantId())
+                .query(Boolean.class).optional()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Payment " + d.paymentId() + " is not in the ledger yet; dispute " + d.disputeId() + " will be retried"));
+        AccountType source = released ? MERCHANT_AVAILABLE : MERCHANT_PENDING;
+        List<Line> lines = new ArrayList<>();
+        lines.add(new Line(accounts.merchant(d.merchantId(), d.livemode(), source, d.currency()), d.amount()));
+        lines.add(new Line(accounts.platform(d.livemode(), DISPUTES_HELD, d.currency()), -d.amount()));
+        lines.add(new Line(accounts.merchant(d.merchantId(), d.livemode(), MERCHANT_AVAILABLE, d.currency()), d.fee()));
+        lines.add(new Line(accounts.platform(d.livemode(), PLATFORM_FEES, d.currency()), -d.fee()));
+        Optional<String> entryId = engine.post(new Entry(d.eventId(), "dispute_opened", "Dispute " + d.disputeId(),
+                d.merchantId(), d.livemode(), d.currency(), d.disputeId(), d.occurredAt(), lines));
+        if (entryId.isEmpty()) {
+            return;
+        }
+        jdbc.sql("""
+                        INSERT INTO ledger_disputes (dispute_id, merchant_id, livemode, payment_id, currency, amount, fee)
+                        VALUES (:id, :merchant, :livemode, :payment, :currency, :amount, :fee)
+                        """)
+                .param("id", d.disputeId()).param("merchant", d.merchantId()).param("livemode", d.livemode())
+                .param("payment", d.paymentId()).param("currency", d.currency()).param("amount", d.amount())
+                .param("fee", d.fee()).update();
+        insertBalanceTransaction(d.merchantId(), d.livemode(), d.currency(), "dispute", d.disputeId(), d.paymentId(),
+                -d.amount(), 0, -d.amount(), "Dispute " + d.disputeId() + " of " + d.paymentId(), entryId.get(), null,
+                d.occurredAt());
+        insertBalanceTransaction(d.merchantId(), d.livemode(), d.currency(), "dispute_fee", d.disputeId(), d.paymentId(),
+                -d.fee(), 0, -d.fee(), "Fee for dispute " + d.disputeId(), entryId.get(), null, d.occurredAt());
+        if (released) {
+            emitFundsAvailable(entryId.get() + "#hold", d.disputeId(), d.merchantId(), d.livemode(), d.currency(),
+                    -d.amount(), "dispute");
+        } else {
+            jdbc.sql("UPDATE pending_releases SET remaining = remaining - :amount WHERE payment_id = :payment AND merchant_id = :merchant")
+                    .param("amount", d.amount()).param("payment", d.paymentId()).param("merchant", d.merchantId()).update();
+        }
+        emitFundsAvailable(entryId.get() + "#fee", d.disputeId(), d.merchantId(), d.livemode(), d.currency(), -d.fee(),
+                "dispute_fee");
+        emitPosted(entryId.get(), "dispute_opened", d.disputeId(), d.merchantId(), d.livemode(), d.currency(),
+                -d.amount() - d.fee());
+    }
+
+    /** Won: the amount and the fee go back to the merchant. Lost: the amount goes to the customer, the fee stays. */
+    @Transactional
+    public void onDisputeClosed(DisputeClosed c) {
+        if (!inbox.firstTime(c.eventId())) {
+            return;
+        }
+        record Held(String paymentId, String currency, long amount, long fee, boolean closed) {
+        }
+        Held held = jdbc.sql("SELECT payment_id, currency, amount, fee, closed_at IS NOT NULL FROM ledger_disputes WHERE dispute_id = :id FOR UPDATE")
+                .param("id", c.disputeId())
+                .query((rs, n) -> new Held(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getLong(4), rs.getBoolean(5)))
+                .optional()
+                .orElseThrow(() -> new IllegalStateException("Dispute " + c.disputeId() + " is not in the ledger yet; it will be retried"));
+        if (held.closed()) {
+            return;
+        }
+        boolean released = Boolean.TRUE.equals(jdbc.sql("""
+                        SELECT released_at IS NOT NULL FROM pending_releases
+                         WHERE payment_id = :payment AND merchant_id = :merchant FOR UPDATE
+                        """)
+                .param("payment", held.paymentId()).param("merchant", c.merchantId())
+                .query(Boolean.class).optional().orElse(true));
+        List<Line> lines = new ArrayList<>();
+        lines.add(new Line(accounts.platform(c.livemode(), DISPUTES_HELD, held.currency()), held.amount()));
+        if (c.won()) {
+            AccountType back = released ? MERCHANT_AVAILABLE : MERCHANT_PENDING;
+            lines.add(new Line(accounts.merchant(c.merchantId(), c.livemode(), back, held.currency()), -held.amount()));
+            lines.add(new Line(accounts.platform(c.livemode(), PLATFORM_FEES, held.currency()), held.fee()));
+            lines.add(new Line(accounts.merchant(c.merchantId(), c.livemode(), MERCHANT_AVAILABLE, held.currency()), -held.fee()));
+        } else {
+            lines.add(new Line(accounts.platform(c.livemode(), CUSTOMER_FUNDS, held.currency()), -held.amount()));
+        }
+        Optional<String> entryId = engine.post(new Entry(c.eventId(), c.won() ? "dispute_won" : "dispute_lost",
+                "Dispute " + c.disputeId() + (c.won() ? " won" : " lost"), c.merchantId(), c.livemode(), held.currency(),
+                c.disputeId(), c.occurredAt(), lines));
+        jdbc.sql("UPDATE ledger_disputes SET closed_at = :now WHERE dispute_id = :id")
+                .param("now", Sql.ts(c.occurredAt())).param("id", c.disputeId()).update();
+        if (entryId.isEmpty() || !c.won()) {
+            return;
+        }
+        insertBalanceTransaction(c.merchantId(), c.livemode(), held.currency(), "dispute_reversal", c.disputeId(),
+                held.paymentId(), held.amount(), 0, held.amount(), "Dispute " + c.disputeId() + " won", entryId.get(), null,
+                c.occurredAt());
+        insertBalanceTransaction(c.merchantId(), c.livemode(), held.currency(), "dispute_fee_reversal", c.disputeId(),
+                held.paymentId(), held.fee(), 0, held.fee(), "Fee for dispute " + c.disputeId() + " returned", entryId.get(),
+                null, c.occurredAt());
+        if (released) {
+            emitFundsAvailable(entryId.get() + "#hold", c.disputeId(), c.merchantId(), c.livemode(), held.currency(),
+                    held.amount(), "dispute_won");
+        } else {
+            jdbc.sql("UPDATE pending_releases SET remaining = remaining + :amount WHERE payment_id = :payment AND merchant_id = :merchant")
+                    .param("amount", held.amount()).param("payment", held.paymentId()).param("merchant", c.merchantId()).update();
+        }
+        emitFundsAvailable(entryId.get() + "#fee", c.disputeId(), c.merchantId(), c.livemode(), held.currency(), held.fee(),
+                "dispute_fee_returned");
+        emitPosted(entryId.get(), "dispute_won", c.disputeId(), c.merchantId(), c.livemode(), held.currency(),
+                held.amount() + held.fee());
     }
 
     // --- payouts ----------------------------------------------------------------------------------

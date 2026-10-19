@@ -35,6 +35,8 @@ import { PaymentsPage } from "./pages/PaymentsPage";
 import { PayoutDetailPage } from "./pages/PayoutDetailPage";
 import { PayoutSettingsPage } from "./pages/PayoutSettingsPage";
 import { PaymentMethodsPage } from "./pages/PaymentMethodsPage";
+import { DisputeDetailPage } from "./pages/disputes/DisputeDetailPage";
+import { DisputesPage } from "./pages/disputes/DisputesPage";
 import { AccountSecurityPage } from "./pages/AccountSecurityPage";
 import { ActivityPage } from "./pages/SecurityPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
@@ -64,6 +66,8 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="payments/:id" element={<PaymentDetailPage />} />
+            <Route path="disputes" element={<DisputesPage />} />
+            <Route path="disputes/:id" element={<DisputeDetailPage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="connected-accounts" element={<ConnectedAccountsPage />} />
             <Route path="connected-accounts/:id" element={<ConnectedAccountDetailPage />} />

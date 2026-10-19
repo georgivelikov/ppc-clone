@@ -75,14 +75,16 @@ public class PaymentService {
     private final IdentityClient identity;
     private final Duration authorizationValidity;
     private final PaymentMethodSettings methodSettings;
+    private final dev.cutpay.payments.dispute.DisputeService disputes;
 
     public PaymentService(PaymentIntentRepository intents, PaymentAttemptRepository attempts, RefundRepository refunds,
                           AcquirerClient acquirer, OutboxWriter outbox, TransactionTemplate tx,
                           PaymentStreams streams, Clock clock, CustomerService customers,
                           PaymentTransferRepository transfers, IdentityClient identity,
-                          PaymentMethodSettings methodSettings,
+                          PaymentMethodSettings methodSettings, dev.cutpay.payments.dispute.DisputeService disputes,
                           @Value("${cutpay.payments.authorization-validity:P7D}") Duration authorizationValidity) {
         this.methodSettings = methodSettings;
+        this.disputes = disputes;
         this.streams = streams;
         this.clock = clock;
         this.customers = customers;
@@ -587,7 +589,8 @@ public class PaymentService {
         intent.startProcessing(email);
         var attempt = new PaymentAttempt(Ids.generate("att"), intent.getId(), card.brand(), card.last4(),
                 card.expMonth(), card.expYear(), card.fingerprint(), card.cardType(), card.cardRegion())
-                .withToken(token);
+                .withToken(token)
+                .disputedAfter(card.chargebackAfterDays());
         if (card.walletType() != null) {
             attempt.viaWallet(card.walletType());
             intent.useMethod(card.walletType());
@@ -760,6 +763,9 @@ public class PaymentService {
         }
         outbox.write(KafkaTopicsConfig.PAYMENT_TOPIC, eventType, intent.getId(), intent.getMerchantId(),
                 intent.isLivemode(), payload);
+        if ("PaymentSucceeded".equals(eventType)) {
+            disputes.scheduleIfPlanned(intent, attempt);
+        }
         // Screens watching this payment (the "charge with QR" page) hear about it as soon as it commits.
         streams.publishAfterCommit(intent.getId(), intent.getStatus().wire(), intent.getFailureCode());
     }

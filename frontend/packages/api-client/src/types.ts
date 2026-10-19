@@ -220,7 +220,11 @@ export type BalanceTransactionType =
   | "payout_failure"
   | "transfer"
   | "transfer_reversal"
-  | "conversion";
+  | "conversion"
+  | "dispute"
+  | "dispute_fee"
+  | "dispute_reversal"
+  | "dispute_fee_reversal";
 
 export interface BalanceTransaction {
   id: string;
