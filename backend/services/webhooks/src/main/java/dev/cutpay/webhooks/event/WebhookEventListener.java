@@ -19,7 +19,7 @@ class WebhookEventListener {
     }
 
     @KafkaListener(topics = {Topics.PAYMENT, Topics.REFUND, Topics.PAYOUT, Topics.LINK, Topics.CUSTOMER, Topics.SUBSCRIPTION,
-            Topics.INVOICE, Topics.DISPUTE})
+            Topics.INVOICE, Topics.DISPUTE, Topics.REPORT})
     void onEvent(String message) {
         JsonNode event = mapper.readTree(message);
         events.ingest(text(event, "event_id"), text(event, "event_type"), text(event, "merchant_id"),

@@ -10,3 +10,4 @@ CREATE DATABASE billing;
 CREATE DATABASE bnpl;
 CREATE DATABASE webhooks;
 CREATE DATABASE notifications;
+CREATE DATABASE reporting;

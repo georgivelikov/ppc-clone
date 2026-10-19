@@ -33,16 +33,17 @@ final class RolePolicy {
     /** Resources a role may read. Everything not listed is hidden from that role. */
     private static final Map<String, Set<String>> READS = Map.of(
             "developer", Set.of("payments", "payment_links", "customers", "connected_accounts", "billing", "bnpl",
-                    "refunds", "disputes", "balance", "payouts", "bank_accounts", "webhooks", "api_keys", "logs", "merchant"),
+                    "refunds", "disputes", "reporting", "balance", "payouts", "bank_accounts", "webhooks", "api_keys", "logs", "merchant"),
             "viewer", Set.of("payments", "payment_links", "customers", "connected_accounts", "billing", "bnpl",
-                    "refunds", "disputes", "balance", "payouts", "bank_accounts", "webhooks", "merchant"),
+                    "refunds", "disputes", "reporting", "balance", "payouts", "bank_accounts", "webhooks", "merchant"),
             "support", Set.of("payments", "payment_links", "customers", "billing", "bnpl", "refunds", "disputes", "merchant"));
 
     /** Resources a role may change. Writing implies reading, so each of these is also readable. */
     private static final Map<String, Set<String>> WRITES = Map.of(
             "developer", Set.of("payments", "payment_links", "customers", "connected_accounts", "billing", "bnpl",
-                    "webhooks", "api_keys", "logs"),
-            "viewer", Set.of(),
+                    "webhooks", "api_keys", "logs", "reporting"),
+            // Reports change nothing, so the people who only read can ask for them.
+            "viewer", Set.of("reporting"),
             "support", Set.of("refunds", "customers", "disputes"));
 
     private RolePolicy() {

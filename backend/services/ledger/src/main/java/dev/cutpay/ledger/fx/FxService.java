@@ -302,6 +302,7 @@ public class FxService {
 
     private void balanceTransaction(String merchantId, boolean livemode, String currency, String conversionId, long gross,
                                     long fee, long net, String description, String entryId, Instant now) {
+        String id = Ids.generate("txn");
         jdbc.sql("""
                         INSERT INTO balance_transactions (id, merchant_id, livemode, currency, type, source_id, parent_id,
                                                           gross, fee, net, description, journal_entry_id, available_on,
@@ -309,10 +310,12 @@ public class FxService {
                         VALUES (:id, :merchant, :livemode, :currency, 'conversion', :source, NULL, :gross, :fee, :net,
                                 :description, :entry, :now, :now)
                         """)
-                .param("id", Ids.generate("txn")).param("merchant", merchantId).param("livemode", livemode)
+                .param("id", id).param("merchant", merchantId).param("livemode", livemode)
                 .param("currency", currency).param("source", conversionId).param("gross", gross).param("fee", fee)
                 .param("net", net).param("description", description).param("entry", entryId).param("now", Sql.ts(now))
                 .update();
+        dev.cutpay.ledger.posting.BalanceTransactionEvent.emit(outbox, id, merchantId, livemode, currency, "conversion",
+                conversionId, null, gross, fee, net, description, now);
     }
 
     private void fundsAvailable(String entryId, String conversionId, String merchantId, boolean livemode, String currency,

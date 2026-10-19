@@ -1,0 +1,43 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: reporting
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reporting
+    username: cutpay
+    password: cutpay
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+    consumer:
+      group-id: reporting
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+cutpay:
+  reporting:
+    # Signs the download links of finished reports. Anyone holding a valid link can fetch the file until it expires.
+    signing-secret: dev-only-secret-change-me-before-sharing-this-anywhere
+    link-ttl: PT15M
+    job-poll-interval: PT2S
+    dashboard-url: http://localhost:5173

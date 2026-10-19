@@ -29,4 +29,5 @@ include(
     "services:bnpl-sim",
     "services:notifications",
     "services:kyc-sim",
+    "services:reporting",
 )

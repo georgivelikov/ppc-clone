@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { useSession } from "../auth/AuthProvider";
 import { useTestMode } from "../layout/testMode";
+import { Insights } from "./reports/Insights";
 
 const STEPS = ["first", "balance", "connect"] as const;
 
@@ -50,6 +51,8 @@ export function HomePage() {
           <p className="mt-2 text-2xl font-semibold">{t("home.none")}</p>
         </Card>
       </div>
+
+      <Insights days={30} />
 
       {subscribers + left > 0 && (
         <div className="grid gap-4 sm:grid-cols-3" aria-label={t("home.recurring")}>

@@ -33,6 +33,14 @@ class RolePolicyTest {
     }
 
     @Test
+    void viewersAndDevelopersCanAskForReportsButSupportCannot() {
+        assertThat(can("viewer", HttpMethod.POST, "/v1/reporting/report_runs")).isTrue();
+        assertThat(can("developer", HttpMethod.POST, "/v1/reporting/report_runs")).isTrue();
+        assertThat(can("viewer", HttpMethod.GET, "/v1/reporting/overview")).isTrue();
+        assertThat(can("support", HttpMethod.GET, "/v1/reporting/overview")).isFalse();
+    }
+
+    @Test
     void viewersDoNotSeeKeysOrTheTeam() {
         assertThat(can("viewer", HttpMethod.GET, "/v1/api_keys")).isFalse();
         assertThat(can("viewer", HttpMethod.GET, "/v1/team/members")).isFalse();

@@ -25,6 +25,8 @@ public class GatewayConfig {
                         .pathMatchers("/checkout/**", "/vault/**", "/links/**", "/invoices/**").permitAll()
                         // Buy-now-pay-later providers report their decisions here; the bnpl service checks each callback itself.
                         .pathMatchers("/bnpl/callback/**").permitAll()
+                        // A finished report is fetched with a signed link that expires; the reporting service checks the signature.
+                        .pathMatchers("/v1/reporting/files/**").permitAll()
                         .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }))

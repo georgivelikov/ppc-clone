@@ -650,6 +650,7 @@ public class LedgerService {
                                           String sourceId, String parentId, long gross, long fee, long net,
                                           String description, String journalEntryId, Instant availableOn,
                                           Instant createdAt) {
+        String id = Ids.generate("txn");
         jdbc.sql("""
                         INSERT INTO balance_transactions (id, merchant_id, livemode, currency, type, source_id,
                                                           parent_id, gross, fee, net, description,
@@ -657,7 +658,7 @@ public class LedgerService {
                         VALUES (:id, :merchant, :livemode, :currency, :type, :source, :parent, :gross, :fee, :net,
                                 :description, :entry, :availableOn, :createdAt)
                         """)
-                .param("id", Ids.generate("txn"))
+                .param("id", id)
                 .param("merchant", merchantId)
                 .param("livemode", livemode)
                 .param("currency", currency)
@@ -672,6 +673,8 @@ public class LedgerService {
                 .param("availableOn", Sql.ts(availableOn), java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
                 .param("createdAt", Sql.ts(createdAt))
                 .update();
+        BalanceTransactionEvent.emit(outbox, id, merchantId, livemode, currency, type, sourceId, parentId, gross, fee, net,
+                description, createdAt);
     }
 
     /** Tells other services a journal entry exists; {@code amount} is its effect on the merchant's balance. */

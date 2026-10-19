@@ -44,6 +44,10 @@ spring:
               uri: ${cutpay.upstreams.identity}
               predicates:
                 - Path=/me,/v1/onboarding,/v1/onboarding/**,/v1/team,/v1/team/**,/v1/audit_events,/v1/security,/v1/security/**,/v1/merchant,/v1/api_keys,/v1/api_keys/**,/v1/connected_accounts,/v1/connected_accounts/**,/.well-known/**
+            - id: reporting-api
+              uri: ${cutpay.upstreams.reporting}
+              predicates:
+                - Path=/v1/reporting/**
             - id: notifications-api
               uri: ${cutpay.upstreams.notifications}
               predicates:
@@ -169,3 +173,4 @@ cutpay:
     billing: http://localhost:8088
     bnpl: http://localhost:8091
     notifications: http://localhost:8092
+    reporting: http://localhost:8094

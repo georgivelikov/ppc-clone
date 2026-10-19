@@ -37,6 +37,7 @@ import { PayoutSettingsPage } from "./pages/PayoutSettingsPage";
 import { PaymentMethodsPage } from "./pages/PaymentMethodsPage";
 import { DisputeDetailPage } from "./pages/disputes/DisputeDetailPage";
 import { DisputesPage } from "./pages/disputes/DisputesPage";
+import { ReportsPage } from "./pages/reports/ReportsPage";
 import { OnboardingPage } from "./pages/onboarding/OnboardingPage";
 import { AccountSecurityPage } from "./pages/AccountSecurityPage";
 import { ActivityPage } from "./pages/SecurityPage";
@@ -68,6 +69,7 @@ export function App() {
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="payments/:id" element={<PaymentDetailPage />} />
             <Route path="onboarding" element={<OnboardingPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="disputes" element={<DisputesPage />} />
             <Route path="disputes/:id" element={<DisputeDetailPage />} />
             <Route path="customers" element={<CustomersPage />} />

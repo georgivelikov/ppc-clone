@@ -47,6 +47,7 @@ public final class EventMapper {
             case "PaymentMethodDetached" -> paymentMethod("payment_method.detached", p);
             case "SetupIntentSucceeded" -> setupIntent("setup_intent.succeeded", p);
             case "SetupIntentFailed" -> setupIntent("setup_intent.setup_failed", p);
+            case "ReportRunSucceeded" -> Optional.of(new Mapped("reporting.report_run.succeeded", reportRun(p)));
             case "DisputeOpened" -> dispute("charge.dispute.created", p);
             case "DisputeEvidenceSubmitted" -> dispute("charge.dispute.updated", p);
             case "DisputeClosed" -> dispute("charge.dispute.closed", p);
@@ -67,6 +68,16 @@ public final class EventMapper {
         optional(object, "failure_code", p);
         optional(object, "card_brand", p);
         return Optional.of(new Mapped(type, object));
+    }
+
+    /** Only that it is ready: the file itself is fetched with a signed link from the API. */
+    private static Map<String, Object> reportRun(JsonNode p) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put("id", text(p, "report_run_id"));
+        object.put("object", "report_run");
+        object.put("report_type", text(p, "report_type"));
+        object.put("status", "succeeded");
+        return object;
     }
 
     private static Optional<Mapped> dispute(String type, JsonNode p) {

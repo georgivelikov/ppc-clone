@@ -50,6 +50,7 @@ import type {
 } from "./customers";
 import type { PaymentMethodSettings, UpdatePaymentMethodSettingsInput } from "./paymentMethods";
 import type { Dispute, DisputeList, DisputeListParams } from "./disputes";
+import type { CreateReportRunInput, Overview, ReportRun, ReportType } from "./reporting";
 import type {
   Application,
   ApplicationDocument,
@@ -576,6 +577,24 @@ export class ApiClient {
   /** Daily card volume and fees per currency; days without payments are included as zeros. */
   balanceSummary(days = 14, livemode = false): Promise<BalanceSummary> {
     return this.request("GET", `/v1/balance_summary${toQuery({ days, livemode })}`);
+  }
+
+  // --- reporting ----------------------------------------------------------
+
+  getOverview(days = 30, livemode = false): Promise<Overview> {
+    return this.request("GET", `/v1/reporting/overview${toQuery({ days, livemode })}`);
+  }
+
+  async listReportTypes(): Promise<ReportType[]> {
+    return (await this.request<{ data: ReportType[] }>("GET", "/v1/reporting/report_types")).data;
+  }
+
+  createReportRun(input: CreateReportRunInput, livemode = false): Promise<ReportRun> {
+    return this.request("POST", `/v1/reporting/report_runs${toQuery({ livemode })}`, input);
+  }
+
+  async listReportRuns(livemode = false): Promise<ReportRun[]> {
+    return (await this.request<{ data: ReportRun[] }>("GET", `/v1/reporting/report_runs${toQuery({ livemode })}`)).data;
   }
 
   // --- onboarding ---------------------------------------------------------

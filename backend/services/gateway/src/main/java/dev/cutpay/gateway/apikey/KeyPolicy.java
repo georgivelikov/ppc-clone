@@ -33,6 +33,7 @@ final class KeyPolicy {
             Map.entry("/v1/setup_intents", "customers"),
             Map.entry("/v1/refunds", "refunds"),
             Map.entry("/v1/disputes", "disputes"),
+            Map.entry("/v1/reporting", "reporting"),
             Map.entry("/v1/balance", "balance"),
             Map.entry("/v1/balance_transactions", "balance"),
             Map.entry("/v1/balance_summary", "balance"),
