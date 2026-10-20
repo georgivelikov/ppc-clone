@@ -44,7 +44,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 5 | [Billing](docs/plans/phase-05-billing.md) — saved cards, pre-auth, subscriptions, invoices, split payments | ✅ Built |
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine, circuit breakers | ✅ Built |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ✅ Built |
-| 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | 🚧 In progress (team and roles built) |
+| 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ✅ Built |
 | 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | ⏳ Planned |
 
 ## Repository layout (target)
@@ -169,6 +169,13 @@ To scan a code with a phone on the same network, serve the checkout on your comp
 - The checkout offers **Wallet** (a pretend Apple Pay and Google Pay: pick a stored test card, confirm "on the device"; no 3-D Secure) and, for payments in PLN, **BLIK** (type `777123`, then approve in the pretend bank app at `/vault/sim/blik-app`; `000000` is declined). Which methods a payment offers is one rule list, and Settings, Payment methods switches wallets and BLIK off ([ADR 0022](docs/adr/0022-wallets-and-blik.md)).
 - Money stays in the currency it was paid in. **Balances** shows every currency, converts available money with a quote that holds a rate for 15 minutes, and can convert other currencies by itself when they become available. A conversion costs 1% over the (simulated) market rate and is posted so that the books balance in every currency ([ADR 0023](docs/adr/0023-fx-conversions-in-the-ledger.md)).
 - The checkout speaks English, Bulgarian, Romanian, Polish, Hungarian and Greek (`?locale=pl`, or the `locale` of the payment, or the browser's language), and writes prices the way each does; in Bulgarian a euro price also shows leva. The dashboard is in English and Bulgarian. `pnpm i18n:check` finds missing translations ([ADR 0024](docs/adr/0024-localisation.md)).
+
+## Running the business
+- **Team and security**: invite people with a role (owner, admin, developer, viewer, support); two-factor sign-in, password reset, email confirmation and a list of sessions ([ADR 0025](docs/adr/0025-team-roles-and-permissions.md), [0026](docs/adr/0026-notifications-and-sign-in-security.md)). Emails land in Mailpit at http://localhost:8025.
+- **Disputes**: pay with `4000 0000 0000 0259`, move the payments clock a day (`POST :8082/admin/clock/advance?days=1`), answer in Disputes (evidence containing `winning_evidence` wins) ([ADR 0027](docs/adr/0027-disputes.md)).
+- **Onboarding**: Settings shows a banner until the business is approved; document numbers ending in 0 are rejected and in 9 ask for a better photo ([ADR 0028](docs/adr/0028-onboarding-and-kyc.md)).
+- **Reports**: Reports shows the last 30 days and makes CSV or Excel files ([ADR 0029](docs/adr/0029-reporting-read-model.md)).
+- **Back-office** at http://localhost:5177: `admin@cutpay.test`, `admin2@cutpay.test` and `reviewer@cutpay.test`, password `staff-password-123` ([ADR 0030](docs/adr/0030-back-office.md)).
 
 Billing, ledger and payouts run on simulated clocks. To watch a trial end and the next month renew:
 

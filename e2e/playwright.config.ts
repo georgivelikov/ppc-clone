@@ -133,6 +133,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      command: `${pnpm} --filter @cutpay/backoffice dev`,
+      cwd: "../frontend",
+      url: "http://localhost:5177",
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
       command: `${pnpm} --filter @cutpay/checkout dev`,
       cwd: "../frontend",
       url: "http://localhost:5174",

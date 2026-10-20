@@ -1,0 +1,4 @@
+@import "@cutpay/ui/styles.css";
+
+/* Tailwind only scans this app by default; the shared components live in the ui package. */
+@source "../../../packages/ui/src";

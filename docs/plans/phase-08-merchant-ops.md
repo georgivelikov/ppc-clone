@@ -77,13 +77,15 @@ New topics: `onboarding.events`, `dispute.events`, `audit.events`, `notification
 - Dropping and rebuilding reporting DB from Kafka replay gives identical numbers.
 - Tests: permission matrix tests, onboarding state machine tests, Playwright `onboarding.spec.ts`, `dispute.spec.ts`, `team.spec.ts`.
 
-## Progress
-The phase is built in slices, each one tested and pushed on its own.
+## As built
+Status: built, in seven slices. Decisions are in [ADR 0025](../adr/0025-team-roles-and-permissions.md) (team, roles, audit), [0026](../adr/0026-notifications-and-sign-in-security.md) (notifications, two-factor, sessions), [0027](../adr/0027-disputes.md) (disputes), [0028](../adr/0028-onboarding-and-kyc.md) (onboarding), [0029](../adr/0029-reporting-read-model.md) (reporting) and [0030](../adr/0030-back-office.md) (back-office). Where the build differs from the plan above:
 
-1. **Team, roles, audit trail** (built, [ADR 0025](../adr/0025-team-roles-and-permissions.md)). Roles owner, admin, developer, viewer and support; the permission matrix at the gateway (`RolePolicy`) and the finer rules in identity (`TeamRules`); invitations by link (the link is shown once; email waits for notifications); changing and removing members; `audit_events` and the `audit.events` topic; dashboard Settings, Team and Activity; `team.spec.ts` (viewer cannot refund, support can). Not yet: TOTP, email verification, password reset, session list.
-2. Sign-in security: TOTP, password reset, email verification, sessions.
-3. Disputes.
-4. Onboarding and KYC with `kyc-sim`.
-5. Notifications (Mailpit).
-6. Reporting and the read model.
-7. Back-office.
+- **Team and roles.** Owner, admin, developer, viewer and support. The matrix is enforced at the gateway (`RolePolicy`) with the finer rules in identity (`TeamRules`) instead of `@PreAuthorize` with scopes. Invitations are links shown once and emailed. Keycloak was not adopted (ADR 0025).
+- **Sign-in security.** Email confirmation, password reset, TOTP written by hand with recovery codes, a list of sessions that can be ended, and live API keys that need two-factor for owners and admins. The audit log is in Settings, Activity.
+- **Notifications.** A service of its own sends through a hand-written SMTP client to Mailpit, in English and Bulgarian, with a log, retries with backoff and a dead state, and per-person preferences. Thymeleaf and MJML were not used (simple `{{value}}` templates).
+- **Disputes.** In the payments service. The test card `4000 0000 0000 0259` is disputed a day (simulated) after it pays; evidence is text and files; the network decides by the words (`winning_evidence` wins). The ledger moves the amount to a `disputes_held` account and charges a fee (about 15 euros), gives both back on a win. Webhooks `charge.dispute.created/updated/closed`.
+- **Onboarding.** In identity, with a pretend provider `kyc-sim` (register lookup, document checks by last digit, screening). Files are stored in the database, not MinIO; "signed download links" are HMAC links made by the reporting service (ADR 0027, 0029). Live mode is gated by live API keys, not by every endpoint.
+- **Reporting.** A read model from Kafka (including a new `BalanceTransactionRecorded` event from the ledger), report runs as CSV or Excel written without a library, and a rebuild by replay that gives the same fingerprint. The home page and Reports show volume, fees, success rate, decline reasons, method mix and the checkout funnel.
+- **Back-office.** Staff realm, review queue, flags, payout holds, four-eyes adjustments, dispute oversight, audit, health links.
+- **Not built.** Per-payment e-signature beyond a ticked box and a typed name; Thymeleaf/MJML; MinIO; XLSX through Apache POI; a live health dashboard; ongoing KYC monitoring; the `@PreAuthorize` scopes; staff MFA; translating the new screens (the dashboard shell and sign-in remain bilingual, the new pages are English).
+- **Tests.** Unit: the permission matrix, TOTP against the RFC vectors, risk scoring, the report writer and signed links, templates. Integration (Postgres, Kafka): team, security, notifications, disputes in payments and in the ledger, onboarding with a stand-in provider, the read model with a rebuild, staff and adjustments, payout holds. Playwright: `team`, `security`, `dispute`, `onboarding`, `reporting` and `backoffice`.
