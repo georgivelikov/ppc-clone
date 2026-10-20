@@ -34,6 +34,10 @@ management:
         enabled: true
 
 cutpay:
+  staff:
+    # Local sign-ins for the back-office, made on first start: admin@, admin2@ and reviewer@cutpay.test. Turn off outside development.
+    seed: true
+    seed-password: staff-password-123
   kyc:
     # The pretend identity-verification provider and company registry.
     url: http://localhost:8093

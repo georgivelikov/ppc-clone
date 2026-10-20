@@ -72,6 +72,28 @@ public class JwtService {
         return new IssuedToken(token, API_KEY_TOKEN_TTL.toSeconds());
     }
 
+    static final java.time.Duration STAFF_TOKEN_TTL = java.time.Duration.ofHours(8);
+
+    /**
+     * A token for one of Cutpay's own people. It names no business, carries the role {@code staff_reviewer} or
+     * {@code staff_admin} and {@code realm=staff}, and the gateway lets it reach only the back-office routes.
+     */
+    public IssuedToken issueForStaff(String staffId, String email, String role) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .subject(staffId)
+                .issuedAt(now)
+                .expiresAt(now.plus(STAFF_TOKEN_TTL))
+                .claim("email", email)
+                .claim("role", "staff_" + role)
+                .claim("realm", "staff")
+                .build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(this.keyId).build();
+        String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return new IssuedToken(token, STAFF_TOKEN_TTL.toSeconds());
+    }
+
     public record IssuedToken(String value, long expiresInSeconds) {
     }
 }

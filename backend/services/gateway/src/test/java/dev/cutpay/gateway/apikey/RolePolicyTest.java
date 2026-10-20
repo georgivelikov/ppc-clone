@@ -96,6 +96,21 @@ class RolePolicyTest {
     }
 
     @Test
+    void staffReachOnlyTheBackOfficeAndBusinessesNeverDo() {
+        for (String role : new String[] {"staff_admin", "staff_reviewer"}) {
+            assertThat(can(role, HttpMethod.GET, "/v1/staff/merchants")).isTrue();
+            assertThat(can(role, HttpMethod.POST, "/v1/staff/adjustments")).isTrue();
+            assertThat(can(role, HttpMethod.GET, "/v1/balance")).isFalse();
+            assertThat(can(role, HttpMethod.POST, "/v1/refunds")).isFalse();
+            assertThat(can(role, HttpMethod.GET, "/me")).isFalse();
+        }
+        for (String role : new String[] {"owner", "admin", "developer", "viewer", "support", "api"}) {
+            assertThat(can(role, HttpMethod.GET, "/v1/staff/merchants")).as(role).isFalse();
+            assertThat(can(role, HttpMethod.POST, "/v1/staff/adjustments/adj_1/approve")).as(role).isFalse();
+        }
+    }
+
+    @Test
     void sessionRoutesAreOpenToEveryMember() {
         assertThat(can("viewer", HttpMethod.GET, "/me")).isTrue();
         assertThat(can("support", HttpMethod.POST, "/auth/logout")).isTrue();

@@ -29,7 +29,14 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**", "/.well-known/**", "/internal/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/v1/staff/**").authenticated()
+                        // Cutpay staff are a realm of their own: their tokens name no business and open nothing of one.
+                        .anyRequest().access((authentication, context) -> new org.springframework.security.authorization.AuthorizationDecision(
+                                authentication.get() instanceof org.springframework.security.authentication.AbstractAuthenticationToken token
+                                        && token.isAuthenticated()
+                                        && !(token.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt
+                                        && "staff".equals(jwt.getClaimAsString("realm")))
+                                        && !(token instanceof org.springframework.security.authentication.AnonymousAuthenticationToken))))
                 .oauth2ResourceServer(oauth -> oauth.jwt(withDefaults()));
         return http.build();
     }

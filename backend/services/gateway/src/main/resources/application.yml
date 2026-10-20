@@ -40,6 +40,18 @@ spring:
                     redis-rate-limiter.replenishRate: 5
                     redis-rate-limiter.burstCapacity: 10
                     redis-rate-limiter.requestedTokens: 1
+            - id: staff-ledger
+              uri: ${cutpay.upstreams.ledger}
+              predicates:
+                - Path=/v1/staff/adjustments,/v1/staff/adjustments/**
+            - id: staff-payments
+              uri: ${cutpay.upstreams.payments}
+              predicates:
+                - Path=/v1/staff/disputes
+            - id: staff-identity
+              uri: ${cutpay.upstreams.identity}
+              predicates:
+                - Path=/v1/staff/me,/v1/staff/merchants,/v1/staff/merchants/**,/v1/staff/applications,/v1/staff/applications/**,/v1/staff/audit
             - id: identity-api
               uri: ${cutpay.upstreams.identity}
               predicates:

@@ -150,6 +150,9 @@ public class PayoutService {
      */
     @Transactional
     public Optional<Created> createScheduledPayout(Group group) {
+        if (isFrozen(group.merchantId())) {
+            return Optional.empty(); // held by the back-office: the money waits
+        }
         ensureSchedule(group.merchantId());
         record Schedule(String schedule, String anchor) {
         }
@@ -201,6 +204,23 @@ public class PayoutService {
         return created;
     }
 
+    public boolean isFrozen(String merchantId) {
+        return jdbc.sql("SELECT count(*) FROM payout_freezes WHERE merchant_id = :m").param("m", merchantId).query(Integer.class).single() > 0;
+    }
+
+    /** The back-office put payouts on hold, or lifted the hold. Safe to receive twice. */
+    @Transactional
+    public void onFreezeChanged(String eventId, String merchantId, boolean frozen) {
+        if (!inbox.firstTime(eventId)) {
+            return;
+        }
+        if (frozen) {
+            jdbc.sql("INSERT INTO payout_freezes (merchant_id) VALUES (:m) ON CONFLICT DO NOTHING").param("m", merchantId).update();
+        } else {
+            jdbc.sql("DELETE FROM payout_freezes WHERE merchant_id = :m").param("m", merchantId).update();
+        }
+    }
+
     // --- instant payouts --------------------------------------------------------------------------
 
     /** What "Pay out now" would do right now: the payable amount, the fee and what reaches the bank. */
@@ -217,6 +237,9 @@ public class PayoutService {
     /** A manual payout of everything payable, for a fee. */
     @Transactional
     public Created createInstantPayout(Group group) {
+        if (isFrozen(group.merchantId())) {
+            throw ApiException.forbidden("payouts_frozen", "Payouts are on hold for this business. Contact support.");
+        }
         String bankAccount = bankAccountFor(group).orElseThrow(() -> ApiException.invalidRequest(
                 "no_bank_account", "Add a bank account in the payout settings first.", null));
         return createPayout(group, bankAccount, "instant", today())

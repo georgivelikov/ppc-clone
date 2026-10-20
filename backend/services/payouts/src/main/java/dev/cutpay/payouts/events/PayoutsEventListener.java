@@ -27,7 +27,9 @@ class PayoutsEventListener {
     void onMerchantEvent(String message) {
         JsonNode event = mapper.readTree(message);
         String type = text(event, "event_type");
-        if ("MerchantCreated".equals(type)) {
+        if ("PayoutsFrozen".equals(type) || "PayoutsUnfrozen".equals(type)) {
+            payouts.onFreezeChanged(text(event, "event_id"), text(event, "merchant_id"), "PayoutsFrozen".equals(type));
+        } else if ("MerchantCreated".equals(type)) {
             payouts.onMerchantCreated(text(event, "event_id"), text(event, "merchant_id"));
         } else if ("ConnectedAccountCreated".equals(type) || "ConnectedAccountUpdated".equals(type)) {
             JsonNode payload = event.path("payload");

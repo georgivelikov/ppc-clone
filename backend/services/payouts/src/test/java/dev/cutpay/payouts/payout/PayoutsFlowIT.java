@@ -115,6 +115,25 @@ class PayoutsFlowIT {
     }
 
     @Test
+    void aFrozenBusinessKeepsItsMoneyUntilTheHoldIsLifted() throws Exception {
+        fundsAvailable(5_000);
+        addBankAccount(WORKING_IBAN);
+        payouts.onFreezeChanged("evt_" + UUID.randomUUID(), merchant, true);
+        payouts.onFreezeChanged("evt_" + UUID.randomUUID(), merchant, true); // twice is the same as once
+
+        assertThat(payouts.isFrozen(merchant)).isTrue();
+        assertThat(payouts.createScheduledPayout(group)).isEmpty();
+        mvc.perform(post("/v1/payouts").with(asMerchant()).param("currency", "EUR"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("payouts_frozen"));
+        assertThat(payoutCount()).isZero();
+
+        payouts.onFreezeChanged("evt_" + UUID.randomUUID(), merchant, false);
+        assertThat(payouts.isFrozen(merchant)).isFalse();
+        assertThat(payouts.createScheduledPayout(group)).isPresent(); // the money waited and now goes
+        assertThat(payoutCount()).isEqualTo(1);
+    }
+
+    @Test
     void availableFundsArePaidOutOnceABankAccountExists() throws Exception {
         fundsAvailable(9_861);
 

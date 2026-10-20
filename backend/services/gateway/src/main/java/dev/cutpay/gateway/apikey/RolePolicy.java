@@ -54,6 +54,14 @@ final class RolePolicy {
         if (role == null) {
             return true;
         }
+        // Cutpay staff have a realm of their own: the back-office routes and nothing of any business.
+        boolean backOffice = path.equals("/v1/staff") || path.startsWith("/v1/staff/");
+        if (role.startsWith("staff_")) {
+            return backOffice;
+        }
+        if (backOffice) {
+            return false;
+        }
         if (API.equals(role) || EVERYTHING.contains(role)) {
             return true;
         }

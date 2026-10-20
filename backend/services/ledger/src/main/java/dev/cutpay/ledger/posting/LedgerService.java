@@ -467,6 +467,28 @@ public class LedgerService {
         return due.size();
     }
 
+    // --- manual adjustments -----------------------------------------------------------------------
+
+    /**
+     * An approved correction by staff. A positive amount pays the merchant out of the platform's own cash, a negative one takes
+     * it back. Posted once per adjustment (the id is the event id), into available funds.
+     */
+    @Transactional
+    public void postAdjustment(String adjustmentId, String merchantId, boolean livemode, String currency, long amount, String reason) {
+        Instant now = clock.instant();
+        List<Line> lines = List.of(
+                new Line(accounts.merchant(merchantId, livemode, MERCHANT_AVAILABLE, currency), -amount),
+                new Line(accounts.platform(livemode, PLATFORM_CASH, currency), amount));
+        Optional<String> entryId = engine.post(new Entry("adj_" + adjustmentId, "adjustment", "Adjustment: " + reason, merchantId,
+                livemode, currency, adjustmentId, now, lines));
+        entryId.ifPresent(id -> {
+            insertBalanceTransaction(merchantId, livemode, currency, "adjustment", adjustmentId, null, amount, 0, amount,
+                    "Adjustment: " + reason, id, null, now);
+            emitFundsAvailable(id, adjustmentId, merchantId, livemode, currency, amount, "adjustment");
+            emitPosted(id, "adjustment", adjustmentId, merchantId, livemode, currency, amount);
+        });
+    }
+
     // --- disputes ---------------------------------------------------------------------------------
 
     /**
