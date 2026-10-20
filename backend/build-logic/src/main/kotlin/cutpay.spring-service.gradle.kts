@@ -14,6 +14,7 @@ dependencyManagement {
 }
 
 dependencies {
+    implementation(project(":libs:common-observability"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")

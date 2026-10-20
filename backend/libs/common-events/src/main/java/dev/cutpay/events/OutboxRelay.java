@@ -2,7 +2,9 @@ package dev.cutpay.events;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,11 +28,14 @@ public class OutboxRelay {
     private final JdbcClient jdbc;
     private final KafkaTemplate<String, String> kafka;
     private final TransactionTemplate tx;
+    private final TraceLink trace;
 
-    public OutboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx) {
+    public OutboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
+                       TraceLink trace) {
         this.jdbc = jdbc;
         this.kafka = kafka;
         this.tx = tx;
+        this.trace = trace;
     }
 
     @Scheduled(fixedDelayString = "${cutpay.outbox.poll-interval:PT0.5S}")
@@ -44,7 +49,7 @@ public class OutboxRelay {
 
     private int publishBatch() {
         List<OutboxRow> rows = jdbc.sql("""
-                        SELECT id, event_id, topic, event_key, event_type, payload
+                        SELECT id, event_id, topic, event_key, event_type, payload, traceparent
                         FROM outbox
                         WHERE published_at IS NULL
                         ORDER BY id
@@ -53,7 +58,8 @@ public class OutboxRelay {
                         """)
                 .param("limit", BATCH_SIZE)
                 .query((rs, n) -> new OutboxRow(rs.getLong("id"), rs.getString("event_id"), rs.getString("topic"),
-                        rs.getString("event_key"), rs.getString("event_type"), rs.getString("payload")))
+                        rs.getString("event_key"), rs.getString("event_type"), rs.getString("payload"),
+                        rs.getString("traceparent")))
                 .list();
 
         for (OutboxRow row : rows) {
@@ -61,10 +67,7 @@ public class OutboxRelay {
             record.headers().add("event_id", row.eventId().getBytes(StandardCharsets.UTF_8));
             record.headers().add("event_type", row.eventType().getBytes(StandardCharsets.UTF_8));
             try {
-                kafka.send(record).get(10, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while publishing outbox event " + row.eventId(), e);
+                trace.within("outbox publish", row.traceparent(), () -> send(record));
             } catch (Exception e) {
                 // Roll back so published_at stays NULL for this batch; the next poll retries it.
                 log.warn("Failed to publish outbox event {} to {}: {}", row.eventId(), row.topic(), e.toString());
@@ -75,6 +78,18 @@ public class OutboxRelay {
         return rows.size();
     }
 
-    private record OutboxRow(long id, String eventId, String topic, String key, String eventType, String payload) {
+    private void send(ProducerRecord<String, String> record) {
+        try {
+            kafka.send(record).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while publishing to " + record.topic(), e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private record OutboxRow(long id, String eventId, String topic, String key, String eventType, String payload,
+                           String traceparent) {
     }
 }

@@ -15,6 +15,7 @@ include(
     "libs:common-web",
     "libs:common-events",
     "libs:common-test",
+    "libs:common-observability",
     "libs:webhook-signature",
     "services:identity",
     "services:gateway",

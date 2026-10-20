@@ -9,7 +9,8 @@ CREATE TABLE outbox (
     event_type   TEXT        NOT NULL,
     payload      TEXT        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    published_at TIMESTAMPTZ
+    published_at TIMESTAMPTZ,
+    traceparent  TEXT -- W3C trace context of the writer; the relay continues the trace from it
 );
 CREATE INDEX outbox_unpublished_idx ON outbox (id) WHERE published_at IS NULL;
 

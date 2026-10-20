@@ -1,5 +1,8 @@
 package dev.cutpay.events;
 
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -19,8 +22,14 @@ public class CommonEventsAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    OutboxWriter outboxWriter(JdbcClient jdbc, JsonMapper mapper) {
-        return new OutboxWriter(jdbc, mapper);
+    TraceLink traceLink(ObjectProvider<Tracer> tracer, ObjectProvider<Propagator> propagator) {
+        return new TraceLink(tracer, propagator);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    OutboxWriter outboxWriter(JdbcClient jdbc, JsonMapper mapper, TraceLink trace) {
+        return new OutboxWriter(jdbc, mapper, trace);
     }
 
     @Bean
@@ -39,7 +48,8 @@ public class CommonEventsAutoConfiguration {
     @Bean
     @ConditionalOnBean(KafkaTemplate.class)
     @ConditionalOnMissingBean
-    OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx) {
-        return new OutboxRelay(jdbc, kafka, tx);
+    OutboxRelay outboxRelay(JdbcClient jdbc, KafkaTemplate<String, String> kafka, TransactionTemplate tx,
+                           TraceLink trace) {
+        return new OutboxRelay(jdbc, kafka, tx, trace);
     }
 }

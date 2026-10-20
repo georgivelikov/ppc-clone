@@ -6,6 +6,7 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-jdbc")
     api("org.springframework.boot:spring-boot-starter-kafka")
     api("org.springframework.boot:spring-boot-starter-json")
+    api("io.micrometer:micrometer-tracing")
     testImplementation(project(":libs:common-test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-flyway")

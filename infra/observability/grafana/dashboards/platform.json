@@ -1,0 +1,70 @@
+{
+  "uid": "cutpay-platform",
+  "title": "Cutpay platform",
+  "tags": ["cutpay"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Requests per second by service",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (service) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{service}}" }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Latency p50 / p95 / p99 (all services)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Checkout confirm p95 (SLO 800 ms)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.8 }] }, "custom": { "thresholdsStyle": { "mode": "line" } } } },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{service=\"payments\", uri=~\".*confirm.*\"}[5m])))", "legendFormat": "confirm p95" }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "5xx ratio by service",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "expr": "sum by (service) (rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum by (service) (rate(http_server_requests_seconds_count[5m]))", "legendFormat": "{{service}}" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Kafka consumer lag (SLO < 1,000)",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "max by (service, topic) (kafka_consumer_fetch_manager_records_lag_max)", "legendFormat": "{{service}} / {{topic}}" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Database connections (active / pending)",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (service) (hikaricp_connections_active)", "legendFormat": "{{service}} active" },
+        { "expr": "sum by (service) (hikaricp_connections_pending)", "legendFormat": "{{service}} pending" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "JVM heap used",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "expr": "sum by (service) (jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "{{service}}" }]
+    },
+    {
+      "id": 8, "type": "logs", "title": "Errors (Loki)",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "expr": "{level=~\"ERROR|WARN\"}" }]
+    }
+  ]
+}

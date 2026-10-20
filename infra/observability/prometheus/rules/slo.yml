@@ -1,0 +1,42 @@
+groups:
+  - name: cutpay-slo
+    rules:
+      - alert: ServiceDown
+        expr: up{job="cutpay"} == 0
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.service }} is not answering scrapes"
+
+      # Business SLO: checkout confirm p95 < 800 ms.
+      - alert: CheckoutConfirmSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{service="payments", uri=~".*confirm.*"}[5m]))) > 0.8
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Checkout confirm p95 is {{ $value | humanizeDuration }} (SLO 800ms)"
+
+      - alert: ServerErrorsHigh
+        expr: |
+          sum by (service) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum by (service) (rate(http_server_requests_seconds_count[5m])) > 0.05
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.service }} answers more than 5% of requests with a 5xx"
+
+      # Business SLO: consumer lag < 1,000.
+      - alert: ConsumerLagHigh
+        expr: max by (service, topic) (kafka_consumer_fetch_manager_records_lag_max) > 1000
+        for: 5m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.service }} is {{ $value }} records behind on {{ $labels.topic }}"
+
+      - alert: HikariPoolSaturated
+        expr: hikaricp_connections_pending > 0
+        for: 2m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.service }} has requests waiting for a database connection"

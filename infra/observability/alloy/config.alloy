@@ -1,0 +1,37 @@
+// Tails the JSON log files the services write to ./logs and ships them to Loki.
+local.file_match "cutpay" {
+  path_targets = [{ "__path__" = "/logs/*.log" }]
+}
+
+loki.source.file "cutpay" {
+  targets    = local.file_match.cutpay.targets
+  forward_to = [loki.process.cutpay.receiver]
+}
+
+loki.process "cutpay" {
+  stage.json {
+    expressions = {
+      level   = "level",
+      service = "service",
+      app     = "application",
+      trace   = "traceId",
+    }
+  }
+  stage.regex {
+    source     = "filename"
+    expression = `/logs/(?P<svc>[^/]+).log$`
+  }
+  stage.labels {
+    values = { level = "", service = "svc" }
+  }
+  stage.structured_metadata {
+    values = { trace_id = "trace" }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
