@@ -38,6 +38,11 @@ public class ObservabilityDefaults implements EnvironmentPostProcessor {
         defaults.put("management.metrics.distribution.percentiles-histogram.http.server.requests", "true");
         defaults.put("management.metrics.distribution.slo.http.server.requests", "100ms,300ms,800ms,2s");
 
+        // Fourteen services share one Postgres (max_connections 100 by default): ten idle connections each would use it all.
+        defaults.put("spring.datasource.hikari.minimum-idle", "2");
+        defaults.put("spring.datasource.hikari.maximum-pool-size", "10");
+        defaults.put("spring.datasource.hikari.idle-timeout", "60000");
+
         defaults.put("spring.kafka.template.observation-enabled", "true");
         defaults.put("spring.kafka.listener.observation-enabled", "true");
 

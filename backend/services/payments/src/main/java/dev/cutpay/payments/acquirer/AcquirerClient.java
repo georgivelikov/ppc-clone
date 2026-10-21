@@ -189,6 +189,37 @@ public class AcquirerClient {
         }
     }
 
+    /** What the acquirer did with a payment whose answer we never saw. */
+    public sealed interface Lookup {
+        record Charged(String acquirerRef) implements Lookup {
+        }
+
+        /** The acquirer answered and has no charge for it. */
+        record NotCharged() implements Lookup {
+        }
+
+        record Unknown() implements Lookup {
+        }
+    }
+
+    record LookupResponse(String status, String acquirerRef) {
+    }
+
+    public Lookup lookup(String reference) {
+        try {
+            LookupResponse found = breaker.executeSupplier(() -> http.get().uri("/authorizations/by-reference/{reference}", reference)
+                    .retrieve().body(LookupResponse.class));
+            return found == null ? new Lookup.Unknown() : new Lookup.Charged(found.acquirerRef());
+        } catch (CallNotPermittedException e) {
+            return new Lookup.Unknown();
+        } catch (HttpClientErrorException.NotFound e) {
+            return new Lookup.NotCharged();
+        } catch (RuntimeException e) {
+            log.warn("Acquirer lookup of {} failed: {}", reference, e.toString());
+            return new Lookup.Unknown();
+        }
+    }
+
     /** The card network's decision on a dispute. */
     public record DisputeVerdict(String outcome, String reason) {
     }

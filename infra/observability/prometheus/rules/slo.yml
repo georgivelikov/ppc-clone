@@ -40,3 +40,13 @@ groups:
         labels: { severity: ticket }
         annotations:
           summary: "{{ $labels.service }} has requests waiting for a database connection"
+
+  - name: cutpay-money
+    rules:
+      # The three accounts of the money (payments, ledger, acquirer) disagree: see Operations in the back-office.
+      - alert: ReconciliationMismatch
+        expr: max(cutpay_reconciliation_mismatches) > 0
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "Reconciliation found {{ $value }} difference(s) between payments, the ledger and the acquirer"

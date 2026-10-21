@@ -48,6 +48,11 @@ public final class Repositories {
                 + "and p.captureBefore <= :now order by p.captureBefore")
         List<String> findIdsDueForExpiry(@Param("now") Instant now, Pageable pageable);
 
+        /** Payments that started processing before {@code before} and never got an answer recorded. */
+        @Query("select p.id from PaymentIntent p where p.status = dev.cutpay.payments.domain.PaymentStatus.PROCESSING "
+                + "and p.updatedAt < :before order by p.updatedAt")
+        List<String> findIdsStuckProcessing(@Param("before") Instant before, Pageable pageable);
+
         @Query("""
                 select new dev.cutpay.payments.domain.Repositories$VolumeRow(p.currency, count(p), sum(p.amount))
                 from PaymentIntent p

@@ -48,6 +48,10 @@ spring:
               uri: ${cutpay.upstreams.payments}
               predicates:
                 - Path=/v1/staff/disputes
+            - id: staff-reporting
+              uri: ${cutpay.upstreams.reporting}
+              predicates:
+                - Path=/v1/staff/reconciliation/**,/v1/staff/dead_letters,/v1/staff/dead_letters/**
             - id: staff-identity
               uri: ${cutpay.upstreams.identity}
               predicates:

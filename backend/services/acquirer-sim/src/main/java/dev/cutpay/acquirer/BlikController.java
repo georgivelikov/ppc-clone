@@ -128,7 +128,7 @@ class BlikController {
             return false;
         }
         if (approved) {
-            acquirer.recordAuthorization(id, request.amount());
+            acquirer.recordAuthorization(id, request.reference(), request.amount(), request.currency());
         }
         try {
             payments.post().uri("/internal/blik/callback")

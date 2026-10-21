@@ -178,6 +178,40 @@ export interface AuditRow {
   created_at: string;
 }
 
+export interface ReconRun {
+  id: string;
+  scope_date: string | null;
+  status: "running" | "clean" | "mismatched" | "failed";
+  payments_checked: number;
+  refunds_checked: number;
+  acquirer_lines: number;
+  mismatch_count: number;
+  error: string | null;
+  started_at: string;
+}
+
+export interface ReconMismatch {
+  kind: string;
+  payment_id: string;
+  currency: string | null;
+  payments_amount: number | null;
+  ledger_amount: number | null;
+  acquirer_amount: number | null;
+  detail: string;
+}
+
+export interface DeadLetter {
+  topic: string;
+  partition: number;
+  offset: number;
+  original_topic: string | null;
+  key: string | null;
+  event_type: string | null;
+  error: string | null;
+  at: string;
+  payload: string;
+}
+
 const list = <T>(path: string) => call<{ data: T[] }>("GET", path).then((r) => r.data);
 
 export const api = {
@@ -202,4 +236,10 @@ export const api = {
   rejectAdjustment: (id: string, note: string) => call<Adjustment>("POST", `/v1/staff/adjustments/${id}/reject`, { note }),
   disputes: () => list<StaffDispute>("/v1/staff/disputes"),
   audit: () => list<AuditRow>("/v1/staff/audit?limit=100"),
+  reconciliationRuns: () => list<ReconRun>("/v1/staff/reconciliation/runs"),
+  reconciliationMismatches: (id: string) => list<ReconMismatch>(`/v1/staff/reconciliation/runs/${encodeURIComponent(id)}/mismatches`),
+  runReconciliation: () => call<ReconRun>("POST", "/v1/staff/reconciliation/runs"),
+  deadLetters: () => list<DeadLetter>("/v1/staff/dead_letters"),
+  redrive: (d: DeadLetter) => call<DeadLetter>("POST", "/v1/staff/dead_letters/redrive", { topic: d.topic, partition: d.partition, offset: d.offset }),
+  discard: (d: DeadLetter) => call<{ status: string }>("POST", "/v1/staff/dead_letters/discard", { topic: d.topic, partition: d.partition, offset: d.offset }),
 };

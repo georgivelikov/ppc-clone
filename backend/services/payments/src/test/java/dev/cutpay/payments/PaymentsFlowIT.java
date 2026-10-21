@@ -34,7 +34,9 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.json.JsonMapper;
 
-@SpringBootTest(properties = {"cutpay.acquirer.read-timeout=PT1S", "cutpay.outbox.poll-interval=PT0.2S"})
+@SpringBootTest(properties = {"cutpay.acquirer.read-timeout=PT1S", "cutpay.outbox.poll-interval=PT0.2S",
+        // The tests run the sweep themselves; the background one must not touch their rows first.
+        "cutpay.payments.stuck-after=PT8760H"})
 @AutoConfigureMockMvc
 @Testcontainers
 class PaymentsFlowIT {
@@ -759,5 +761,59 @@ class PaymentsFlowIT {
         // Running the job again does nothing more.
         paymentService.expireUncaptured(100);
         assertThat(outboxCount(stale, "PaymentCanceled")).isEqualTo(1);
+    }
+
+    /** Pretends the service died between asking the network and recording the answer. */
+    private String stuckInProcessing() throws Exception {
+        stubAuthorize("""
+                {"status":"declined","decline_code":"card_declined","message":"x"}""");
+        String created = createPayment();
+        confirm(field(created, "client_secret"));
+        String id = field(created, "id");
+        jdbc.sql("UPDATE payment_intents SET status = 'PROCESSING', failure_code = NULL, failure_message = NULL, "
+                + "updated_at = now() - interval '1 hour' WHERE id = :id").param("id", id).update();
+        return id;
+    }
+
+    private String statusOf(String id) throws Exception {
+        return field(mvc.perform(get("/v1/payment_intents/" + id).with(merchant())).andReturn().getResponse().getContentAsString(), "status");
+    }
+
+    @Test
+    void aPaymentStuckInProcessingIsSettledFromWhatTheNetworkDid() throws Exception {
+        String id = stuckInProcessing();
+        ACQUIRER.stubFor(WireMock.get(urlEqualTo("/authorizations/by-reference/" + id)).willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"approved\",\"acquirer_ref\":\"auth_found\",\"amount\":2500,\"currency\":\"EUR\"}")));
+
+        assertThat(paymentService.resolveStuck(java.time.Duration.ofMinutes(5), 10)).isGreaterThanOrEqualTo(1);
+
+        assertThat(statusOf(id)).isEqualTo("succeeded");
+        assertThat(outboxCount(id, "PaymentSucceeded")).isEqualTo(1);
+        // A second sweep finds nothing to do.
+        paymentService.resolveStuck(java.time.Duration.ofMinutes(5), 10);
+        assertThat(outboxCount(id, "PaymentSucceeded")).isEqualTo(1);
+    }
+
+    @Test
+    void aStuckPaymentTheNetworkNeverChargedFails() throws Exception {
+        String id = stuckInProcessing();
+        ACQUIRER.stubFor(WireMock.get(urlEqualTo("/authorizations/by-reference/" + id)).willReturn(aResponse().withStatus(404)
+                .withHeader("Content-Type", "application/json").withBody("{}")));
+
+        paymentService.resolveStuck(java.time.Duration.ofMinutes(5), 10);
+
+        assertThat(statusOf(id)).isEqualTo("failed");
+        assertThat(outboxCount(id, "PaymentFailed")).isEqualTo(2); // the first try, then the sweep
+    }
+
+    @Test
+    void aStuckPaymentIsLeftAloneWhenTheNetworkCannotBeAsked() throws Exception {
+        String id = stuckInProcessing();
+        ACQUIRER.stubFor(WireMock.get(urlEqualTo("/authorizations/by-reference/" + id)).willReturn(aResponse().withStatus(503)));
+
+        paymentService.resolveStuck(java.time.Duration.ofMinutes(5), 10);
+
+        assertThat(statusOf(id)).isEqualTo("processing");
     }
 }

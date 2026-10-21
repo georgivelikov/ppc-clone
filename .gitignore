@@ -30,3 +30,7 @@ e2e/.auth/
 .env
 .env.*
 !.env.example
+
+# Chaos tooling and service logs
+logs/
+e2e/chaos/.pids.json

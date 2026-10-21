@@ -7,6 +7,7 @@ import { useAuth, useStaff } from "./auth";
 import { AdjustmentsPage } from "./pages/AdjustmentsPage";
 import { AuditPage, DisputesPage, SystemPage } from "./pages/OtherPages";
 import { MerchantPage, MerchantsPage } from "./pages/MerchantsPage";
+import { OperationsPage } from "./pages/OperationsPage";
 import { ReviewPage, ReviewQueuePage } from "./pages/ReviewPages";
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
   { to: "/adjustments", label: "Adjustments" },
   { to: "/disputes", label: "Disputes" },
   { to: "/audit", label: "Audit" },
+  { to: "/operations", label: "Operations" },
   { to: "/system", label: "System" },
 ];
 
@@ -111,6 +113,7 @@ export function App() {
         <Route path="adjustments" element={<AdjustmentsPage />} />
         <Route path="disputes" element={<DisputesPage />} />
         <Route path="audit" element={<AuditPage />} />
+        <Route path="operations" element={<OperationsPage />} />
         <Route path="system" element={<SystemPage />} />
         <Route path="*" element={<Navigate to="/review" replace />} />
       </Route>

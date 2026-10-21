@@ -357,6 +357,42 @@ public class PaymentService {
     }
 
     /**
+     * A payment moves to processing, the card network is asked, and the answer is recorded in a second transaction. If this service
+     * dies (or the database is away) between the two, the customer may have been charged while the payment says processing forever.
+     * This asks the network what happened to each such payment and records it.
+     *
+     * @param olderThan how long a payment may legitimately be processing
+     * @return how many payments were settled
+     */
+    public int resolveStuck(Duration olderThan, int limit) {
+        int resolved = 0;
+        for (String id : intents.findIdsStuckProcessing(clock.instant().minus(olderThan), PageRequest.of(0, limit))) {
+            try {
+                AcquirerClient.Lookup found = acquirer.lookup(id);
+                if (found instanceof AcquirerClient.Lookup.Unknown) {
+                    continue; // cannot tell; try again later
+                }
+                resolved += tx.execute(status -> {
+                    PaymentIntent intent = intents.lockById(id).orElseThrow();
+                    if (intent.getStatus() != PaymentStatus.PROCESSING) {
+                        return 0;
+                    }
+                    PaymentAttempt attempt = attempts.findFirstByPaymentIntentIdOrderByCreatedAtDesc(id).orElseThrow();
+                    AuthResult result = found instanceof AcquirerClient.Lookup.Charged charged
+                            ? new AuthResult.Approved(charged.acquirerRef())
+                            : new AuthResult.Unavailable("no answer was recorded and the network has no charge");
+                    log.warn("Payment {} was stuck in processing; the network says: {}", id, found);
+                    settle(id, attempt.getId(), result);
+                    return 1;
+                });
+            } catch (RuntimeException e) {
+                log.warn("Could not resolve the stuck payment {}", id, e);
+            }
+        }
+        return resolved;
+    }
+
+    /**
      * Releases authorisations nobody captured in time (7 days by default). One at a time and independent, so a
      * single payment the acquirer cannot reach does not hold up the others; it is simply tried again.
      *

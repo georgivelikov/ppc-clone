@@ -38,7 +38,7 @@ class AcquirerController {
     record StoredCard(String pan, int expMonth, int expYear, String walletType) {
     }
 
-    record PendingChallenge(String authorizationId, long amount, String currency) {
+    record PendingChallenge(String authorizationId, long amount, String currency, String reference) {
     }
 
     record Runtime(long latencyMs, double failureRate) {
@@ -87,12 +87,14 @@ class AcquirerController {
     private final Map<String, Long> captured = new java.util.HashMap<>();
     private final java.util.Set<String> voided = ConcurrentHashMap.newKeySet();
     private final AtomicReference<Runtime> runtime;
+    private final SettlementBook settlement;
     private final AcquirerProperties properties;
     private final RestClient payments;
 
-    AcquirerController(AcquirerProperties properties, RestClient.Builder builder,
+    AcquirerController(AcquirerProperties properties, RestClient.Builder builder, SettlementBook settlement,
                        @Value("${cutpay.payments-url}") String paymentsUrl) {
         this.properties = properties;
+        this.settlement = settlement;
         this.runtime = new AtomicReference<>(new Runtime(properties.latencyMs(), properties.failureRate()));
         this.payments = builder.baseUrl(paymentsUrl).build();
     }
@@ -185,7 +187,7 @@ class AcquirerController {
 
     @PostMapping("/authorize")
     AuthorizeResponse authorize(@Valid @RequestBody AuthorizeRequest request) throws InterruptedException {
-        return decide(request.token(), request.amount(), request.currency(), request.channel(),
+        return decide(request.token(), request.amount(), request.currency(), request.reference(), request.channel(),
                 Boolean.TRUE.equals(request.offSession()), false);
     }
 
@@ -195,10 +197,11 @@ class AcquirerController {
      */
     @PostMapping("/verify")
     AuthorizeResponse verify(@Valid @RequestBody VerifyRequest request) throws InterruptedException {
-        return decide(request.token(), 0, "EUR", request.channel(), false, true);
+        return decide(request.token(), 0, "EUR", null, request.channel(), false, true);
     }
 
-    private AuthorizeResponse decide(String token, long amount, String currency, String channel, boolean offSession,
+    private AuthorizeResponse decide(String token, long amount, String currency, String reference, String channel,
+                                     boolean offSession,
                                      boolean verifyOnly)
             throws InterruptedException {
         StoredCard card = tokens.get(token);
@@ -245,10 +248,13 @@ class AcquirerController {
         // authentication, so the issuer does not ask again.
         boolean wallet = card.walletType() != null;
         if (asksForChallenge && !moto && !offSession && !wallet) {
-            challenges.put(ref, new PendingChallenge(ref, amount, currency));
+            challenges.put(ref, new PendingChallenge(ref, amount, currency, reference));
             return new AuthorizeResponse("requires_action", ref, null, "3-D Secure authentication required");
         }
         authorizations.put(ref, amount);
+        if (!verifyOnly) {
+            settlement.authorized(ref, reference, amount, currency);
+        }
         return new AuthorizeResponse("approved", ref, null, null);
     }
 
@@ -265,6 +271,7 @@ class AcquirerController {
         ChallengeResponse result;
         if (properties.threeDsCode().equals(request.code())) {
             authorizations.put(id, challenge.amount());
+            settlement.authorized(id, challenge.reference(), challenge.amount(), challenge.currency());
             result = new ChallengeResponse("approved", null, null);
         } else {
             result = new ChallengeResponse("declined", "authentication_failed", "3-D Secure authentication failed.");
@@ -300,6 +307,7 @@ class AcquirerController {
             captured.put(ref, request.amount());
             // From now on only what was captured can be refunded.
             authorizations.put(ref, request.amount());
+            settlement.captured(ref, request.amount());
         }
         return new AuthorizeResponse("approved", ref, null, null);
     }
@@ -316,6 +324,7 @@ class AcquirerController {
                 throw ApiException.conflict("already_captured", "A captured authorization cannot be released", null);
             }
             voided.add(ref);
+            settlement.voided(ref);
         }
         return new AuthorizeResponse("approved", ref, null, null);
     }
@@ -334,12 +343,15 @@ class AcquirerController {
             }
             refunded.put(request.acquirerRef(), already + request.amount());
         }
-        return new RefundResponse("succeeded", "ref_" + UUID.randomUUID().toString().replace("-", ""));
+        String refundRef = "ref_" + UUID.randomUUID().toString().replace("-", "");
+        settlement.refunded(refundRef, request.acquirerRef(), request.amount());
+        return new RefundResponse("succeeded", refundRef);
     }
 
     /** Lets another simulated payment method (BLIK) register what it approved, so it can be refunded. */
-    void recordAuthorization(String ref, long amount) {
+    void recordAuthorization(String ref, String reference, long amount, String currency) {
         authorizations.put(ref, amount);
+        settlement.authorized(ref, reference, amount, currency);
     }
 
     /** Chaos knobs for later phases; no authentication because this service is never exposed by the gateway. */

@@ -41,3 +41,7 @@ cutpay:
     link-ttl: PT15M
     job-poll-interval: PT2S
     dashboard-url: http://localhost:5173
+  reconciliation:
+    acquirer-url: http://localhost:8083
+    # A difference is only reported if it is still there after this long: events are asynchronous.
+    settle-wait: PT10S
