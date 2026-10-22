@@ -19,7 +19,7 @@ dependencies {
 
     // QR codes (ZXing draws the matrix; we render PNG and SVG ourselves) and the printable table card.
     implementation("com.google.zxing:core:3.5.3")
-    implementation("com.github.librepdf:openpdf:2.0.3")
+    implementation("com.github.librepdf:openpdf:3.0.5")
 
     testImplementation(project(":libs:common-test"))
     testImplementation("com.google.zxing:javase:3.5.3")
