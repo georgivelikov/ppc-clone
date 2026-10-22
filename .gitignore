@@ -35,3 +35,4 @@ e2e/.auth/
 logs/
 e2e/chaos/.pids.json
 canary-result.json
+scripts/.web-pids.json

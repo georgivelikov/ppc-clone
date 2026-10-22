@@ -61,6 +61,8 @@ e2e/        Playwright end-to-end tests
 
 **Prerequisites:** Docker, JDK 25, Node.js 22+ (pnpm is fetched on demand through `npx`).
 
+**Quickest way:** `node scripts/start.mjs` starts the infrastructure, the 14 services (building the jars the first time) and the five web apps, and prints the URLs; `node scripts/stop.mjs` stops them (`--keep-infra` leaves Docker running, `--wipe` also deletes the data). `--no-web` and `--no-backend` start part of it. The steps below do the same by hand.
+
 ```bash
 # 1. Infrastructure: Postgres, Kafka, Redis, Mailpit, Kafka UI
 docker compose -f infra/docker-compose.yml up -d
