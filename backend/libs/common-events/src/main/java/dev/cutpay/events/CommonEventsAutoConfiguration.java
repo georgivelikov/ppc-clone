@@ -28,8 +28,9 @@ public class CommonEventsAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    OutboxWriter outboxWriter(JdbcClient jdbc, JsonMapper mapper, TraceLink trace) {
-        return new OutboxWriter(jdbc, mapper, trace);
+    OutboxWriter outboxWriter(JdbcClient jdbc, JsonMapper mapper, TraceLink trace,
+                              ObjectProvider<io.micrometer.core.instrument.MeterRegistry> meters) {
+        return new OutboxWriter(jdbc, mapper, trace, meters.getIfAvailable());
     }
 
     @Bean

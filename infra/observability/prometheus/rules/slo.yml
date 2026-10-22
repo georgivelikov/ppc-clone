@@ -50,3 +50,39 @@ groups:
         labels: { severity: page }
         annotations:
           summary: "Reconciliation found {{ $value }} difference(s) between payments, the ledger and the acquirer"
+
+      # Merchants' servers that keep failing: deliveries are retried, but giving up means an order was never told.
+      - alert: WebhookDeliveriesGivingUp
+        expr: sum(increase(cutpay_webhooks_deliveries_total{outcome="gave_up"}[30m])) > 0
+        for: 1m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $value }} webhook delivery(ies) gave up after all retries in the last 30 minutes"
+
+      # Fewer than 4 in 5 payments that start end well, over an hour with real volume: a checkout or acquirer problem.
+      - alert: PaymentConversionLow
+        expr: |
+          sum(increase(cutpay_events_total{event_type="PaymentSucceeded"}[1h]))
+            / sum(increase(cutpay_events_total{event_type="PaymentIntentCreated"}[1h])) < 0.5
+          and sum(increase(cutpay_events_total{event_type="PaymentIntentCreated"}[1h])) > 50
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Only {{ $value | humanizePercentage }} of started payments succeeded in the last hour"
+
+  - name: cutpay-canary
+    rules:
+      - alert: CanaryFailing
+        expr: min(cutpay_canary_success) == 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "The synthetic customer journey (sign up, pay, see the payment) is failing"
+
+      # A canary that stopped reporting is as bad as one that fails.
+      - alert: CanaryStale
+        expr: time() - max(cutpay_canary_last_run_timestamp_seconds) > 1800
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "The synthetic customer journey has not reported for over 30 minutes"

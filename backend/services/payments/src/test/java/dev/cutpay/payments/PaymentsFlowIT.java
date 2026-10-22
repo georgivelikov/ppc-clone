@@ -240,15 +240,31 @@ class PaymentsFlowIT {
     }
 
     @Test
-    void aSlowAcquirerTimesOut() throws Exception {
+    void aSlowAcquirerLeavesThePaymentProcessingBecauseItMayHaveChargedTheCard() throws Exception {
+        // The bank answers after the timeout: it may well have charged the card, so "failed" would be a lie.
         ACQUIRER.stubFor(WireMock.post(urlEqualTo("/authorize")).willReturn(aResponse().withFixedDelay(3000)
                 .withHeader("Content-Type", "application/json").withBody("{\"status\":\"approved\"}")));
-        String secret = field(createPayment(), "client_secret");
+        String created = createPayment();
+        String secret = field(created, "client_secret");
+        String id = field(created, "id");
 
         mvc.perform(post("/checkout/sessions/%s/confirm".formatted(secret)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"tok_visa\"}"))
-                .andExpect(jsonPath("$.status").value("failed"))
-                .andExpect(jsonPath("$.failure_code").value("processing_error"));
+                .andExpect(jsonPath("$.status").value("processing"));
+        assertThat(outboxCount(id, "PaymentFailed")).isZero();
+
+        // Confirming again must not charge twice.
+        mvc.perform(post("/checkout/sessions/%s/confirm".formatted(secret)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"tok_visa\"}"))
+                .andExpect(status().is4xxClientError());
+
+        // Later the sweeper asks the bank: it did charge.
+        jdbc.sql("UPDATE payment_intents SET updated_at = now() - interval '1 hour' WHERE id = :id").param("id", id).update();
+        ACQUIRER.stubFor(WireMock.get(urlEqualTo("/authorizations/by-reference/" + id)).willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"approved\",\"acquirer_ref\":\"auth_late\",\"amount\":2500,\"currency\":\"EUR\"}")));
+        paymentService.resolveStuck(java.time.Duration.ofMinutes(5), 10);
+        assertThat(statusOf(id)).isEqualTo("succeeded");
     }
 
     @Test

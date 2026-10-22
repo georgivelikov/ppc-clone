@@ -244,7 +244,102 @@ async function experiment5() {
   return ok;
 }
 
-const all = { 1: experiment1, 2: experiment2, 3: experiment3, 4: experiment4, 5: experiment5 };
+// ---------------------------------------------------------------------------------------------------------------------
+// Toxiproxy sits between payments and the acquirer simulator, so the network itself can be made slow or silent.
+const TOXIPROXY = "http://localhost:8474";
+async function toxi(method, path, body) {
+  const response = await fetch(TOXIPROXY + path, {
+    method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: response.status, body: await response.json().catch(() => ({})) };
+}
+
+async function experiment6() {
+  console.log("\n6. The network between payments and the acquirer gets slow, then goes silent (Toxiproxy)");
+  console.log("   Hypothesis: a slow answer is cut off at the read timeout and the customer gets a clear failure; a payment the bank");
+  console.log("   did process but whose answer was lost is settled by the sweeper, not left charged-but-failed; silence charges nobody.");
+  const probe = await toxi("GET", "/version").catch(() => null);
+  if (!probe || probe.status !== 200) {
+    return check("toxiproxy is running (docker compose --profile chaos up -d toxiproxy)", false);
+  }
+  await toxi("DELETE", "/proxies/acquirer");
+  await toxi("POST", "/proxies", { name: "acquirer", listen: "0.0.0.0:8666", upstream: "host.docker.internal:8083", enabled: true });
+
+  // Payments goes through the proxy from now on; the sweeper looks at payments stuck for 15 s instead of 2 minutes.
+  stop("payments");
+  await waitDown("payments");
+  process.env.CUTPAY_ACQUIRER_URL = "http://localhost:8666";
+  process.env.CUTPAY_PAYMENTS_STUCK_AFTER = "PT15S";
+  await start("payments");
+  delete process.env.CUTPAY_ACQUIRER_URL;
+  delete process.env.CUTPAY_PAYMENTS_STUCK_AFTER;
+  await waitHealthy("payments");
+
+  const merchant = await newMerchant();
+  const token = await staff();
+  let ok = true;
+  try {
+    const warm = await payMany(merchant, 6, 2);
+    ok = check("through the proxy, payments work", warm.every((r) => r.result === "succeeded"), JSON.stringify(summarise(warm).outcomes)) && ok;
+
+    // A. The network is slow: the first call to the bank (reading the card token) takes 7 s, payments gives up after 5 s.
+    //    The bank has seen nothing, so nothing can have been charged.
+    await toxi("POST", "/proxies/acquirer/toxics", { name: "slow", type: "latency", stream: "downstream", attributes: { latency: 7000 } });
+    const slow = await payMany(merchant, 12, 4);
+    const slowSummary = summarise(slow);
+    console.log(`  with a 7 s delay: ${JSON.stringify(slowSummary)}`);
+    ok = check("every customer got a clear answer (502 acquirer_unavailable)", slow.every((r) => r.status === 502 && r.failure === "acquirer_unavailable"), JSON.stringify(slowSummary.outcomes)) && ok;
+    ok = check("nobody waited past the timeout (read timeout 5 s + margin)", slowSummary.p95 < 9000, `p95 ${slowSummary.p95} ms`) && ok;
+    await toxi("DELETE", "/proxies/acquirer/toxics/slow");
+
+    // B. Silence: the connection opens, nothing ever comes back, and the request never reaches the bank.
+    await toxi("POST", "/proxies/acquirer/toxics", { name: "silent", type: "timeout", stream: "upstream", attributes: { timeout: 0 } });
+    const silent = await payMany(merchant, 8, 4);
+    const silentSummary = summarise(silent);
+    console.log(`  with silence: ${JSON.stringify(silentSummary)}`);
+    ok = check("silence ends in a clear error, not a hang", silent.every((r) => r.status === 502 && r.failure === "acquirer_unavailable"), JSON.stringify(silentSummary.outcomes)) && ok;
+    ok = check("and within the timeout", silentSummary.p95 < 9000, `p95 ${silentSummary.p95} ms`) && ok;
+    await toxi("DELETE", "/proxies/acquirer/toxics/silent");
+
+    // C. The bank itself is slow: it takes 7 s to decide, payments gives up after 5 s, and the bank then charges the card.
+    //    This is the dangerous one: the customer was told "unavailable" and the card was charged anyway.
+    await acquirerConfig({ latency_ms: 7000 });
+    let slowBank;
+    try {
+      slowBank = await payMany(merchant, 8, 4);
+    } finally {
+      await acquirerConfig({ latency_ms: 0 });
+    }
+    const slowBankSummary = summarise(slowBank);
+    console.log(`  with a slow bank: ${JSON.stringify(slowBankSummary)}`);
+    ok = check("the customer is told it is processing, not that it failed, within the timeout",
+      slowBank.every((r) => r.status === 200 && r.result === "processing") && slowBankSummary.p95 < 9000, `p95 ${slowBankSummary.p95} ms`) && ok;
+    await sleep(11_000); // the circuit breaker opened on the timeouts; it tries again after ten seconds
+
+    const after = await payMany(merchant, 6, 2);
+    ok = check("when the network heals, the first payments succeed", after.every((r) => r.result === "succeeded"), JSON.stringify(summarise(after).outcomes)) && ok;
+
+    // The bank processed the delayed requests after payments had stopped waiting. Give the sweeper its time.
+    await sleep(35_000);
+    const settled = (await api("GET", "/v1/payment_intents?limit=100", { token: merchant.token })).body.data;
+    const byStatus = {};
+    for (const p of settled) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1;
+    console.log(`  final payment states: ${JSON.stringify(byStatus)}`);
+    ok = check("no payment is left in processing", !byStatus.processing, JSON.stringify(byStatus)) && ok;
+    ok = check("the 8 the slow bank charged were settled as succeeded by the sweeper (6 + 8 + 6 in all)",
+      (byStatus.succeeded ?? 0) === 6 + 8 + 6, JSON.stringify(byStatus)) && ok;
+    ok = (await cleanReconciliation(token, "after the slow network")) && ok;
+  } finally {
+    await toxi("DELETE", "/proxies/acquirer");
+    stop("payments");
+    await waitDown("payments");
+    await start("payments");
+    await waitHealthy("payments");
+  }
+  return ok;
+}
+
+const all = { 1: experiment1, 2: experiment2, 3: experiment3, 4: experiment4, 5: experiment5, 6: experiment6 };
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(all);
 for (const n of wanted) {
   try {

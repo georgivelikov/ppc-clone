@@ -5,7 +5,7 @@ import { CreditCard } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { CheckoutApiError, confirm, tokenize, type Session } from "./api";
+import { CheckoutApiError, confirm, getSession, tokenize, type Session } from "./api";
 import { detectBrand, formatCardNumber, formatExpiry, isExpired, luhnValid, parseExpiry } from "./card";
 
 /** The rules for the card form; the messages are in the language being shown. */
@@ -60,7 +60,21 @@ export function PaymentForm({ secret, session, onUpdate }: Props) {
         cvc: values.cvc,
       });
       // 2. Our payments service only ever sees the token.
-      onUpdate(await confirm(secret, token, values.email));
+      try {
+        onUpdate(await confirm(secret, token, values.email));
+      } catch (error) {
+        // A server error or a lost connection does not mean the payment failed: the answer may have been lost on its
+        // way back after the card was charged. Look at the payment before telling the customer anything, so they are
+        // not invited to pay twice for something that went through.
+        if (!(error instanceof CheckoutApiError) || error.status >= 500) {
+          const current = await getSession(secret).catch(() => null);
+          if (current && current.status !== "requires_payment_method") {
+            onUpdate(current);
+            return;
+          }
+        }
+        throw error;
+      }
     } catch (error) {
       setFormError(error instanceof CheckoutApiError && error.status < 500 ? error.message : t("card.failed"));
     }

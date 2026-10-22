@@ -89,6 +89,32 @@ describe("hosted checkout", () => {
     expect(api.confirm).toHaveBeenCalledWith("pay_1_secret_x", "tok_1", "anna@example.com");
   });
 
+  it("looks the payment up when the answer is lost, instead of calling a paid payment failed", async () => {
+    // The first read is the page load; the second is the look-up after the confirm answered 500.
+    vi.mocked(api.getSession).mockResolvedValueOnce(base).mockResolvedValueOnce({ ...base, status: "succeeded" });
+    vi.mocked(api.tokenize).mockResolvedValue("tok_1");
+    vi.mocked(api.confirm).mockRejectedValue(new api.CheckoutApiError(500, "internal_error", "boom"));
+    renderCheckout();
+    await screen.findByLabelText("Card number");
+    await fillCard("4242424242424242");
+    await userEvent.click(screen.getByRole("button", { name: /^Pay/ }));
+
+    expect(await screen.findByRole("heading", { name: "Payment successful" })).toBeInTheDocument();
+  });
+
+  it("still shows the error when the look-up finds the payment unpaid", async () => {
+    vi.mocked(api.getSession).mockResolvedValue(base);
+    vi.mocked(api.tokenize).mockResolvedValue("tok_1");
+    vi.mocked(api.confirm).mockRejectedValue(new api.CheckoutApiError(500, "internal_error", "boom"));
+    renderCheckout();
+    await screen.findByLabelText("Card number");
+    await fillCard("4242424242424242");
+    await userEvent.click(screen.getByRole("button", { name: /^Pay/ }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Payment successful" })).not.toBeInTheDocument();
+  });
+
   it("shows the decline reason when the payment fails", async () => {
     vi.mocked(api.getSession).mockResolvedValue(base);
     vi.mocked(api.tokenize).mockResolvedValue("tok_1");

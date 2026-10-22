@@ -159,6 +159,18 @@ services:
       - "3000:3000"
     depends_on: [prometheus, tempo, loki]
 
+  # Network faults between services (latency, stalls, cut connections): docs/chaos, experiment 6.
+  #   docker compose -f infra/docker-compose.yml --profile chaos up -d toxiproxy
+  # The experiment creates a proxy on :8666 in front of the acquirer simulator on the host.
+  toxiproxy:
+    profiles: [chaos]
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8474:8474"
+      - "8666:8666"
+
 volumes:
   postgres-data:
   kafka-data:

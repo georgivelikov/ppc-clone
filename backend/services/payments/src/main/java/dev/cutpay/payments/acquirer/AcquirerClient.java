@@ -63,8 +63,16 @@ public class AcquirerClient {
         record RequiresAction(String acquirerRef) implements AuthResult {
         }
 
-        /** Timeout, 5xx, network error or an open circuit: we do not know what happened at the bank. */
-        record Unavailable(String reason) implements AuthResult {
+        /**
+         * The bank gave no usable answer. {@code outcomeUnknown} says whether the request may nevertheless have been
+         * processed: true when it was sent and the answer never came (a read timeout, a connection cut), false when it
+         * never left (circuit open, could not connect) or the bank answered with an error. An unknown outcome must not
+         * be reported to the customer as a failure: the card may have been charged.
+         */
+        record Unavailable(String reason, boolean outcomeUnknown) implements AuthResult {
+            public Unavailable(String reason) {
+                this(reason, false);
+            }
         }
     }
 
@@ -184,9 +192,33 @@ public class AcquirerClient {
             log.warn("Acquirer circuit is open, failing fast");
             return new AuthResult.Unavailable("circuit open");
         } catch (RuntimeException e) {
-            log.warn("Acquirer {} call failed: {}", what, e.toString());
-            return new AuthResult.Unavailable(e.getClass().getSimpleName());
+            boolean unknown = requestMayHaveBeenProcessed(e);
+            log.warn("Acquirer {} call failed ({}): {}", what, unknown ? "outcome unknown" : "not processed", e.toString());
+            return new AuthResult.Unavailable(e.getClass().getSimpleName(), unknown);
         }
+    }
+
+    /**
+     * Was the request sent before things went wrong? A refused or timed-out connection means it was not. An answer
+     * with an error status means the bank handled it and said no. A read timeout or a cut connection means the bank
+     * may have been working on it while we stopped listening.
+     */
+    static boolean requestMayHaveBeenProcessed(Throwable error) {
+        for (Throwable t = error; t != null; t = t.getCause()) {
+            if (t instanceof org.springframework.web.client.RestClientResponseException) {
+                return false;
+            }
+            if (t instanceof java.net.http.HttpConnectTimeoutException || t instanceof java.net.ConnectException
+                    || t instanceof java.net.UnknownHostException) {
+                return false;
+            }
+        }
+        for (Throwable t = error; t != null; t = t.getCause()) {
+            if (t instanceof java.io.IOException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** What the acquirer did with a payment whose answer we never saw. */

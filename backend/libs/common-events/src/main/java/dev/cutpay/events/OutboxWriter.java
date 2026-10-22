@@ -1,5 +1,6 @@
 package dev.cutpay.events;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -16,11 +17,17 @@ public class OutboxWriter {
     private final JdbcClient jdbc;
     private final JsonMapper mapper;
     private final TraceLink trace;
+    private final MeterRegistry meters;
 
     public OutboxWriter(JdbcClient jdbc, JsonMapper mapper, TraceLink trace) {
+        this(jdbc, mapper, trace, null);
+    }
+
+    public OutboxWriter(JdbcClient jdbc, JsonMapper mapper, TraceLink trace, MeterRegistry meters) {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.trace = trace;
+        this.meters = meters;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -40,6 +47,11 @@ public class OutboxWriter {
                 .param("payload", mapper.writeValueAsString(envelope))
                 .param("traceparent", trace.current())
                 .update();
+        if (meters != null) {
+            // Counted when the business change is recorded, one counter per kind of event: the payment funnel
+            // (created, succeeded, failed), refunds and the buy-now-pay-later outcomes are all just event types.
+            meters.counter("cutpay.events", "event_type", eventType, "topic", topic).increment();
+        }
         return eventId;
     }
 }

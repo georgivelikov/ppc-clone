@@ -34,3 +34,4 @@ e2e/.auth/
 # Chaos tooling and service logs
 logs/
 e2e/chaos/.pids.json
+canary-result.json

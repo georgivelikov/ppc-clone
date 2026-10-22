@@ -657,6 +657,13 @@ public class PaymentService {
                 intent.fail(declined.code(), declined.message());
                 publish("PaymentFailed", intent);
             }
+            case AuthResult.Unavailable unavailable when unavailable.outcomeUnknown() -> {
+                // The request was sent and no answer came back: the bank may have charged the card. Failing the payment
+                // here would tell the customer "not paid" about money that has gone. It stays processing, and the sweeper
+                // asks the bank what happened (resolveStuck); the customer is shown "we are confirming your payment".
+                log.warn("Payment {} has no answer from the bank ({}); leaving it processing for the sweeper",
+                        intent.getId(), unavailable.reason());
+            }
             case AuthResult.Unavailable unavailable -> {
                 attempt.failed("processing_error");
                 intent.fail("processing_error", PROCESSING_ERROR_MESSAGE);

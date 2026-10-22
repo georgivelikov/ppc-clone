@@ -1,0 +1,97 @@
+{
+  "uid": "cutpay-business",
+  "title": "Cutpay business: payments funnel, webhooks, buy-now-pay-later",
+  "tags": ["cutpay"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "row", "title": "Payments funnel", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 } },
+    {
+      "id": 2, "type": "stat", "title": "Payments created (last hour)",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(increase(cutpay_events_total{event_type=\"PaymentIntentCreated\"}[1h]))" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Succeeded (last hour)",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(increase(cutpay_events_total{event_type=\"PaymentSucceeded\"}[1h]))" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Failed (last hour)",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(increase(cutpay_events_total{event_type=\"PaymentFailed\"}[1h]))" }]
+    },
+    {
+      "id": 5, "type": "gauge", "title": "Conversion: succeeded / created (last hour)",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "green", "value": 0.8 } ] } } },
+      "targets": [{ "expr": "sum(increase(cutpay_events_total{event_type=\"PaymentSucceeded\"}[1h])) / sum(increase(cutpay_events_total{event_type=\"PaymentIntentCreated\"}[1h]))" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Payment events per minute, by outcome",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (event_type) (rate(cutpay_events_total{event_type=~\"Payment(IntentCreated|Succeeded|Failed|RequiresAction|Authorized|Canceled)\"}[5m])) * 60", "legendFormat": "{{event_type}}" }]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Refunds and disputes per minute",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (event_type) (rate(cutpay_events_total{event_type=~\"Refund.*|Dispute.*\"}[5m])) * 60", "legendFormat": "{{event_type}}" }]
+    },
+
+    { "id": 8, "type": "row", "title": "Webhook delivery", "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 } },
+    {
+      "id": 9, "type": "timeseries", "title": "Delivery attempts per minute, by outcome",
+      "gridPos": { "x": 0, "y": 15, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (outcome) (rate(cutpay_webhooks_deliveries_total[5m])) * 60", "legendFormat": "{{outcome}}" }]
+    },
+    {
+      "id": 10, "type": "gauge", "title": "Delivered on the first try (last 15 min)",
+      "gridPos": { "x": 8, "y": 15, "w": 4, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1,
+        "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 0.9 }, { "color": "green", "value": 0.98 } ] } } },
+      "targets": [{ "expr": "sum(increase(cutpay_webhooks_deliveries_total{outcome=\"delivered\"}[15m])) / sum(increase(cutpay_webhooks_deliveries_total[15m]))" }]
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "How long merchants' servers take to answer (p50 / p95)",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le) (rate(cutpay_webhooks_delivery_duration_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(cutpay_webhooks_delivery_duration_seconds_bucket[5m])))", "legendFormat": "p95" }
+      ]
+    },
+
+    { "id": 12, "type": "row", "title": "Buy now, pay later", "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 } },
+    {
+      "id": 13, "type": "timeseries", "title": "Applications and decisions per minute",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (event_type) (rate(cutpay_events_total{event_type=~\"Bnpl(ApplicationCreated|Approved|Declined|Settled|Canceled|Expired)\"}[5m])) * 60", "legendFormat": "{{event_type}}" }]
+    },
+    {
+      "id": 14, "type": "timeseries", "title": "Provider trouble per minute (failures and timeouts)",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (event_type) (rate(cutpay_events_total{event_type=~\"Bnpl(ProviderFailed|ProviderTimedOut|PaymentRejected)\"}[5m])) * 60", "legendFormat": "{{event_type}}" }]
+    },
+    {
+      "id": 15, "type": "gauge", "title": "Approval rate (last hour)",
+      "gridPos": { "x": 0, "y": 32, "w": 6, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [{ "expr": "sum(increase(cutpay_events_total{event_type=\"BnplApproved\"}[1h])) / sum(increase(cutpay_events_total{event_type=\"BnplApplicationCreated\"}[1h]))" }]
+    }
+  ]
+}

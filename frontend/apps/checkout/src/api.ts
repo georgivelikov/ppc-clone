@@ -51,8 +51,20 @@ export class CheckoutApiError extends Error {
   }
 }
 
+const hex = (bytes: number) =>
+  Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * A W3C trace context for one call. The browser starts the trace, so a slow or failed checkout can be followed from the
+ * customer's click through the gateway, payments, the bank and the events that follow (Tempo, ADR 0031). Ids only:
+ * nothing about the customer or the card.
+ */
+export function newTraceparent(): string {
+  return `00-${hex(16)}-${hex(8)}-01`;
+}
+
 export async function call<T>(method: string, path: string, body?: unknown, publishableKey?: string): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", traceparent: newTraceparent() };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   // Embedded checkouts identify the merchant integration; the gateway ignores it on these public routes.
   if (publishableKey) headers.Authorization = `Bearer ${publishableKey}`;

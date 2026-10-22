@@ -32,4 +32,4 @@ Fourteen services with the default ten-connection pools on one Postgres with `ma
 ## Consequences
 - The acquirer file is in memory, like the rest of the simulator; reconciling across a simulator restart only covers what happened since.
 - `redrive` sends to the original topic, so every consumer of that topic sees the record again. That is safe only because consumers are idempotent, which is already a rule here.
-- A confirm can still answer 500 for a payment that went through (see experiment 4). The sweeper makes the payment right; the customer's screen is a separate matter (the checkout page should look the payment up before showing an error).
+- A confirm can still answer 500 for a payment that went through (see experiment 4). The sweeper makes the payment right, and the checkout page now looks the payment up before showing an error (ADR 0037).

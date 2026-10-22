@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -36,9 +37,11 @@ public class DeliveryService {
     private final Clock clock;
     private final WebhookSender sender;
     private final WebhookProperties properties;
+    private final MeterRegistry meters;
 
     public DeliveryService(JdbcClient jdbc, TransactionTemplate tx, Clock clock, WebhookSender sender,
-                           WebhookProperties properties) {
+                           WebhookProperties properties, MeterRegistry meters) {
+        this.meters = meters;
         this.jdbc = jdbc;
         this.tx = tx;
         this.clock = clock;
@@ -148,6 +151,7 @@ public class DeliveryService {
                     .param("attempt", attempt).param("code", result.status()).param("id", work.deliveryId()).update();
             jdbc.sql("UPDATE webhook_endpoints SET failing_since = NULL WHERE id = :id")
                     .param("id", work.endpointId()).update();
+            count("delivered", result);
             return;
         }
 
@@ -162,6 +166,7 @@ public class DeliveryService {
                 .param("attempt", attempt).param("next", Sql.ts(next.orElse(null)))
                 .param("code", result.status()).param("id", work.deliveryId()).update();
 
+        count(next.isPresent() ? "retry" : "gave_up", result);
         OffsetDateTime failingSince = jdbc.sql("""
                         UPDATE webhook_endpoints SET failing_since = COALESCE(failing_since, :now)
                          WHERE id = :id RETURNING failing_since
@@ -180,6 +185,13 @@ public class DeliveryService {
                 log.warn("Disabled webhook endpoint {} after continuous failures", work.endpointId());
             }
         }
+    }
+
+    /** Every attempt, by outcome, and how long the merchant's server took to answer. */
+    private void count(String outcome, Result result) {
+        meters.counter("cutpay.webhooks.deliveries", "outcome", outcome).increment();
+        meters.timer("cutpay.webhooks.delivery.duration", "outcome", outcome)
+                .record(java.time.Duration.ofMillis(Math.max(0, result.durationMs())));
     }
 
     /** Puts a delivery back in the queue now. Returns false when it does not exist for this caller. */
