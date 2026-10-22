@@ -18,7 +18,7 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     // The invoice PDF.
-    implementation("com.github.librepdf:openpdf:2.0.3")
+    implementation("com.github.librepdf:openpdf:3.0.5")
 
     testImplementation(project(":libs:common-test"))
     testImplementation("org.wiremock:wiremock-standalone:3.13.1")
