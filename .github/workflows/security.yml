@@ -1,0 +1,108 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # New advisories appear without any change in the repository: look again every Monday.
+    - cron: "17 5 * * 1"
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the whole history: a secret removed later is still a leaked secret
+      - name: Scan
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 detect \
+            --source /repo --config /repo/.gitleaks.toml --redact --no-banner
+
+  frontend-dependencies:
+    name: Frontend dependencies (pnpm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Production dependencies only: what ships to browsers. A dev-tool advisory does not reach a customer.
+      - run: pnpm audit --prod --audit-level high
+
+  backend-dependencies:
+    name: Backend dependencies (OWASP Dependency-Check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew bootJar -x test --console=plain
+        working-directory: backend
+      # Scans the jars that would be deployed, nested libraries included. NVD_API_KEY (free) makes the database
+      # download take minutes instead of hours; without it the scan still runs, slowly.
+      - name: Scan
+        run: |
+          mkdir -p reports
+          docker run --rm -v "$PWD:/src" -v dc-data:/usr/share/dependency-check/data \
+            owasp/dependency-check:12.1.0 \
+            --scan "/src/backend/services/*/build/libs/*.jar" \
+            --format HTML --format SARIF --out /src/reports \
+            --failOnCVSS 7 --suppression /src/.security/dependency-check-suppressions.xml \
+            ${NVD_API_KEY:+--nvdApiKey "$NVD_API_KEY"}
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check
+          path: reports
+
+  zap-baseline:
+    name: ZAP baseline (checkout)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      # The production build of the page that handles card data, served with the headers it ships with.
+      - run: pnpm --filter @cutpay/checkout build
+        working-directory: frontend
+      - name: Serve the build
+        run: |
+          nohup pnpm --filter @cutpay/checkout exec vite preview --host 0.0.0.0 --port 5174 --strictPort > preview.log 2>&1 &
+          npx --yes wait-on http://localhost:5174
+        working-directory: frontend
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:5174/c/pay_scan_secret_scan
+          rules_file_name: .zap/rules.tsv
+          allow_issue_writing: false
+          fail_action: true

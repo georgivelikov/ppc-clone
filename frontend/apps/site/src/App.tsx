@@ -14,6 +14,7 @@ import { WebhooksGuidePage } from "./pages/docs/WebhooksGuidePage";
 import { FaqPage } from "./pages/FaqPage";
 import { HomePage } from "./pages/HomePage";
 import { PricingPage } from "./pages/PricingPage";
+import { SecurityPage } from "./pages/SecurityPage";
 import { ProductsPage } from "./pages/ProductsPage";
 
 // Redoc is large; only load it when someone opens the API reference.
@@ -79,6 +80,10 @@ function Layout() {
             ·{" "}
             <Link to="/faq" className="hover:text-ink">
               FAQ
+            </Link>{" "}
+            ·{" "}
+            <Link to="/security" className="hover:text-ink">
+              Security
             </Link>
           </p>
         </div>
@@ -96,6 +101,7 @@ export function App() {
         <Route path="pricing" element={<PricingPage />} />
         <Route path="business-types" element={<BusinessTypesPage />} />
         <Route path="faq" element={<FaqPage />} />
+        <Route path="security" element={<SecurityPage />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<GettingStartedPage />} />
           <Route path="test-cards" element={<TestCardsPage />} />

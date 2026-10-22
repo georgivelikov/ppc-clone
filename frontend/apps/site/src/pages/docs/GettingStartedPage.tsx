@@ -43,7 +43,12 @@ const SDK = `<div id="card"></div>
   };
 </script>`;
 
-const HOSTED = `curl ${API_URL}/v1/checkout_sessions \\
+const SDK_PINNED = `<script
+  src="${CHECKOUT_URL}/v1/0.1.0/cutpay.js"
+  integrity="sha384-..."   <!-- the contents of /v1/0.1.0/cutpay.js.sri -->
+  crossorigin="anonymous"></script>`;
+
+const HOSTED =`curl ${API_URL}/v1/checkout_sessions \\
   -H "Authorization: Bearer sk_test_..." \\
   -H "Content-Type: application/json" \\
   -d '{"amount": 2500, "currency": "EUR", "return_url": "https://shop.example.com/thanks"}'
@@ -98,6 +103,12 @@ export function GettingStartedPage() {
         number never reaches your code; you only get the result.
       </p>
       <CodeBlock language="HTML" label="Embedded card field" code={SDK} />
+      <p className="mt-2 text-sm">
+        For a page that takes payments, pin the script to a release and add its integrity hash, so the browser refuses to run
+        a file that is not the one you reviewed. Each release publishes the hash next to the file:{" "}
+        <code>/v1/0.1.0/cutpay.js</code> and <code>/v1/0.1.0/cutpay.js.sri</code>.
+      </p>
+      <CodeBlock language="HTML" label="Pinned, with Subresource Integrity" code={SDK_PINNED} />
       <h3 className="mt-4 font-semibold">On Cutpay&apos;s page</h3>
       <p className="mt-1 text-sm">
         Create a checkout session instead and redirect the customer to the <code>url</code> you get back. They return to your{" "}

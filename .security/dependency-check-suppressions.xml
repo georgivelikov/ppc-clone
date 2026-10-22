@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Findings reviewed and judged not to apply here. Each entry needs a reason and a date to look at it again.
+  Empty on purpose: add an entry only after reading the advisory.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>

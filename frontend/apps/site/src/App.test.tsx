@@ -25,6 +25,13 @@ describe("navigation", () => {
     expect(screen.getByRole("link", { name: "Start for free" })).toHaveAttribute("href", "http://localhost:5173/signup");
   });
 
+  it("has a security page with the disclosure address, linked from the footer", () => {
+    renderAt("/security");
+    expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute("href", "/security");
+    expect(screen.getByRole("heading", { name: "Reporting a vulnerability" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "security@cutpay.example" })).toHaveAttribute("href", "mailto:security@cutpay.example");
+  });
+
   it("shows a not-found page with a way back", () => {
     renderAt("/nothing-here");
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();

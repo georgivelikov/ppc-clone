@@ -1,5 +1,6 @@
 package dev.cutpay.payouts.payout;
 
+import dev.cutpay.crypto.FieldCipher;
 import dev.cutpay.events.InboxGuard;
 import dev.cutpay.events.OutboxWriter;
 import dev.cutpay.payouts.config.PayoutProperties;
@@ -47,14 +48,16 @@ public class PayoutService {
     private final InboxGuard inbox;
     private final Clock clock;
     private final PayoutProperties properties;
+    private final FieldCipher cipher;
 
     public PayoutService(JdbcClient jdbc, OutboxWriter outbox, InboxGuard inbox, Clock clock,
-                         PayoutProperties properties) {
+                         PayoutProperties properties, FieldCipher cipher) {
         this.jdbc = jdbc;
         this.outbox = outbox;
         this.inbox = inbox;
         this.clock = clock;
         this.properties = properties;
+        this.cipher = cipher;
     }
 
     // --- projections of other services' events ----------------------------------------------------
@@ -103,13 +106,16 @@ public class PayoutService {
                     .param("account", accountId).update();
         }
         jdbc.sql("""
-                        INSERT INTO bank_accounts (id, merchant_id, livemode, iban, holder_name, currency, status, created_at)
-                        VALUES (:id, :account, :livemode, :iban, :holder, :currency, 'active', :now)
+                        INSERT INTO bank_accounts (id, merchant_id, livemode, iban, iban_country, iban_last4, holder_name,
+                                                   currency, status, created_at)
+                        VALUES (:id, :account, :livemode, :iban, :country, :last4, :holder, :currency, 'active', :now)
                         """)
                 .param("id", Ids.generate("ba"))
                 .param("account", accountId)
                 .param("livemode", livemode)
-                .param("iban", iban)
+                .param("iban", cipher.encrypt(iban, accountId))
+                .param("country", iban.substring(0, 2))
+                .param("last4", iban.substring(iban.length() - 4))
                 .param("holder", holder)
                 .param("currency", currency)
                 .param("now", Sql.ts(clock.instant()))
@@ -382,7 +388,7 @@ public class PayoutService {
                 .list();
 
         for (Due d : due) {
-            boolean closed = d.iban().endsWith(CLOSED_ACCOUNT_SUFFIX);
+            boolean closed = cipher.decrypt(d.iban(), d.merchantId()).endsWith(CLOSED_ACCOUNT_SUFFIX);
             String status = closed ? "failed" : "paid";
             String failureCode = closed ? "account_closed" : null;
             jdbc.sql("""

@@ -1,0 +1,13 @@
+title = "Cutpay secret scanning"
+
+[extend]
+useDefault = true
+
+# The only findings so far, all examples and test vectors, not credentials. Anything new is a real finding to look at.
+[[allowlists]]
+description = "Test vectors and documentation placeholders"
+paths = [
+  '''backend/services/identity/src/test/java/dev/cutpay/identity/TotpTest\.java''',   # RFC 6238 test secret
+  '''frontend/apps/site/src/pages/docs/GettingStartedPage\.tsx''',                    # example client_secret in the docs
+  '''frontend/packages/checkout-js/src/sdk\.test\.ts''',                              # fake client secrets in SDK tests
+]

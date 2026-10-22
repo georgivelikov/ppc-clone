@@ -115,6 +115,30 @@ class PayoutsFlowIT {
     }
 
     @Test
+    void theIbanIsStoredEncryptedAndTheListStillShowsTheLastFourDigits() throws Exception {
+        addBankAccount(WORKING_IBAN);
+
+        String stored = jdbc.sql("SELECT iban FROM bank_accounts WHERE merchant_id = :m").param("m", merchant)
+                .query(String.class).single();
+        assertThat(stored).startsWith("local:v1:").doesNotContain(WORKING_IBAN).doesNotContain("5678");
+
+        mvc.perform(get("/v1/bank_accounts").with(asMerchant()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].country").value("BG"))
+                .andExpect(jsonPath("$.data[0].iban_last4").value("5678"));
+    }
+
+    @Test
+    void aClosedAccountIsStillRecognisedThroughTheEncryption() throws Exception {
+        fundsAvailable(5_000);
+        addBankAccount(CLOSED_IBAN);
+        assertThat(payouts.createScheduledPayout(group)).isPresent();
+        advance(Duration.ofMinutes(2));
+        payouts.settleDuePayouts(10);
+        assertThat(onlyPayoutStatus()).isEqualTo("failed");
+    }
+
+    @Test
     void aFrozenBusinessKeepsItsMoneyUntilTheHoldIsLifted() throws Exception {
         fundsAvailable(5_000);
         addBankAccount(WORKING_IBAN);

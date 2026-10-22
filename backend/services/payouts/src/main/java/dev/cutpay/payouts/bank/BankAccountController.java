@@ -1,5 +1,6 @@
 package dev.cutpay.payouts.bank;
 
+import dev.cutpay.crypto.FieldCipher;
 import dev.cutpay.money.Iban;
 import dev.cutpay.payouts.payout.Sql;
 import dev.cutpay.web.ApiException;
@@ -47,24 +48,27 @@ class BankAccountController {
 
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final FieldCipher cipher;
 
-    BankAccountController(JdbcClient jdbc, Clock clock) {
+    BankAccountController(JdbcClient jdbc, Clock clock, FieldCipher cipher) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.cipher = cipher;
     }
 
     @GetMapping("/v1/bank_accounts")
     BankAccountList list(@AuthenticationPrincipal Jwt jwt, @RequestParam(name = "livemode", defaultValue = "false") boolean requestedLivemode) {
         boolean livemode = RequestMode.resolve(jwt.getClaimAsBoolean("livemode"), requestedLivemode);
         List<BankAccountView> accounts = jdbc.sql("""
-                        SELECT id, iban, holder_name, currency, status, livemode, created_at
+                        SELECT id, iban_country, iban_last4, holder_name, currency, status, livemode, created_at
                           FROM bank_accounts
                          WHERE merchant_id = :merchant AND livemode = :livemode AND status = 'active'
                          ORDER BY id DESC
                         """)
                 .param("merchant", merchant(jwt))
                 .param("livemode", livemode)
-                .query((rs, n) -> view(rs.getString("id"), rs.getString("iban"), rs.getString("holder_name"),
+                .query((rs, n) -> view(rs.getString("id"), rs.getString("iban_country"), rs.getString("iban_last4"),
+                        rs.getString("holder_name"),
                         rs.getString("currency").trim(), rs.getString("status"), rs.getBoolean("livemode"),
                         Sql.instant(rs, "created_at")))
                 .list();
@@ -87,19 +91,23 @@ class BankAccountController {
         String id = Ids.generate("ba");
         Instant now = clock.instant();
         jdbc.sql("""
-                        INSERT INTO bank_accounts (id, merchant_id, livemode, iban, holder_name, currency, status,
-                                                   created_at)
-                        VALUES (:id, :merchant, :livemode, :iban, :holder, :currency, 'active', :createdAt)
+                        INSERT INTO bank_accounts (id, merchant_id, livemode, iban, iban_country, iban_last4,
+                                                   holder_name, currency, status, created_at)
+                        VALUES (:id, :merchant, :livemode, :iban, :country, :last4, :holder, :currency, 'active',
+                                :createdAt)
                         """)
                 .param("id", id)
                 .param("merchant", merchant(jwt))
                 .param("livemode", livemode)
-                .param("iban", iban)
+                .param("iban", cipher.encrypt(iban, merchant(jwt)))
+                .param("country", iban.substring(0, 2))
+                .param("last4", Iban.last4(iban))
                 .param("holder", request.holderName().trim())
                 .param("currency", currency)
                 .param("createdAt", Sql.ts(now))
                 .update();
-        return view(id, iban, request.holderName().trim(), currency, "active", livemode, now);
+        return view(id, iban.substring(0, 2), Iban.last4(iban), request.holderName().trim(), currency, "active",
+                livemode, now);
     }
 
     /** Removing keeps the row: past payouts still point at it. */
@@ -122,10 +130,9 @@ class BankAccountController {
         return new Deleted(id, "bank_account", true);
     }
 
-    private static BankAccountView view(String id, String iban, String holder, String currency, String status,
-                                        boolean livemode, Instant created) {
-        return new BankAccountView(id, "bank_account", iban.substring(0, 2), Iban.last4(iban), holder, currency,
-                status, livemode, created);
+    private static BankAccountView view(String id, String country, String last4, String holder, String currency,
+                                        String status, boolean livemode, Instant created) {
+        return new BankAccountView(id, "bank_account", country, last4, holder, currency, status, livemode, created);
     }
 
     private static String merchant(Jwt jwt) {

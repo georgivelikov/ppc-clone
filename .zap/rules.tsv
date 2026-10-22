@@ -1,0 +1,7 @@
+# ZAP baseline rules for the checkout page. Columns: rule id, action (IGNORE|WARN|FAIL), comment.
+# Everything not listed uses the default (WARN). Set a rule to FAIL once its finding has been understood and fixed.
+10020	FAIL	(Anti-clickjacking header missing)
+10021	FAIL	(X-Content-Type-Options missing)
+10038	FAIL	(Content-Security-Policy header not set)
+10055	FAIL	(CSP: wildcard or unsafe directive)
+10049	IGNORE	(Storable and cacheable content: the page is a static app shell with no personal data in it)

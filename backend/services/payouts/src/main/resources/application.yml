@@ -46,3 +46,12 @@ cutpay:
     bank-delay: PT1M
     # Fee for a manual "pay out now" payout, in basis points (100 = 1%).
     instant-fee-bps: 100
+  crypto:
+    # Bank account numbers are encrypted by Vault's transit engine before they reach the database (ADR 0034).
+    # The dev token and bootstrap (create the transit mount and key) are for the local Vault in infra/docker-compose.yml.
+    provider: vault
+    vault:
+      address: ${VAULT_ADDR:http://localhost:8200}
+      token: ${VAULT_TOKEN:cutpay-dev-root}
+      key: cutpay-pii
+      bootstrap: ${VAULT_BOOTSTRAP:true}

@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":libs:common-money"))
     implementation(project(":libs:common-web"))
     implementation(project(":libs:common-events"))
+    implementation(project(":libs:common-crypto"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
