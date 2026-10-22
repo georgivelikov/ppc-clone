@@ -3,7 +3,9 @@ name: cutpay
 services:
   postgres:
     image: postgres:16-alpine
-    command: ["postgres", "-c", "max_connections=300"]
+    # wal_level=logical lets Debezium read changes from the database log (docs/adr/0038-change-data-capture.md);
+    # it costs a little extra log volume and nothing else while no connector is registered.
+    command: ["postgres", "-c", "max_connections=300", "-c", "wal_level=logical", "-c", "max_replication_slots=20", "-c", "max_wal_senders=20"]
     environment:
       POSTGRES_USER: cutpay
       POSTGRES_PASSWORD: cutpay
@@ -158,6 +160,29 @@ services:
     ports:
       - "3000:3000"
     depends_on: [prometheus, tempo, loki]
+
+  # Change data capture: Debezium reads the outbox tables from Postgres' log and publishes them to Kafka, in place of
+  # the polling relay inside each service.  docker compose -f infra/docker-compose.yml --profile cdc up -d connect
+  # then  node infra/cdc/register.mjs payments   (see infra/cdc/README.md)
+  connect:
+    profiles: [cdc]
+    image: quay.io/debezium/connect:3.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: cutpay-connect
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    ports:
+      - "8095:8083"   # Kafka Connect REST (8083 is the acquirer simulator on the host)
 
   # Network faults between services (latency, stalls, cut connections): docs/chaos, experiment 6.
   #   docker compose -f infra/docker-compose.yml --profile chaos up -d toxiproxy

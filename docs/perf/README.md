@@ -72,3 +72,6 @@ Delivery workers claim 20 deliveries per poll, send them on virtual threads and 
 - **`api_request_logs` retention.** There is no such table: request history is in the logs (Loki, with its own retention). If it is added, it should be partitioned by day and the oldest partition dropped.
 - **Batch consumers, projections for the list, index tuning with `EXPLAIN ANALYZE`.** The list query already uses `payment_intents_merchant_idx` and runs in under a millisecond; the cost was in the application, not in missing indexes.
 - **Multiple instances.** Horizontal scale is how the 200/s target would be met; it needs a real cluster (see the deployment slice).
+
+## Outbox: polling relay against Debezium
+Commit-to-Kafka wait of an event, measured with `perf/relay-lag.mjs` (details and cutover in `docs/adr/0038-change-data-capture.md`): polling p50 256 ms / p95 518 ms; Debezium with the default poll interval the same (p50 266 ms); tuned (`poll.interval.ms=20`) p50 16 ms / p95 29 ms, and in a 16-way burst p50 48 ms / p95 84 ms against 349 / 611 for polling. End to end (payment to webhook received) both were about 0.8 s, because the consumers and the webhook worker's own poll dominate.

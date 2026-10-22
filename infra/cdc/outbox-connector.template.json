@@ -1,0 +1,35 @@
+{
+  "name": "__SERVICE__-outbox",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "cutpay",
+    "database.password": "cutpay",
+    "database.dbname": "__SERVICE__",
+    "topic.prefix": "cdc___SERVICE__",
+    "slot.name": "debezium___SERVICE__",
+    "publication.name": "dbz___SERVICE__",
+    "publication.autocreate.mode": "filtered",
+    "table.include.list": "public.outbox",
+    "tombstones.on.delete": "false",
+    "snapshot.mode": "no_data",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.table.field.event.id": "event_id",
+    "transforms.outbox.table.field.event.key": "event_key",
+    "transforms.outbox.table.field.event.payload": "payload",
+    "transforms.outbox.table.fields.additional.placement": "event_id:header:event_id,event_type:header:event_type,traceparent:header:traceparent",
+    "transforms.outbox.route.by.field": "topic",
+    "transforms.outbox.route.topic.replacement": "${routedByValue}",
+    "transforms.outbox.table.expand.json.payload": "false",
+
+    "poll.interval.ms": "20",
+    "heartbeat.interval.ms": "10000"
+  }
+}
