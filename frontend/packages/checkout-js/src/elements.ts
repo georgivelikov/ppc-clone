@@ -1,3 +1,4 @@
+import { randomUUID } from "./uuid";
 import {
   parseFrameMessage,
   wrap,
@@ -97,7 +98,7 @@ export class CardElement {
         error: { type: "validation_error", code: "element_not_mounted", message: "Mount the card element first." },
       });
     }
-    const requestId = crypto.randomUUID();
+    const requestId = randomUUID();
     return new Promise<ConfirmResult>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);

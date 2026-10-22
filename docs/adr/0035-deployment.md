@@ -15,9 +15,9 @@ Until now the system ran from `docker compose` plus `bootRun`. A production-shap
 - **Releases.** Argo CD applies the chart from `main` (GitOps, with self-heal), and payments can be released as an Argo Rollouts canary that adopts the Deployment's pod template. Migrations follow expand/contract so old and new versions can share a database during a canary or a rollback (written down in `deploy/README.md`).
 
 ## Not done
-- **Not run in a cluster.** The chart lints, renders and validates against the schemas of every resource it uses, operator resources included, and the images were built and run; but no cluster (kind) was available, so the first install will likely need small fixes. The environment variable names come from the `application.yml` keys and are the most likely place for one.
+- **Not exercised beyond a smoke journey.** The chart was installed on kind and the browser canary (sign up, pay on the hosted checkout, see the payment) passed against it, with KEDA scalers ready. The full Playwright suite was not run against the cluster; failover, backups and upgrades of the operators were not tried. The install found four defects (Strimzi's API version and supported Kafka versions, nginx and KEDA needing fully-qualified service names, and a front-end call that fails on plain http); see `deploy/README.md`.
 - Network policies, mutual TLS, cert-manager TLS, a secret manager and real resource sizing are listed in `deploy/README.md` as what a real environment adds.
-- Debezium in place of the polling outbox relay is a separate piece of work, not part of this slice.
+- Debezium in place of the polling outbox relay is covered separately (ADR 0038).
 
 ## Consequences
 - A single Dockerfile means a build per service downloads Gradle dependencies; a BuildKit cache mount keeps that tolerable locally. CI builds two images as a smoke test, not all eighteen.

@@ -25,7 +25,8 @@ spec:
           ports:
             - {name: http, containerPort: 8080}
           env:
-            - {name: GATEWAY_URL, value: "http://gateway:8080"}
+            # Fully qualified: nginx does not use the search domains, so a short name would go to the outside DNS.
+            - {name: GATEWAY_URL, value: "http://gateway.{{ $.Release.Namespace }}.svc.cluster.local:8080"}
             - {name: DNS_RESOLVER, value: {{ $.Values.dnsResolver | quote }}}
           readinessProbe:
             httpGet: {path: /, port: http}

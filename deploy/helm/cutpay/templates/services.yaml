@@ -121,7 +121,8 @@ spec:
   triggers:
     - type: kafka
       metadata:
-        bootstrapServers: {{ $.Values.kafka.bootstrap | quote }}
+        # KEDA runs in another namespace, so the short service name does not resolve for it.
+        bootstrapServers: {{ printf "%s.%s.svc:9092" (index (splitList ":" $.Values.kafka.bootstrap) 0) $.Release.Namespace | quote }}
         consumerGroup: {{ $svc.keda.group | default $name | quote }}
         lagThreshold: {{ $svc.keda.lagThreshold | default 500 | quote }}
         offsetResetPolicy: latest

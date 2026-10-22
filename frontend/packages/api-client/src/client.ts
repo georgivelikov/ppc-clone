@@ -1,3 +1,4 @@
+import { randomUUID } from "./uuid";
 import type {
   AuthResponse,
   Balance,
@@ -978,7 +979,7 @@ export class ApiClient {
     if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
     if (useAuth && this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     // One key per user action, reused on the automatic retry after a token refresh so it cannot double-submit.
-    const idempotencyKey = options.idempotencyKey ?? (options.idempotent ? crypto.randomUUID() : undefined);
+    const idempotencyKey = options.idempotencyKey ?? (options.idempotent ? randomUUID() : undefined);
     if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
 
     const response = await this.fetchImpl(this.baseUrl + path, {

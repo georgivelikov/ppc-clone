@@ -13,7 +13,8 @@ deploy/
 ## What was checked, and what was not
 - Both Dockerfiles build and the images start (`kyc-sim` was run and answered its health check as a non-root user; the checkout image was run and its headers inspected, which found and fixed a bug where the card field would have been un-frameable).
 - The chart passes `helm lint`, and the rendered manifests, operator resources included (Strimzi, CloudNativePG, KEDA, Argo Rollouts), validate against their schemas with kubeconform (CI repeats this).
-- **It has not been run in a cluster.** kind and the operators were not available where this was written, so expect to fix small things on the first install (resource sizes, a missing environment variable for a service). The environment variable names were derived from each service's `application.yml` keys, which is where a mistake is most likely.
+- **It was installed on kind (v0.30, Kubernetes 1.34) with Strimzi, CloudNativePG, KEDA and ingress-nginx, and a customer journey was run through it.** All 14 services, 4 web apps and Postgres/Kafka came up Ready; the browser canary (`e2e/canary`, pointed at `http://dashboard.localtest.me`) signed up a merchant, took a card payment on the hosted checkout in 0.4 s and saw it in the dashboard; the four KEDA scalers became ready. The full Playwright suite was not run against the cluster (it starts its own servers and addresses `localhost` in places).
+- **The install found four defects that no schema check could**, all fixed: the current Strimzi serves only `kafka.strimzi.io/v1` (the chart used `v1beta2`, which passes schema validation and is refused by the cluster) and supports only newer Kafka versions than the one first chosen; nginx does not use the pod's DNS search domains, so `gateway` as a name went to the outside DNS and every API call answered 502 (it now uses the full service name); KEDA runs in its own namespace, where the short Kafka service name does not resolve; and the dashboard crashed on creating a payment because `crypto.randomUUID` exists only on https or localhost pages, and the cluster was reached over plain http (the client packages now fall back to `getRandomValues`).
 
 ## Try it on kind
 ```
@@ -23,7 +24,7 @@ kind create cluster --name cutpay --config deploy/kind/kind-config.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
 # Operators: Kafka (Strimzi) and Postgres (CloudNativePG). Optional: KEDA, Argo Rollouts.
-helm install strimzi oci://quay.io/strimzi-helm/strimzi-kafka-operator -n operators --create-namespace
+helm install strimzi oci://quay.io/strimzi-helm/strimzi-kafka-operator -n operators --create-namespace --set watchAnyNamespace=true
 kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
 helm repo add kedacore https://kedacore.github.io/charts && helm install keda kedacore/keda -n keda --create-namespace
 
