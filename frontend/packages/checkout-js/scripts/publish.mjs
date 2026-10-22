@@ -18,10 +18,12 @@ const pinned = join(target, version);
 mkdirSync(pinned, { recursive: true });
 copyFileSync(join(dist, "cutpay.umd.cjs"), join(target, "cutpay.js"));
 copyFileSync(join(dist, "cutpay.esm.js"), join(target, "cutpay.esm.js"));
+copyFileSync(join(dist, "cutpay-button.js"), join(target, "cutpay-button.js"));
 copyFileSync(join(dist, "cutpay.umd.cjs"), join(pinned, "cutpay.js"));
 copyFileSync(join(dist, "cutpay.esm.js"), join(pinned, "cutpay.esm.js"));
+copyFileSync(join(dist, "cutpay-button.js"), join(pinned, "cutpay-button.js"));
 
-for (const file of ["cutpay.js", "cutpay.esm.js"]) {
+for (const file of ["cutpay.js", "cutpay.esm.js", "cutpay-button.js"]) {
   const digest = createHash("sha384").update(readFileSync(join(pinned, file))).digest("base64");
   writeFileSync(join(pinned, `${file}.sri`), `sha384-${digest}\n`);
 }

@@ -70,7 +70,9 @@ function cutpaySdk(): Plugin {
     name: "cutpay-sdk",
     async buildStart() {
       if (process.env.VITEST) return;
-      await build({ root: sdkRoot.pathname.replace(/^\/([A-Za-z]:)/, "$1"), logLevel: "warn" });
+      const root = sdkRoot.pathname.replace(/^\/([A-Za-z]:)/, "$1");
+      await build({ root, logLevel: "warn" });
+      await build({ root, configFile: `${root}vite.button.config.ts`, logLevel: "warn" });
       const publish = new URL("scripts/publish.mjs", sdkRoot).href;
       await import(/* @vite-ignore */ pathToFileURL(new URL(publish).pathname.replace(/^\/([A-Za-z]:)/, "$1")).href);
     },

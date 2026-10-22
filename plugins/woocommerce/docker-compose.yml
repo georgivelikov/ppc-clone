@@ -1,0 +1,57 @@
+# A WordPress with WooCommerce for trying the plugin, next to the Cutpay stack:
+#   docker compose -f plugins/woocommerce/docker-compose.yml up -d
+#   node plugins/woocommerce/integration.mjs        (needs the Cutpay services running, e.g. node e2e/chaos/stack.mjs up)
+# Shop: http://localhost:8099  admin: admin / admin
+name: cutpay-woo
+
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  wordpress:
+    image: wordpress:php8.3-apache
+    depends_on:
+      db: {condition: service_healthy}
+    ports:
+      - "8099:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # the plugin calls the Cutpay API on the host
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wordpress:/var/www/html
+      - ./cutpay-for-woocommerce:/var/www/html/wp-content/plugins/cutpay-for-woocommerce:ro
+
+  # wp-cli shares the WordPress files; run:  docker compose run --rm wpcli wp --info
+  wpcli:
+    image: wordpress:cli-php8.3
+    profiles: ["tools"]
+    depends_on: [wordpress]
+    user: "33:33"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      HOME: /tmp
+    volumes:
+      - wordpress:/var/www/html
+      - ./cutpay-for-woocommerce:/var/www/html/wp-content/plugins/cutpay-for-woocommerce:ro
+
+volumes:
+  wordpress:

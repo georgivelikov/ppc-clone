@@ -10,7 +10,7 @@
     "./protocol": "./src/protocol.ts"
   },
   "scripts": {
-    "build": "vite build && node scripts/publish.mjs",
+    "build": "vite build && vite build -c vite.button.config.ts && node scripts/publish.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

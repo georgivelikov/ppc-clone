@@ -81,6 +81,15 @@ jobs:
             e2e/playwright-report
             e2e/test-results
 
+  woocommerce-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP lint and tests
+        run: |
+          docker run --rm -v "$PWD/plugins/woocommerce/cutpay-for-woocommerce:/p" php:8.3-cli sh -c \
+            'for f in $(find /p -name "*.php"); do php -l "$f" | grep -v "^No syntax" || true; done; php /p/tests/run.php'
+
   deploy:
     runs-on: ubuntu-latest
     steps:

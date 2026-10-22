@@ -43,6 +43,14 @@ const SDK = `<div id="card"></div>
   };
 </script>`;
 
+const BUTTON = `<!-- Opens a payment link -->
+<div data-cutpay-button data-link="${CHECKOUT_URL}/l/your-link"></div>
+
+<!-- Or asks your server for a session: it answers {"url": "..."} -->
+<div data-cutpay-button data-endpoint="/api/pay" data-label="Buy now"></div>
+
+<script src="${CHECKOUT_URL}/v1/cutpay-button.js" async></script>`;
+
 const SDK_PINNED = `<script
   src="${CHECKOUT_URL}/v1/0.1.0/cutpay.js"
   integrity="sha384-..."   <!-- the contents of /v1/0.1.0/cutpay.js.sri -->
@@ -109,6 +117,17 @@ export function GettingStartedPage() {
         <code>/v1/0.1.0/cutpay.js</code> and <code>/v1/0.1.0/cutpay.js.sri</code>.
       </p>
       <CodeBlock language="HTML" label="Pinned, with Subresource Integrity" code={SDK_PINNED} />
+      <h3 className="mt-4 font-semibold">A pay button for any page</h3>
+      <p className="mt-1 text-sm">
+        For a site with no server code, put a button on the page that opens a payment link you made in the dashboard. For
+        prices that depend on a cart, point it at an endpoint on your own server that creates a checkout session (your secret
+        key stays there) and answers with the page to send the customer to.
+      </p>
+      <CodeBlock language="HTML" label="Pay button" code={BUTTON} />
+      <p className="mt-2 text-sm">
+        Using WooCommerce? The <code>Cutpay for WooCommerce</code> plugin does all of this for you: install it, paste your keys,
+        and add the webhook endpoint it shows.
+      </p>
       <h3 className="mt-4 font-semibold">On Cutpay&apos;s page</h3>
       <p className="mt-1 text-sm">
         Create a checkout session instead and redirect the customer to the <code>url</code> you get back. They return to your{" "}
