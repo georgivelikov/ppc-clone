@@ -1,0 +1,43 @@
+# Same policy as the dev server's plugin in apps/checkout/vite.config.ts, strict variant.
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+  include /etc/nginx/snippets/security-headers.conf;
+
+  # The card field is embedded by merchants; every other page refuses to be framed.
+  location /elements/ {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors *" always;
+    # Not try_files: its fallback is an internal redirect that would land in "location /" and take its headers
+    # (frame-ancestors 'none'), which would stop merchants embedding the card field.
+    rewrite ^ /index.html break;
+  }
+
+  # The SDK: cross-origin readable so a merchant can pin it with integrity=; versioned copies never change.
+  location /v1/ {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "public, max-age=300";
+    location ~ ^/v1/[0-9][^/]*/ {
+      include /etc/nginx/snippets/security-headers.conf;
+      add_header Access-Control-Allow-Origin "*" always;
+      add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+  }
+
+  location ~ ^/(checkout|links|invoices|vault)/ {
+    set $gateway ${GATEWAY_URL};
+    resolver ${DNS_RESOLVER} valid=10s;
+    proxy_pass $gateway;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Frame-Options "DENY" always;
+    try_files $uri /index.html;
+  }
+}

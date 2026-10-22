@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cutpay
+description: The Cutpay payments platform - fourteen services, four web apps and (optionally) the stateful platform they need
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

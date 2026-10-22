@@ -80,3 +80,22 @@ jobs:
           path: |
             e2e/playwright-report
             e2e/test-results
+
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chart lints and renders
+        run: |
+          docker run --rm -v "$PWD/deploy/helm:/c" alpine/helm:3.18.4 lint /c/cutpay
+          mkdir -p .render
+          docker run --rm -v "$PWD/deploy/helm:/c" alpine/helm:3.18.4 template cutpay /c/cutpay --set keda.enabled=true --set rollout.enabled=true > .render/all.yaml
+      - name: Manifests are valid, operator resources included
+        run: |
+          docker run --rm -v "$PWD/.render:/m" ghcr.io/yannh/kubeconform:latest -summary -strict \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' /m/all.yaml
+      - name: The images build
+        run: |
+          docker build -q -f backend/Dockerfile --build-arg SERVICE=kyc-sim -t cutpay/kyc-sim:ci backend
+          docker build -q -f frontend/Dockerfile --build-arg APP=checkout -t cutpay/checkout:ci .

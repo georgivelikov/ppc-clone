@@ -1,0 +1,161 @@
+# Defaults suit a kind cluster on a laptop (see deploy/README.md). values-prod-example.yaml shows what changes elsewhere.
+
+image:
+  registry: "cutpay/"       # images are cutpay/<service>:<tag>
+  tag: dev
+  pullPolicy: IfNotPresent  # kind: the images are loaded into the cluster, not pulled
+
+# nginx in the web apps resolves the gateway at request time. kube-dns is the cluster's DNS service.
+dnsResolver: kube-dns.kube-system.svc.cluster.local
+
+hosts:
+  # *.localtest.me resolves to 127.0.0.1, which the kind cluster publishes on port 80.
+  checkout: checkout.localtest.me
+  dashboard: dashboard.localtest.me
+  backoffice: backoffice.localtest.me
+  api: api.localtest.me
+  www: www.localtest.me
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    api: api.localtest.me
+    checkout: checkout.localtest.me
+    dashboard: dashboard.localtest.me
+    backoffice: backoffice.localtest.me
+    site: www.localtest.me
+
+kafka:
+  bootstrap: cutpay-kafka-kafka-bootstrap:9092
+
+postgres:
+  host: cutpay-pg-rw        # CloudNativePG's read-write service for the cluster below
+  secret: cutpay-pg-app     # CloudNativePG creates it: keys username and password
+
+# Operators' resources (Kafka by Strimzi, Postgres by CloudNativePG). Off when the cluster already has them.
+platform:
+  enabled: true
+  kafka: {version: 4.1.0, replicas: 1, storage: 5Gi}
+  postgres: {cluster: cutpay-pg, instances: 1, storage: 5Gi}
+
+devDependencies:
+  enabled: true             # Redis, Mailpit and a dev-mode Vault
+
+keda:
+  enabled: false            # needs KEDA installed; scales the consumers on Kafka lag
+
+defaultResources:
+  requests: {cpu: 100m, memory: 384Mi}
+  limits: {memory: 640Mi}
+
+web:
+  checkout: {}
+  dashboard: {}
+  backoffice: {}
+  site: {}
+
+services:
+  gateway:
+    port: 8080
+    replicas: 1
+    autoscale: {min: 1, max: 4, cpu: 70}
+    env:
+      SPRING_DATA_REDIS_HOST: redis
+      CUTPAY_UPSTREAMS_IDENTITY: http://identity:8081
+      CUTPAY_UPSTREAMS_PAYMENTS: http://payments:8082
+      CUTPAY_UPSTREAMS_ACQUIRER: http://acquirer-sim:8083
+      CUTPAY_UPSTREAMS_LEDGER: http://ledger:8084
+      CUTPAY_UPSTREAMS_PAYOUTS: http://payouts:8085
+      CUTPAY_UPSTREAMS_WEBHOOKS: http://webhooks:8086
+      CUTPAY_UPSTREAMS_LINKS: http://links:8087
+      CUTPAY_UPSTREAMS_BILLING: http://billing:8088
+      CUTPAY_UPSTREAMS_BNPL: http://bnpl:8091
+      CUTPAY_UPSTREAMS_NOTIFICATIONS: http://notifications:8092
+      CUTPAY_UPSTREAMS_REPORTING: http://reporting:8094
+  identity:
+    port: 8081
+    db: identity
+    env:
+      CUTPAY_KYC_URL: http://kyc-sim:8093
+  payments:
+    port: 8082
+    db: payments
+    jwks: true
+    replicas: 2
+    autoscale: {min: 2, max: 6, cpu: 70}
+    env:
+      CUTPAY_CHECKOUT_URL: "http://{{ .Values.hosts.checkout }}"
+      CUTPAY_IDENTITY_URL: http://identity:8081
+      CUTPAY_BNPL_URL: http://bnpl:8091
+      CUTPAY_ACQUIRER_URL: http://acquirer-sim:8083
+  acquirer-sim:
+    port: 8083
+    env:
+      CUTPAY_PAYMENTS_URL: http://payments:8082
+  ledger:
+    port: 8084
+    db: ledger
+    jwks: true
+    keda: {min: 1, max: 3}
+  payouts:
+    port: 8085
+    db: payouts
+    jwks: true
+    env:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: cutpay-dev-root     # dev only: in a real cluster this comes from a Secret and a narrow policy
+  webhooks:
+    port: 8086
+    db: webhooks
+    jwks: true
+    keda: {min: 1, max: 3}
+  links:
+    port: 8087
+    db: links
+    jwks: true
+    env:
+      CUTPAY_LINKS_CHECKOUT_URL: "http://{{ .Values.hosts.checkout }}"
+      CUTPAY_LINKS_PAYMENTS_URL: http://payments:8082
+  billing:
+    port: 8088
+    db: billing
+    jwks: true
+    env:
+      CUTPAY_BILLING_CHECKOUT_URL: "http://{{ .Values.hosts.checkout }}"
+      CUTPAY_BILLING_PAYMENTS_URL: http://payments:8082
+  bnpl-sim:
+    port: 8089
+  bnpl:
+    port: 8091
+    db: bnpl
+    jwks: true
+    env:
+      CUTPAY_BNPL_PAYMENTS_URL: http://payments:8082
+      CUTPAY_BNPL_CALLBACK_BASE_URL: http://bnpl:8091
+      CUTPAY_BNPL_PROVIDERS_SPLITNOW_URL: http://bnpl-sim:8089/splitnow/v1
+      CUTPAY_BNPL_PROVIDERS_LENDO_URL: http://bnpl-sim:8089/lendo/api
+      CUTPAY_BNPL_PROVIDERS_KREDITKO_URL: http://bnpl-sim:8089/kreditko
+      CUTPAY_BNPL_PROVIDERS_PAYLATEREU_URL: http://bnpl-sim:8089/paylatereu/api
+  notifications:
+    port: 8092
+    db: notifications
+    jwks: true
+    keda: {min: 1, max: 3}
+    env:
+      CUTPAY_NOTIFICATIONS_SMTP_HOST: mailpit
+      CUTPAY_NOTIFICATIONS_DASHBOARD_URL: "http://{{ .Values.hosts.dashboard }}"
+  kyc-sim:
+    port: 8093
+  reporting:
+    port: 8094
+    db: reporting
+    jwks: true
+    keda: {min: 1, max: 3}
+    env:
+      CUTPAY_REPORTING_DASHBOARD_URL: "http://{{ .Values.hosts.dashboard }}"
+      CUTPAY_RECONCILIATION_ACQUIRER_URL: http://acquirer-sim:8083
+
+rollout:
+  enabled: false            # Argo Rollouts canary for payments (see deploy/README.md)
+  replicas: 5

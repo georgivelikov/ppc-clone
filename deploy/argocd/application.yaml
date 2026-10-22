@@ -1,0 +1,23 @@
+# GitOps: Argo CD watches this repository and makes the cluster match deploy/helm/cutpay at the commit on main.
+# A deployment is then a merge, and a rollback is a revert. Nobody runs helm by hand against a shared cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cutpay
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/OWNER/ppc-clone.git   # replace with the real repository
+    targetRevision: main
+    path: deploy/helm/cutpay
+    helm:
+      valueFiles: [values.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cutpay
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true     # a change made by hand in the cluster is undone
+    syncOptions: [CreateNamespace=true]

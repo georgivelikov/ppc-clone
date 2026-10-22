@@ -1,0 +1,64 @@
+{{- if .Values.platform.enabled }}
+# Kafka and Postgres are run by operators (Strimzi, CloudNativePG) that must be installed first; see deploy/README.md.
+# An operator is what turns "a database" from a pod into something that fails over, backs up and upgrades itself.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: broker
+  labels:
+    strimzi.io/cluster: cutpay-kafka
+spec:
+  replicas: {{ .Values.platform.kafka.replicas }}
+  roles: [controller, broker]
+  storage:
+    type: jbod
+    volumes:
+      - {id: 0, type: persistent-claim, size: {{ .Values.platform.kafka.storage }}, deleteClaim: false}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: cutpay-kafka
+  annotations:
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+spec:
+  kafka:
+    version: {{ .Values.platform.kafka.version }}
+    listeners:
+      - {name: plain, port: 9092, type: internal, tls: false}
+    config:
+      num.partitions: 3
+      default.replication.factor: {{ .Values.platform.kafka.replicas }}
+      min.insync.replicas: {{ sub (int .Values.platform.kafka.replicas) (ternary 1 0 (gt (int .Values.platform.kafka.replicas) 1)) }}
+      offsets.topic.replication.factor: {{ .Values.platform.kafka.replicas }}
+      transaction.state.log.replication.factor: {{ .Values.platform.kafka.replicas }}
+      transaction.state.log.min.isr: 1
+  entityOperator:
+    topicOperator: {}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.platform.postgres.cluster }}
+spec:
+  instances: {{ .Values.platform.postgres.instances }}
+  storage:
+    size: {{ .Values.platform.postgres.storage }}
+  bootstrap:
+    initdb:
+      database: cutpay
+      owner: cutpay
+      # One database per service: no service can read another's tables.
+      postInitSQL:
+        {{- range $name, $svc := .Values.services }}
+        {{- if $svc.db }}
+        - CREATE DATABASE {{ $svc.db }} OWNER cutpay
+        {{- end }}
+        {{- end }}
+  postgresql:
+    parameters:
+      max_connections: "300"
+  monitoring:
+    enablePodMonitor: false
+{{- end }}

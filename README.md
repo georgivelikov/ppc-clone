@@ -45,7 +45,7 @@ See [docs/plans/README.md](docs/plans/README.md) for the full architecture, conv
 | 6 | [BNPL aggregator](docs/plans/phase-06-bnpl.md) — fake providers, routing engine, circuit breakers | ✅ Built |
 | 7 | [Methods & localisation](docs/plans/phase-07-methods-localisation.md) — wallets, BLIK, FX, i18n | ✅ Built |
 | 8 | [Merchant operations](docs/plans/phase-08-merchant-ops.md) — KYC, team, disputes, reports, back-office | ✅ Built |
-| 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | 🚧 In progress (slices 1-4: observability, resilience and reconciliation, performance, security) |
+| 9 | [Hardening](docs/plans/phase-09-hardening.md) — observability, chaos, performance, security, plugins | 🚧 In progress (slices 1-5: observability, resilience and reconciliation, performance, security, deployment) |
 
 ## Repository layout (target)
 

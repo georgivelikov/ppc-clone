@@ -1,0 +1,29 @@
+{{- if and .Values.rollout.enabled (hasKey .Values.services "payments") }}
+# Canary release of payments with Argo Rollouts. The Rollout takes the pod template from the payments Deployment
+# (workloadRef), so there is one definition of the service, and runs the new version beside the old one: 10% of the
+# pods, a pause to look at the error rate and latency (Grafana, the SLO alerts), then 50%, then all. Aborting
+# (kubectl argo rollouts abort payments) returns to the old version at once. Without a traffic router the share of
+# traffic follows the share of pods; with ingress-nginx or a mesh it can be an exact percentage.
+# Needs the Argo Rollouts controller; off by default.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: payments
+spec:
+  replicas: {{ .Values.rollout.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payments
+  workloadRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payments
+    scaleDown: progressively
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: {duration: 5m}
+        - setWeight: 50
+        - pause: {duration: 5m}
+{{- end }}
