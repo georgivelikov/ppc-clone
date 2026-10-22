@@ -23,7 +23,7 @@ dependencies {
 
     testImplementation(project(":libs:common-test"))
     testImplementation("com.google.zxing:javase:3.5.3")
-    testImplementation("org.wiremock:wiremock-standalone:3.13.1")
+    testImplementation("org.wiremock:wiremock-standalone:3.13.2")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
 }

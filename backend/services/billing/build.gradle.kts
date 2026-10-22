@@ -21,7 +21,7 @@ dependencies {
     implementation("com.github.librepdf:openpdf:2.0.3")
 
     testImplementation(project(":libs:common-test"))
-    testImplementation("org.wiremock:wiremock-standalone:3.13.1")
+    testImplementation("org.wiremock:wiremock-standalone:3.13.2")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
 }
