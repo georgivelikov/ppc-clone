@@ -6,7 +6,7 @@ Six experiments, each a hypothesis, a fault injected while the platform is under
 docker compose -f infra/docker-compose.yml up -d
 (cd backend && ./gradlew bootJar)
 cd e2e
-node chaos/stack.mjs up              # every service as a plain jar, so one can be killed
+node chaos/stack.mjs up              # every service as a plain jar, so one can be killed (stop the containers first: node scripts/stop.mjs --keep-infra)
 docker compose -f ../infra/docker-compose.yml --profile chaos up -d toxiproxy    # experiment 6 only
 node chaos/experiments.mjs           # all six, or: node chaos/experiments.mjs 1 3
 node chaos/stack.mjs down

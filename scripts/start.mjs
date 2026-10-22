@@ -4,14 +4,16 @@
 //   node scripts/start.mjs                everything
 //   node scripts/start.mjs --no-web       infrastructure and backend only
 //   node scripts/start.mjs --no-backend   infrastructure and web apps only
-//   node scripts/start.mjs --build        build the jars even if they exist
+//   node scripts/start.mjs --jars         run the services as plain jars on the host instead of containers
+//                                         (the chaos experiments need this: they kill processes)
+//   node scripts/start.mjs --build        (jars) build the jars even if they exist
 //
 // Stop with: node scripts/stop.mjs
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, openSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PORTS, up } from "../e2e/chaos/stack.mjs";
+import { PORTS, up, waitHealthy } from "../e2e/chaos/stack.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const logs = join(root, "logs");
@@ -50,9 +52,18 @@ async function waitReachable(name, port, timeoutMs = 90_000) {
   throw new Error(`${name} did not answer on port ${port} within ${timeoutMs / 1000} s`);
 }
 
+const jars = args.has("--jars");
+
 function startInfrastructure() {
   console.log("Infrastructure (docker compose)...");
   run("docker", ["compose", "-f", "infra/docker-compose.yml", "up", "-d", "--wait"], root);
+}
+
+async function startContainers() {
+  console.log(`Backend services (${Object.keys(PORTS).length} containers; the first run builds the images)...`);
+  process.env.COMPOSE_PARALLEL_LIMIT = "3";
+  run("docker", ["compose", "-f", "infra/docker-compose.yml", "-f", "infra/docker-compose.apps.yml", "up", "-d", "--build"], root);
+  for (const name of Object.keys(PORTS)) await waitHealthy(name, 240_000);
 }
 
 async function startBackend() {
@@ -86,7 +97,7 @@ async function startWeb() {
 }
 
 if (!args.has("--no-infra")) startInfrastructure();
-if (!args.has("--no-backend")) await startBackend();
+if (!args.has("--no-backend")) await (jars ? startBackend() : startContainers());
 if (!args.has("--no-web")) await startWeb();
 
 console.log(`

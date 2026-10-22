@@ -8,7 +8,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { down } from "../e2e/chaos/stack.mjs";
+import { PORTS, down } from "../e2e/chaos/stack.mjs";
+
+const APPS = Object.keys(PORTS);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const webPidFile = join(root, "scripts", ".web-pids.json");
@@ -32,10 +34,11 @@ if (existsSync(webPidFile)) {
 
 console.log("Stopping backend services...");
 down();
+spawnSync("docker", ["compose", "-f", "infra/docker-compose.yml", "-f", "infra/docker-compose.apps.yml", "stop", ...APPS], { cwd: root, stdio: "inherit", shell: isWindows });
 
 if (!args.has("--keep-infra")) {
   console.log(args.has("--wipe") ? "Removing infrastructure and its data..." : "Stopping infrastructure (data is kept)...");
-  spawnSync("docker", ["compose", "-f", "infra/docker-compose.yml", args.has("--wipe") ? "down" : "stop", ...(args.has("--wipe") ? ["-v"] : [])], {
+  spawnSync("docker", ["compose", "-f", "infra/docker-compose.yml", "-f", "infra/docker-compose.apps.yml", args.has("--wipe") ? "down" : "stop", ...(args.has("--wipe") ? ["-v"] : [])], {
     cwd: root,
     stdio: "inherit",
     shell: isWindows,

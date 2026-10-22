@@ -1,0 +1,179 @@
+# The 14 backend services as containers, on top of the infrastructure in docker-compose.yml:
+#
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.apps.yml up -d --build
+#
+# (node scripts/start.mjs --docker does this.) Every service keeps its usual port on the laptop, so the Vite apps,
+# the e2e tests and the health checks work unchanged. Services reach each other by service name, which is the
+# same wiring the Helm chart uses (deploy/helm/cutpay/values.yaml).
+#
+# The memory limit is what makes this tidier than 14 loose JVMs: each one is capped (the JVM sizes its heap from it
+# and not from the laptop's RAM), and `docker stats` shows what each costs.
+
+x-service: &service
+  restart: unless-stopped
+  mem_limit: 640m
+  environment: &env
+    SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError"
+  depends_on: &deps
+    postgres: {condition: service_healthy}
+    kafka: {condition: service_healthy}
+
+x-db: &db-env
+  SPRING_DATASOURCE_USERNAME: cutpay
+  SPRING_DATASOURCE_PASSWORD: cutpay
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://identity:8081/.well-known/jwks.json
+
+services:
+  gateway:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: gateway}}
+    image: cutpay/gateway:dev
+    ports: ["8080:8080"]
+    depends_on:
+      <<: *deps
+      redis: {condition: service_healthy}
+    environment:
+      <<: *env
+      SPRING_DATA_REDIS_HOST: redis
+      CUTPAY_UPSTREAMS_IDENTITY: http://identity:8081
+      CUTPAY_UPSTREAMS_PAYMENTS: http://payments:8082
+      CUTPAY_UPSTREAMS_ACQUIRER: http://acquirer-sim:8083
+      CUTPAY_UPSTREAMS_LEDGER: http://ledger:8084
+      CUTPAY_UPSTREAMS_PAYOUTS: http://payouts:8085
+      CUTPAY_UPSTREAMS_WEBHOOKS: http://webhooks:8086
+      CUTPAY_UPSTREAMS_LINKS: http://links:8087
+      CUTPAY_UPSTREAMS_BILLING: http://billing:8088
+      CUTPAY_UPSTREAMS_BNPL: http://bnpl:8091
+      CUTPAY_UPSTREAMS_NOTIFICATIONS: http://notifications:8092
+      CUTPAY_UPSTREAMS_REPORTING: http://reporting:8094
+
+  identity:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: identity}}
+    image: cutpay/identity:dev
+    ports: ["8081:8081"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/identity
+      CUTPAY_KYC_URL: http://kyc-sim:8093
+
+  payments:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: payments}}
+    image: cutpay/payments:dev
+    ports: ["8082:8082"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      CUTPAY_IDENTITY_URL: http://identity:8081
+      CUTPAY_BNPL_URL: http://bnpl:8091
+      CUTPAY_ACQUIRER_URL: http://acquirer-sim:8083
+
+  acquirer-sim:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: acquirer-sim}}
+    image: cutpay/acquirer-sim:dev
+    ports: ["8083:8083"]
+    environment:
+      <<: *env
+      CUTPAY_PAYMENTS_URL: http://payments:8082
+
+  ledger:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: ledger}}
+    image: cutpay/ledger:dev
+    ports: ["8084:8084"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ledger
+
+  payouts:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: payouts}}
+    image: cutpay/payouts:dev
+    ports: ["8085:8085"]
+    depends_on:
+      <<: *deps
+      vault: {condition: service_healthy}
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payouts
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: cutpay-dev-root
+
+  webhooks:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: webhooks}}
+    image: cutpay/webhooks:dev
+    ports: ["8086:8086"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/webhooks
+
+  links:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: links}}
+    image: cutpay/links:dev
+    ports: ["8087:8087"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/links
+      CUTPAY_LINKS_PAYMENTS_URL: http://payments:8082
+
+  billing:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: billing}}
+    image: cutpay/billing:dev
+    ports: ["8088:8088"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/billing
+      CUTPAY_BILLING_PAYMENTS_URL: http://payments:8082
+
+  bnpl-sim:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: bnpl-sim}}
+    image: cutpay/bnpl-sim:dev
+    ports: ["8089:8089"]
+
+  bnpl:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: bnpl}}
+    image: cutpay/bnpl:dev
+    ports: ["8091:8091"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bnpl
+      CUTPAY_BNPL_PAYMENTS_URL: http://payments:8082
+      CUTPAY_BNPL_CALLBACK_BASE_URL: http://bnpl:8091
+      CUTPAY_BNPL_PROVIDERS_SPLITNOW_URL: http://bnpl-sim:8089/splitnow/v1
+      CUTPAY_BNPL_PROVIDERS_LENDO_URL: http://bnpl-sim:8089/lendo/api
+      CUTPAY_BNPL_PROVIDERS_KREDITKO_URL: http://bnpl-sim:8089/kreditko
+      CUTPAY_BNPL_PROVIDERS_PAYLATEREU_URL: http://bnpl-sim:8089/paylatereu/api
+
+  notifications:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: notifications}}
+    image: cutpay/notifications:dev
+    ports: ["8092:8092"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notifications
+      CUTPAY_NOTIFICATIONS_SMTP_HOST: mailpit
+
+  kyc-sim:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: kyc-sim}}
+    image: cutpay/kyc-sim:dev
+    ports: ["8093:8093"]
+
+  reporting:
+    <<: *service
+    build: {context: ../backend, dockerfile: Dockerfile, args: {SERVICE: reporting}}
+    image: cutpay/reporting:dev
+    ports: ["8094:8094"]
+    environment:
+      <<: [*env, *db-env]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reporting
+      CUTPAY_RECONCILIATION_ACQUIRER_URL: http://acquirer-sim:8083
