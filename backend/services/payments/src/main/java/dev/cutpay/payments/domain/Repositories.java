@@ -70,6 +70,9 @@ public final class Repositories {
 
         List<PaymentAttempt> findByPaymentIntentIdOrderByCreatedAtAsc(String paymentIntentId);
 
+        /** For lists: the attempts of a whole page of payments in one query. */
+        List<PaymentAttempt> findByPaymentIntentIdInOrderByCreatedAtAsc(java.util.Collection<String> paymentIntentIds);
+
         Optional<PaymentAttempt> findFirstByAcquirerRef(String acquirerRef);
 
         Optional<PaymentAttempt> findFirstByPaymentIntentIdOrderByCreatedAtDesc(String paymentIntentId);

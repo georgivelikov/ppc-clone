@@ -1,7 +1,9 @@
 package dev.cutpay.events;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -23,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class OutboxRelay {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxRelay.class);
-    private static final int BATCH_SIZE = 100;
+    private static final int BATCH_SIZE = 500;
 
     private final JdbcClient jdbc;
     private final KafkaTemplate<String, String> kafka;
@@ -62,31 +64,31 @@ public class OutboxRelay {
                         rs.getString("traceparent")))
                 .list();
 
+        if (rows.isEmpty()) {
+            return 0;
+        }
+        // Hand the whole batch to the producer, then wait for every acknowledgement: one round trip for the batch
+        // instead of one per event. Records with the same key still go out in order.
+        List<CompletableFuture<?>> acks = new ArrayList<>(rows.size());
         for (OutboxRow row : rows) {
             var record = new ProducerRecord<>(row.topic(), row.key(), row.payload());
             record.headers().add("event_id", row.eventId().getBytes(StandardCharsets.UTF_8));
             record.headers().add("event_type", row.eventType().getBytes(StandardCharsets.UTF_8));
-            try {
-                trace.within("outbox publish", row.traceparent(), () -> send(record));
-            } catch (Exception e) {
-                // Roll back so published_at stays NULL for this batch; the next poll retries it.
-                log.warn("Failed to publish outbox event {} to {}: {}", row.eventId(), row.topic(), e.toString());
-                throw new IllegalStateException("Outbox publish failed", e);
-            }
-            jdbc.sql("UPDATE outbox SET published_at = now() WHERE id = :id").param("id", row.id()).update();
+            trace.within("outbox publish", row.traceparent(), () -> acks.add(kafka.send(record)));
         }
-        return rows.size();
-    }
-
-    private void send(ProducerRecord<String, String> record) {
         try {
-            kafka.send(record).get(10, TimeUnit.SECONDS);
+            CompletableFuture.allOf(acks.toArray(CompletableFuture[]::new)).get(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while publishing to " + record.topic(), e);
+            throw new IllegalStateException("Interrupted while publishing the outbox", e);
         } catch (ExecutionException | TimeoutException e) {
-            throw new IllegalStateException(e);
+            // Roll back so published_at stays NULL for this batch; the next poll retries it.
+            log.warn("Failed to publish an outbox batch of {}: {}", rows.size(), e.toString());
+            throw new IllegalStateException("Outbox publish failed", e);
         }
+        long[] ids = rows.stream().mapToLong(OutboxRow::id).toArray();
+        jdbc.sql("UPDATE outbox SET published_at = now() WHERE id = ANY(:ids)").param("ids", ids).update();
+        return rows.size();
     }
 
     private record OutboxRow(long id, String eventId, String topic, String key, String eventType, String payload,

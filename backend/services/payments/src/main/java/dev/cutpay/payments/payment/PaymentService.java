@@ -297,8 +297,14 @@ public class PaymentService {
         int limit = Math.max(1, Math.min(filter.limit(), 100));
         var page = intents.findBy(spec, q -> q.sortBy(Sort.by(Sort.Direction.DESC, "id")).limit(limit + 1).all());
         boolean hasMore = page.size() > limit;
-        var data = page.stream().limit(limit)
-                .map(p -> PaymentView.of(p, attempts.findByPaymentIntentIdOrderByCreatedAtAsc(p.getId()), java.util.List.of(),
+        var shown = page.stream().limit(limit).toList();
+        Map<String, List<PaymentAttempt>> attemptsByPayment = new LinkedHashMap<>();
+        if (!shown.isEmpty()) {
+            attempts.findByPaymentIntentIdInOrderByCreatedAtAsc(shown.stream().map(PaymentIntent::getId).toList())
+                    .forEach(a -> attemptsByPayment.computeIfAbsent(a.getPaymentIntentId(), k -> new ArrayList<>()).add(a));
+        }
+        var data = shown.stream()
+                .map(p -> PaymentView.of(p, attemptsByPayment.getOrDefault(p.getId(), List.of()), List.of(),
                         filter.expand().contains(EXPAND_LATEST_ATTEMPT)))
                 .toList();
         return new PaymentList("list", data, hasMore);

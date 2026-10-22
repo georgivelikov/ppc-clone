@@ -43,6 +43,10 @@ public class ObservabilityDefaults implements EnvironmentPostProcessor {
         defaults.put("spring.datasource.hikari.maximum-pool-size", "10");
         defaults.put("spring.datasource.hikari.idle-timeout", "60000");
 
+        // The topics have three partitions; with one consumer thread per listener a service reads them one after the
+        // other (docs/perf: the ledger drained ~100 events a second). Events with the same key stay in order.
+        defaults.put("spring.kafka.listener.concurrency", "3");
+
         defaults.put("spring.kafka.template.observation-enabled", "true");
         defaults.put("spring.kafka.listener.observation-enabled", "true");
 
